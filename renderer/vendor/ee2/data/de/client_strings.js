@@ -123,7 +123,7 @@ export default {
   // [Array]
   INCURSION_MODS: ['Guatelitzi\'s', 'Xopec\'s', 'Topotante\'s', 'Tacati\'s', 'Matatl\'s', 'of Matatl', 'Citaqualotl\'s', 'of Citaqualotl', 'of Tacati', 'of Guatelitzi', 'of Puhuarte'],
   ITEM_SUPERIOR: /^(.*) \(hochwertig\)$/,
-  ITEM_EXCEPTIONAL: /^Außergewöhnliches (.*)$/,
+  ITEM_EXCEPTIONAL: /^Außergewöhnlich(?:e|er|es|en) (.*)$/,
   MAP_BLIGHTED: /^Befallene (.*)$/,
   MAP_BLIGHT_RAVAGED: /^Extrem befallene (.*)$/,
   ITEM_SYNTHESISED: /^Synthetisiertes (.*)$/,
@@ -162,6 +162,6 @@ export default {
   LOG_LEVEL_UP: /^(?<char_name>.*) \((?<char_class>.*)\) ist jetzt Stufe (?<level>\d+)$/,
   // [Manual]
   LOG_ZONE_GEN: /^Generating level (?<area_level>\d+) area "(?<zone>.*)" with seed (?<seed>\d+)$/,
-  REQUIRES_LINE: /^Erfordert: \s*(?:Stufe[^\d,]*(?<level>\d+))?\D*(?:(?<str>\d+)[^\d,]*(Stärke|Str))?\D*(?:(?<dex>\d+)[^\d,]*(Geschick |Ges ))?\D*(?:(?<int>\d+)[^\d,]*(Intelligenz|Int))?$/,
+  REQUIRES_LINE: /^Erfordert: \s*(?:Stufe[^\d,]*(?<level>\d+))?\D*(?:(?<str>\d+)[^\d,]*(Stärke|Str))?\D*(?:(?<dex>\d+)[^\d,]*(Geschick|Ges))?\D*(?:(?<int>\d+)[^\d,]*(Intelligenz|Int))?$/,
   UNIDENTIFIED: /^Nicht identifiziert(?:\s*\(Level\s*(?<tier>\d+)\))?$/,
 }
