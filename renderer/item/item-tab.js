@@ -1006,7 +1006,7 @@
       name: parsed.rarity === 'Unique'
         ? (parsed.isUnidentified
           ? (unidResolved ? unidResolved.refName : null)
-          : (title || (parsed.info && parsed.info.name)))
+          : ((parsed.info && (parsed.info.refName || parsed.info.name)) || title))
         : null,
       // >1 unique on this base, so which one it is cannot be known from the TEXT - but the
       // player can see the art. The UI shows the candidates and lets them say which, which
