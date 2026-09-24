@@ -890,14 +890,18 @@
     }).filter(Boolean);
 
     const title = ownName(parsed.rawText, parsed.rarity);
+    // Search is posted to www.pathofexile.com, so type/name strings must be the
+    // English trade identity. On translated clients, rare items print a localised
+    // second nameplate line ("Aufseher-Tafel"), while the parser's db match already
+    // knows the canonical refName ("Overseer Tablet"). Prefer that canonical base.
+    //
     // A unique resolves to its UNIQUE entry, so info.refName is the unique's own
-    // name ("Clear Skies") and NOT the base ("Delirium Tablet"). parsed.baseType
-    // carries the real base at every rarity. Taking refName sent a unique tablet's
-    // name as `type` and GGG answered 400 "Unknown item base type"; it also made
-    // the header print the unique's name twice.
-    const baseType = parsed.baseType
-      || (parsed.info && parsed.info.unique && parsed.info.unique.base)
-      || (parsed.info && parsed.info.refName) || (parsed.info && parsed.info.name) || null;
+    // name ("Clear Skies") and NOT the base ("Delirium Tablet"). info.unique.base
+    // carries the real base at every rarity. Taking the unique name as `type` sent
+    // unique tablets to GGG as an unknown item base type and duplicated the header.
+    const baseType = (parsed.info && parsed.info.unique && parsed.info.unique.base)
+      || (parsed.info && (parsed.info.refName || parsed.info.name))
+      || parsed.baseType || null;
     // Capture each mod's PARSE-TIME auto-off classification so the "collapsed
     // modifiers" bracket (item-ui.js) knows which off mods the classifier set
     // aside vs. ones turned off by hand. Sticky - never changes as modes toggle;
