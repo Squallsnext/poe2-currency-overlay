@@ -28,7 +28,9 @@ const RepriceRules = require('./renderer/reprice-rules.js');
 //
 // So: poll. Stop the instant digits are read, which is what makes this cheap - a fast
 // setup exits on the first look and never pays for the rest.
-const POLL_EVERY_MS = 40;   // a frame at a time, not a paint at a time
+// Short: every look already waits for the next VIDEO frame (__rpNextFrame, up to 45ms),
+// which is the real pacing - a 40ms sleep on top of that only added latency per look.
+const POLL_EVERY_MS = 10;
 // How long a successful read stays pasteable, e.g. by the controller's paste button.
 // Long enough to glance at the badge and confirm the number, short enough that a stale
 // result from a different item never gets pasted by an unrelated later press.
@@ -321,6 +323,11 @@ function create(deps) {
     let firstShotAt = null; // ms since t0 when autoGrab FIRST located the field - null means it never did
     let grabMs = 0, readMs = 0; // summed time actually spent in autoGrab/readPrice, vs. spent polling/waiting
     const autoGiveUpMs = (region && region.w > 0) ? AUTO_GIVE_UP_WITH_FALLBACK_MS : GIVE_UP_AFTER_MS;
+    // A number only counts once two consecutive frames read the SAME value. The dialog
+    // draws in over a few frames, and a frame caught mid-draw reads plausibly but wrong -
+    // "14" came back as a confident "11" and the rule then wrote 10 for an item priced
+    // 13+. One extra frame is a small price for not pasting a wrong number into a listing.
+    let prevBase = null;
     while (Date.now() - t0 < autoGiveUpMs) {
       await new Promise((r) => setTimeout(r, POLL_EVERY_MS));
       const wait = Date.now() - t0;
@@ -354,7 +361,8 @@ function create(deps) {
         ? await deps.readPrice(shot, { at: wait, auto: usedAuto, blockH: auto && auto.block ? auto.block.h : 0 })
         : null;
       readMs += Date.now() - tRead;
-      if (base == null) continue;
+      if (base == null) { prevBase = null; continue; }
+      if (base !== prevBase) { prevBase = base; continue; } // wait for a second frame to agree
 
       const ctx = {};
       // Optional. A rule that does not branch on currency never needs it, and an

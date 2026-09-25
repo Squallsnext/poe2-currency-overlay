@@ -759,7 +759,7 @@ window.I18N_CATALOGS.de = {
   "networth.settings.toggle_confidence_label": "OCR-Konfidenz % anzeigen",
   "networth.settings.toggle_confidence_sub": "Zeigt, wie sicher sich der Scan bei jeder Zahl war; niedrige Werte lohnt es sich gegenzuprüfen.",
   "networth.settings.toggle_ocr_debug_label": "OCR-Debugbilder anzeigen",
-  "networth.settings.toggle_ocr_debug_sub": "Zeigt unter jeder Zeile den genauen Ausschnitt, den der Leser gesehen hat, plus einen Button um eine fehlerhafte Ziffern-Vorlage zu vergessen.",
+  "networth.settings.toggle_ocr_debug_sub": "Zeigt unter jeder Zeile den genauen Ausschnitt, den der Leser gesehen hat, mit Reglern zum Einstellen. In der Entwicklerversion speichert es außerdem Debugbilder von Scans und Reprice-Lesungen – aus = nichts wird gespeichert.",
   "networth.settings.toggle_dup_label": "Doppelte Tabs als separate Zeilen erfassen",
   "networth.settings.toggle_dup_sub": "Erneutes Scannen eines Tab-Typs fragt, ob seine Zeile ersetzt oder eine neue hinzugefügt werden soll.",
   "networth.settings.toggle_hires_label": "Zahlen in hoher Auflösung lesen",

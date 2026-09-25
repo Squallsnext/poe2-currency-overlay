@@ -172,7 +172,7 @@
     const res = el('div', 'set-field');
     const resIn = el('div', 'set-inline');
     resIn.appendChild(el('label', null, t('networth.settings.supported_res_label')));
-    resIn.appendChild(el('span', 'set-sub', '1920×1080, 2560×1440'));
+    resIn.appendChild(el('span', 'set-sub', '1920×1080, 2560×1440, 5120×2880'));
     res.appendChild(resIn);
     root.appendChild(res);
 

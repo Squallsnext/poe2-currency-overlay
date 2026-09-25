@@ -764,7 +764,7 @@ window.I18N_CATALOGS.en = {
   "networth.settings.toggle_confidence_label": "Show OCR confidence %",
   "networth.settings.toggle_confidence_sub": "Show how sure the scan was of each count; low numbers are worth double-checking.",
   "networth.settings.toggle_ocr_debug_label": "Show OCR debug images",
-  "networth.settings.toggle_ocr_debug_sub": "Show the exact crop the reader saw under each line, plus a button to forget a misbehaving digit template.",
+  "networth.settings.toggle_ocr_debug_sub": "Show the exact crop the reader saw under each line, with sliders to tune it. In dev builds it also saves debug images of scans and reprice reads - off = nothing is saved.",
   "networth.settings.toggle_dup_label": "Capture duplicate tabs as separate rows",
   "networth.settings.toggle_dup_sub": "Re-capturing a tab type asks whether to replace its row or add a new one.",
   "networth.settings.toggle_hires_label": "Read counts at high resolution",

@@ -3287,15 +3287,17 @@ const reprice = repriceMod.create({
       // DEV BUILDS ONLY. Nobody's installed copy should quietly fill a folder with
       // screenshots of their trades, and that guarantee should not rest on someone
       // remembering to delete this block before a release.
-      if (!app.isPackaged) try {
+      // ...and only while the OCR debug switch is on: this runs on every poll of every
+      // right-click, and a PNG written per look was a measurable part of the reprice delay
+      if (!app.isPackaged && config.stashShowOcrDebug) try {
         const dir = path.join(app.getPath('userData'), 'read-diag');
         fs.mkdirSync(dir, { recursive: true });
         const stamp = new Date().toISOString().replace(/[:.]/g, '-');
         const tag = (r.value == null ? 'NONE' : 'read-' + r.value)
           + (r.text && r.value == null ? '-saw-' + r.text.replace(/[^0-9]/g, '') : '');
         if (shot.url) {
-          fs.writeFileSync(path.join(dir, stamp + '_' + tag + '.png'),
-            Buffer.from(String(shot.url).split(',')[1], 'base64'));
+          fs.promises.writeFile(path.join(dir, stamp + '_' + tag + '.png'),
+            Buffer.from(String(shot.url).split(',')[1], 'base64')).catch(() => {}); // background, never blocks a read
         }
       } catch { /* diagnostics must never break a reprice */ }
       // ===== READDIAG-END ============================================================
@@ -3354,13 +3356,15 @@ const reprice = repriceMod.create({
       // ===== ICONDIAG - dev builds only, see READDIAG ================================
       // The Test read button had diagnostics and the live path did not, so a currency
       // that failed here left nothing behind and the rule silently took its else branch.
-      if (!app.isPackaged) try {
+      // ...and only while the OCR debug switch is on: this runs on every poll of every
+      // right-click, and a PNG written per look was a measurable part of the reprice delay
+      if (!app.isPackaged && config.stashShowOcrDebug) try {
         const dir = path.join(app.getPath('userData'), 'read-diag');
         fs.mkdirSync(dir, { recursive: true });
         const stamp = new Date().toISOString().replace(/[:.]/g, '-');
         if (shot.url) {
-          fs.writeFileSync(path.join(dir, stamp + '_icon-' + (m.family || 'NONE') + '.png'),
-            Buffer.from(String(shot.url).split(',')[1], 'base64'));
+          fs.promises.writeFile(path.join(dir, stamp + '_icon-' + (m.family || 'NONE') + '.png'),
+            Buffer.from(String(shot.url).split(',')[1], 'base64')).catch(() => {}); // background, never blocks a read
         }
         console.log('[icon] ' + shot.w + 'x' + shot.h + ' -> ' + (m.family || 'NO MATCH')
           + ' score ' + m.score.toFixed(3) + ' margin ' + m.margin.toFixed(3)
