@@ -2217,7 +2217,10 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
         filtBuf[dp + 3] = 255;
       }
     }
-    const { binarized } = DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Object.assign({}, P, { floor }), cs);
+    const { shrunk, binarized } = DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Object.assign({}, P, { floor }), cs);
+    // the cut actually applied: binarize() takes the higher of floor and the cell's own
+    // Otsu threshold, so a floor below Otsu does nothing - show which one is in charge
+    const effFloor = Math.max(DR.otsu(shrunk.data), floor);
     const binBuf = Buffer.alloc(binarized.w * binarized.h * 4);
     for (let i = 0; i < binarized.w * binarized.h; i++) {
       const v = binarized.data[i] ? 255 : 0;
@@ -2228,7 +2231,7 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
       rawUrl: toUrl(rawBuf, cw, chh, UPSCALE),
       filtUrl: toUrl(filtBuf, cw, chh, UPSCALE),
       binUrl: toUrl(binBuf, binarized.w, binarized.h, 6),
-      floor, desatSat, contrast,
+      floor, effFloor, desatSat, contrast,
       // what is saved for this slot right now (null = automatic), so the panel can tell
       // "slider moved, not saved yet" from "this is the saved value"
       saved: {

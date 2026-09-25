@@ -661,6 +661,7 @@ window.I18N_CATALOGS.de = {
   "networth.line.confirm_failed_title": "Konnte aus diesem Bild nicht lernen (Ziffern berühren sich oder Icon überlappt) - beim nächsten Scan nochmal versuchen",
   "networth.line.confirm_title": "Bestätigen, dass diese Anzahl stimmt - lehrt den Leser daraus",
   "networth.line.debug_contrast_val": "Kontrast {v}",
+  "networth.line.debug_floor_eff_val": "floor {v} (wirksam: {eff})",
   "networth.line.debug_img_binarized": "Schwarz-Weiß, so wird es mit den Ziffer-Vorlagen verglichen",
   "networth.line.debug_img_filtered": "Nach Sättigung + Kontrast (schwarz = rausgefiltert)",
   "networth.line.debug_img_raw": "Original",

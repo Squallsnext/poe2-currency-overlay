@@ -666,6 +666,7 @@ window.I18N_CATALOGS.en = {
   "networth.line.confirm_failed_title": "Could not learn from this frame (digits touching or overlapping an icon) - try again next scan",
   "networth.line.confirm_title": "Confirm this count is correct - teaches the reader from it",
   "networth.line.debug_contrast_val": "contrast {v}",
+  "networth.line.debug_floor_eff_val": "floor {v} (in effect: {eff})",
   "networth.line.debug_img_binarized": "Black/white, what the digit templates are matched against",
   "networth.line.debug_img_filtered": "After saturation + contrast (black = filtered out)",
   "networth.line.debug_img_raw": "Original",

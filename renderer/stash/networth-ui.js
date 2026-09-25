@@ -371,7 +371,11 @@
             row.appendChild(s); row.appendChild(lab);
             return { row, s, lab, fmt };
           };
-          const floorC = mkRow(60, 200, cached.floor, (v) => 'floor ' + v);
+          // floor label also shows the cut actually applied (the higher of floor and the
+          // cell's automatic threshold), refreshed with each preview
+          const floorFmt = (v) => (cached.effFloor != null && cached.effFloor !== +v
+            ? t('networth.line.debug_floor_eff_val', { v, eff: cached.effFloor }) : 'floor ' + v);
+          const floorC = mkRow(60, 200, cached.floor, floorFmt);
           const satC = mkRow(5, 120, cached.desatSat, (v) => t('networth.line.debug_sat_val', { v }));
           const conC = mkRow(0, 200, cached.contrast, (v) => t('networth.line.debug_contrast_val', { v }));
           const saved = cached.saved || {};
@@ -400,8 +404,9 @@
               if (!res || !res.ok) return;
               rawImg.src = res.rawUrl; filtImg.src = res.filtUrl; binImg.src = res.binUrl;
               showPreview(res.preview);
-              Object.assign(cached, { floor: res.floor, desatSat: res.desatSat, contrast: res.contrast,
+              Object.assign(cached, { floor: res.floor, effFloor: res.effFloor, desatSat: res.desatSat, contrast: res.contrast,
                 rawUrl: res.rawUrl, filtUrl: res.filtUrl, binUrl: res.binUrl, preview: res.preview });
+              floorC.lab.textContent = floorFmt(floorC.s.value);
             }, 120);
           };
           for (const c of [floorC, satC, conC]) {
