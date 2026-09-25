@@ -27,7 +27,7 @@
   //   cellScale per-cell rescale readCellEx must apply (extreme regime only)
   //   px        buffer px per reference px (for size-dependent filters)
   //   orig      the unadjusted source (raw view), src has brightness/contrast applied
-  // `o` = { sat, contrast, bright, gain } - see channelOpts(); all optional.
+  // `o` = { sat, contrast, bright, gain, satPct } - see channelOpts(); all optional.
   function buildChannel(buf, W, H, box, refBox, o) {
     o = o || {};
     const scale = box.h / refBox.h;
@@ -41,7 +41,7 @@
       originX = refBox.x - MARGIN; originY = refBox.y - MARGIN; px = 1;
     }
     const orig = src;
-    src = DR.adjustRGBA(src, W2, H2, o.bright, o.gain);
+    src = DR.adjustRGBA(src, W2, H2, o.bright, o.gain, o.satPct);
     let V = DR.valueChannelDesatMax(src, W2, H2, o.sat == null ? DR.DESAT_SAT : o.sat);
     if (o.contrast) V = DR.contrastGate(V, src, W2, H2, o.contrast, DR.CONTRAST_RADIUS * px);
     return { V, src, orig, W2, H2, originX, originY, cellScale, px, scale };
@@ -55,9 +55,10 @@
       contrast: ov && ov.contrast ? ov.contrast : 0,
       bright: ov && ov.bright ? ov.bright : 0,
       gain: ov && ov.gain != null ? ov.gain : 100,
+      satPct: ov && ov.satPct != null ? ov.satPct : 100,
     };
   }
-  function channelKey(o) { return [o.sat, o.contrast || 0, o.bright || 0, o.gain == null ? 100 : o.gain].join('|'); }
+  function channelKey(o) { return [o.sat, o.contrast || 0, o.bright || 0, o.gain == null ? 100 : o.gain, o.satPct == null ? 100 : o.satPct].join('|'); }
 
   // A slot's centre in channel coordinates. `ov` is the slot's saved override (may be
   // null, and may carry only floor/saturation/contrast with no position).

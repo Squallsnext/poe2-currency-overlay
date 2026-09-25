@@ -676,6 +676,7 @@ window.I18N_CATALOGS.de = {
   "networth.line.debug_reset_button": "Zurück auf automatisch",
   "networth.line.debug_reset_title": "Gespeicherte Werte für dieses Feld löschen, der Leser entscheidet wieder selbst. • = gespeichert",
   "networth.line.debug_sat_val": "Farb-Grenze {v}",
+  "networth.line.debug_satpct_val": "Sättigung {v}% (0 = grau)",
   "networth.line.debug_save_button": "Speichern",
   "networth.line.debug_status_auto": "automatisch (nichts gespeichert)",
   "networth.line.debug_status_changed": "geändert, noch nicht gespeichert",

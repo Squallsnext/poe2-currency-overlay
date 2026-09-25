@@ -373,6 +373,9 @@
           const floorFmt = (v) => (cached.effFloor != null && cached.effFloor !== +v
             ? t('networth.line.debug_floor_eff_val', { v, eff: cached.effFloor }) : 'floor ' + v);
           const specs = [
+            // real saturation of the colour source (0 = grey): the reader's brightness is
+            // max(R,G,B), so pure red/blue count as bright as white until greyed out
+            { key: 'satPct', min: 0, max: 200, step: 5, fmt: (v) => t('networth.line.debug_satpct_val', { v }) },
             // brightness/contrast of the colour source before every filter (test)
             { key: 'bright', min: -100, max: 50, step: 5, fmt: (v) => t('networth.line.debug_bright_val', { v }) },
             { key: 'gain', min: 40, max: 150, step: 5, fmt: (v) => t('networth.line.debug_gain_val', { v }) },
@@ -470,7 +473,7 @@
           stdBtn.onclick = (e) => { e.stopPropagation(); if (cached.defaults) setAll(cached.defaults, false); };
           const offBtn = el('button', 'nw-dbg-pin', t('networth.line.debug_preset_off'));
           offBtn.title = t('networth.line.debug_preset_off_title');
-          offBtn.onclick = (e) => { e.stopPropagation(); setAll({ bright: 0, gain: 100, desatSat: 255, contrast: 0, minBlob: 0 }, true); };
+          offBtn.onclick = (e) => { e.stopPropagation(); setAll({ satPct: 100, bright: 0, gain: 100, desatSat: 255, contrast: 0, minBlob: 0 }, true); };
           presetRow.appendChild(stdBtn); presetRow.appendChild(offBtn);
           btnRow.appendChild(saveBtn);
           if (hasSaved) btnRow.appendChild(resetBtn);

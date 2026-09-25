@@ -681,6 +681,7 @@ window.I18N_CATALOGS.en = {
   "networth.line.debug_reset_button": "Back to automatic",
   "networth.line.debug_reset_title": "Delete the saved values for this slot, the reader decides on its own again. • = saved",
   "networth.line.debug_sat_val": "colour limit {v}",
+  "networth.line.debug_satpct_val": "saturation {v}% (0 = grey)",
   "networth.line.debug_save_button": "Save",
   "networth.line.debug_status_auto": "automatic (nothing saved)",
   "networth.line.debug_status_changed": "changed, not saved yet",

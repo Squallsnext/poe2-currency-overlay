@@ -779,20 +779,31 @@
     return out;
   }
 
-  // Brightness/contrast on the colour source BEFORE any filter - classic image-editor
-  // style: out = (v - 128) * gain/100 + 128 + bright, per channel, clamped. Returns a new
-  // buffer (alpha untouched); bright 0 + gain 100 returns buf itself.
-  function adjustRGBA(buf, W, H, bright, gain) {
-    bright = bright || 0; gain = gain == null ? 100 : gain;
-    if (!bright && gain === 100) return buf;
-    const lut = new Uint8Array(256), k = gain / 100;
+  // Saturation + brightness/contrast on the colour source BEFORE any filter, image-editor
+  // style. Saturation first: each channel is pulled toward the pixel's grey (the MEAN of
+  // its channels - order-agnostic, like everything here, since the buffer may be RGBA or
+  // BGRA) by satPct/100: 0 = fully grey, 100 = unchanged, 200 = twice as colourful. This
+  // matters because the reader's brightness is max(R,G,B): a pure red (255,0,0) is as
+  // "bright" as white to it, but greyed out it is 85 - clearly darker than a white digit.
+  // Then out = (v - 128) * gain/100 + 128 + bright, clamped. Returns a new buffer (alpha
+  // untouched); all-neutral settings return buf itself.
+  function adjustRGBA(buf, W, H, bright, gain, satPct) {
+    bright = bright || 0; gain = gain == null ? 100 : gain; satPct = satPct == null ? 100 : satPct;
+    if (!bright && gain === 100 && satPct === 100) return buf;
+    const lut = new Uint8Array(256), k = gain / 100, sk = satPct / 100;
     for (let v = 0; v < 256; v++) {
       const o = Math.round((v - 128) * k + 128 + bright);
       lut[v] = o < 0 ? 0 : (o > 255 ? 255 : o);
     }
+    const clamp = (v) => (v < 0 ? 0 : (v > 255 ? 255 : Math.round(v)));
     const out = Buffer.alloc(W * H * 4);
     for (let p = 0; p < W * H * 4; p += 4) {
-      out[p] = lut[buf[p]]; out[p + 1] = lut[buf[p + 1]]; out[p + 2] = lut[buf[p + 2]]; out[p + 3] = buf[p + 3];
+      let a = buf[p], g = buf[p + 1], c = buf[p + 2];
+      if (sk !== 1) {
+        const m = (a + g + c) / 3;
+        a = clamp(m + (a - m) * sk); g = clamp(m + (g - m) * sk); c = clamp(m + (c - m) * sk);
+      }
+      out[p] = lut[a]; out[p + 1] = lut[g]; out[p + 2] = lut[c]; out[p + 3] = buf[p + 3];
     }
     return out;
   }
