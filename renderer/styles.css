@@ -1220,6 +1220,7 @@ footer {
 .nw-card-adjust { flex: 0 0 auto; background: transparent; border: 1px solid var(--am-hi); color: var(--am-hi);
   cursor: pointer; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-right: 6px; }
 .nw-card-adjust:hover { background: color-mix(in srgb, var(--am-hi) 15%, transparent); }
+.nw-card-adjust-on { background: color-mix(in srgb, var(--am-hi) 22%, transparent); }
 .nw-card-total { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto; }
 .nw-card-total .nw-ex { color: var(--tx-gold); font-size: 15px; font-weight: 700; }
 .nw-card-total .nw-div { color: var(--tx-dim); font-size: 12px; }

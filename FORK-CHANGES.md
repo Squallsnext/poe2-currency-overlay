@@ -132,6 +132,11 @@ preview and teach alike:
   saved sliders are marked with •; **Back to automatic** clears the slot.
 - **Standard** / **All filters off** presets (preview only).
 - **Copy / Paste** settings between slots (paste saves directly).
+- **Apply to whole tab:** saves the current slot's sliders onto every slot of that stash
+  tab (with a confirmation), for the common case of one well-tuned slot fitting the tab.
+- **Per-tab debug:** the global "Show OCR debug images" switch only adds a **Debug** button
+  to each tab card; previews (each a full re-read) are built only for tabs switched on
+  there. With four tabs debugging at once, the load was noticeable.
 - **Learn from this image**: teaches from exactly the black/white cell on screen with the
   current (even unsaved) sliders; reports "found N parts, expected M digits" instead of
   learning garbage.

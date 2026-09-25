@@ -20,7 +20,7 @@
   const fmtDiv = (n) => n == null ? null : (n >= 100 ? Math.round(n) : n.toFixed(1)).toLocaleString('en-US') + ' ' + unit(t('networth.unit.div_label'), 'divine');
   const fmtCount = (n) => Number(n).toLocaleString('en-US');
 
-  const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, showOcrDebug: false, hiRes: false, showRel: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null, wizard: null };
+  const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, showOcrDebug: false, hiRes: false, showRel: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null, wizard: null, debugRows: new Set() };
   // apiId -> {rawUrl, binUrl} | 'loading', for the OCR-debug toggle. Cleared on every
   // fresh capture (see onStashCaptured below) and per-slot after a teach/forget, since
   // either changes what the NEXT fetch of that slot would show.
@@ -166,6 +166,7 @@
       if (weak && !state.showOcrDebug) {
         btn(t('networth.wizard.s5_debug'), () => {
           state.showOcrDebug = true; try { window.api.setStashShowOcrDebug(true); } catch {}
+          const wr = rowsOfType(w.tab); if (wr.length) { const last = wr[wr.length - 1]; state.debugRows.add(last.id); state.expanded[last.id] = true; }
           state.showConfidence = true; try { window.api.setStashShowConfidence(true); } catch {}
           render();
         });
@@ -389,6 +390,20 @@
       };
       head.appendChild(adj);
     }
+    // OCR debug per TAB: the global switch only makes this button available; the images,
+    // sliders and previews are built just for the tab(s) switched on here. With debug on
+    // for every tab at once, four tabs of previews (each a full re-read) were a real load.
+    if (state.showOcrDebug) {
+      const on = state.debugRows.has(row.id);
+      const dbgBtn = el('button', 'nw-card-adjust' + (on ? ' nw-card-adjust-on' : ''), t(on ? 'networth.row.debug_on' : 'networth.row.debug_off'));
+      dbgBtn.title = t('networth.row.debug_title');
+      dbgBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (on) state.debugRows.delete(row.id); else { state.debugRows.add(row.id); state.expanded[row.id] = true; }
+        render();
+      };
+      head.appendChild(dbgBtn);
+    }
     const rowEx = rowTotalEx(r);
     const tot = el('div', 'nw-card-total' + (rowEdited(r) ? ' nw-edited' : ''));
     tot.appendChild(el('span', 'nw-ex', fmtEx(rowEx)));
@@ -500,7 +515,7 @@
       // number (the count field above already teaches on a real correction) or confirm it
       // (the checkmark above already teaches on confirmation), and if the digit templates
       // themselves seem to be the problem, forget them and let them rebuild from scratch.
-      if (state.showOcrDebug && !ln.missing && window.api.stashSlotDebugImage) {
+      if (state.showOcrDebug && state.debugRows.has(row.id) && !ln.missing && window.api.stashSlotDebugImage) {
         const dbg = el('div', 'nw-dbg');
         const cached = dbgImgCache[ln.apiId];
         if (cached === 'loading') {
@@ -693,7 +708,27 @@
             body.hidden = !isOpen();
             toggleBtn.textContent = (isOpen() ? '▾ ' : '▸ ') + t('networth.line.debug_settings_toggle');
           };
-          topRow.appendChild(toggleBtn); topRow.appendChild(copyBtn); topRow.appendChild(pasteBtn);
+          // "for the whole tab": this slot's current sliders onto EVERY slot of this tab, in
+          // one go - the usual case is one well-tuned slot (e.g. the first Transmutation) whose
+          // settings suit the whole tab. Saved directly; floor stays automatic if it is here.
+          const allBtn = el('button', 'nw-dbg-pin', t('networth.line.debug_apply_tab'));
+          allBtn.title = t('networth.line.debug_apply_tab_title');
+          allBtn.onclick = async (e) => {
+            e.stopPropagation();
+            const ids = [...new Set((row.result.lines || []).map((l) => l.apiId))];
+            const tabName = TAB_LABEL[row.tab] || row.tab;
+            if (!window.confirm(t('networth.line.debug_apply_tab_confirm', { n: ids.length, tab: tabName }))) return;
+            allBtn.disabled = true;
+            const out = values();
+            if (!touched.has('floor') && saved.floor == null) out.floor = null;
+            for (const id of ids) {
+              try { await window.api.stashSlotSaveReadSettings(id, out); } catch {}
+              delete dbgImgCache[id];
+            }
+            state.notice = { kind: 'ok', msg: t('networth.line.debug_apply_tab_done', { n: ids.length, tab: tabName, hotkey: state.hotkey }) };
+            render();
+          };
+          topRow.appendChild(toggleBtn); topRow.appendChild(copyBtn); topRow.appendChild(pasteBtn); topRow.appendChild(allBtn);
           btnRow.appendChild(saveBtn);
           if (hasSaved) btnRow.appendChild(resetBtn);
           btnRow.appendChild(status);
