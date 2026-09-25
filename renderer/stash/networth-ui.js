@@ -35,11 +35,10 @@
   // the median of up to 30, so copies drown out variety instead of adding it). A WRONG
   // read is always teachable, whatever its confidence.
   const LEARN_BELOW = 0.75;
-  // OCR-debug settings section open/closed - one choice for every slot's panel,
-  // remembered across restarts. Closed by default: the sliders are only needed while
-  // tuning, and a closed section keeps the list from jumping on every re-render.
-  let dbgSettingsOpen = false;
-  try { dbgSettingsOpen = localStorage.getItem('nwDbgSettingsOpen') === '1'; } catch { /* storage blocked */ }
+  // OCR-debug settings section: closed by default, opened per slot (apiId) - only the
+  // one being tuned. Kept across re-renders (so a save doesn't snap it shut), not across
+  // restarts.
+  const dbgSettingsOpen = new Set();
   const TAB_LABEL = { currency: t('networth.tab.currency'), abyss: t('networth.tab.abyss'), essence: t('networth.tab.essence'), runes: t('networth.tab.runes'), 'runes-kalguuran': t('networth.tab.runes_kalguuran'), ritual: t('networth.tab.ritual'), soulcore: t('networth.tab.soulcore'), idol: t('networth.tab.idol'), 'ancient-augment': t('networth.tab.ancient_augment'), delirium: t('networth.tab.delirium'), breach: t('networth.tab.breach'), expedition: t('networth.tab.expedition') };
   const MIRROR_ICON = 'https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lEdXBsaWNhdGUiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/26bc31680e/CurrencyDuplicate.png';
 
@@ -541,17 +540,16 @@
           // a slot doesn't need its sliders open - "Speichern" does, and lives inside)
           const topRow = el('div', 'nw-dbg-floor-row');
           const body = el('div', 'nw-dbg-body');
-          body.hidden = !dbgSettingsOpen;
-          const toggleBtn = el('button', 'nw-dbg-pin', (dbgSettingsOpen ? '▾ ' : '▸ ') + t('networth.line.debug_settings_toggle'));
+          const isOpen = () => dbgSettingsOpen.has(ln.apiId);
+          body.hidden = !isOpen();
+          const toggleBtn = el('button', 'nw-dbg-pin', (isOpen() ? '▾ ' : '▸ ') + t('networth.line.debug_settings_toggle'));
           toggleBtn.onclick = (e) => {
             e.stopPropagation();
-            dbgSettingsOpen = !dbgSettingsOpen;
-            try { localStorage.setItem('nwDbgSettingsOpen', dbgSettingsOpen ? '1' : '0'); } catch { /* storage blocked */ }
-            // flip every open panel in place - no render(), which would drop unsaved drags
-            for (const b of document.querySelectorAll('.nw-dbg-body')) b.hidden = !dbgSettingsOpen;
-            for (const b of document.querySelectorAll('.nw-dbg-toggle')) b.textContent = (dbgSettingsOpen ? '▾ ' : '▸ ') + t('networth.line.debug_settings_toggle');
+            if (isOpen()) dbgSettingsOpen.delete(ln.apiId); else dbgSettingsOpen.add(ln.apiId);
+            // flip just this panel in place - no render(), which would drop unsaved drags
+            body.hidden = !isOpen();
+            toggleBtn.textContent = (isOpen() ? '▾ ' : '▸ ') + t('networth.line.debug_settings_toggle');
           };
-          toggleBtn.classList.add('nw-dbg-toggle');
           topRow.appendChild(toggleBtn); topRow.appendChild(copyBtn); topRow.appendChild(pasteBtn);
           btnRow.appendChild(saveBtn);
           if (hasSaved) btnRow.appendChild(resetBtn);
