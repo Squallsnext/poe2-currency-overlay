@@ -2083,7 +2083,7 @@ function findTabSlot(apiId) {
   }
   return null;
 }
-ipcMain.handle('stash-teach-count', (_e, { apiId, value } = {}) => {
+ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings } = {}) => {
   try {
     value = String(value == null ? '' : value).replace(/[^0-9]/g, '');
     if (!value) return { ok: false, reason: 'empty' };
@@ -2097,7 +2097,10 @@ ipcMain.handle('stash-teach-count', (_e, { apiId, value } = {}) => {
     // cut the glyphs from the SAME image the live reader matches against (read-pipeline.js:
     // same regime, same saved position and saturation/contrast/floor for this slot) - a
     // template learned from a differently-processed crop never quite fits the real one
-    const ov = (config.stashSlotOverrides && config.stashSlotOverrides[tab] && config.stashSlotOverrides[tab][apiId]) || null;
+    // `settings` (from the OCR-debug panel's "learn" button): the panel's CURRENT slider
+    // values, saved or not - so it learns from exactly the black/white image on screen
+    const saved = (config.stashSlotOverrides && config.stashSlotOverrides[tab] && config.stashSlotOverrides[tab][apiId]) || null;
+    const ov = settings ? Object.assign({}, saved, settings) : saved;
     const ch = RP.buildChannel(Buffer.from(cap.bitmap), cap.W, cap.H, cap.box, refBox, RP.channelOpts(ov));
     const pos = RP.slotPos(ch, slot, ov, refBox, cap.box);
     const P = RP.slotParams(TAB_MAPS[tab], ch.scale, ov);

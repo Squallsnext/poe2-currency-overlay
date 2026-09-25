@@ -487,6 +487,40 @@
           for (const sp of specs) controls.appendChild(sliders[sp.key].row);
           controls.appendChild(presetRow);
           controls.appendChild(btnRow);
+          // "learn from this image": teach the digit templates from exactly the black/
+          // white cell on screen, with the CURRENT slider values (saved or not) - for the
+          // case where the right image shows a clean number the reader still misreads.
+          // The number box starts at the row's count; correct it if that is wrong too.
+          if (window.api.stashTeachCount) {
+            const learnRow = el('div', 'nw-dbg-floor-row');
+            const learnIn = el('input', 'nw-dbg-learn-in'); learnIn.type = 'text'; learnIn.inputMode = 'numeric';
+            learnIn.value = ln.count != null ? String(effCount(ln)) : '';
+            learnIn.onclick = (e) => e.stopPropagation();
+            const learnBtn = el('button', 'nw-dbg-pin', t('networth.line.debug_learn_button'));
+            learnBtn.title = t('networth.line.debug_learn_title');
+            const learnMsg = el('span', 'nw-dbg-floor-val');
+            learnBtn.onclick = async (e) => {
+              e.stopPropagation();
+              const value = learnIn.value.replace(/[^0-9]/g, '');
+              if (!value) return;
+              learnBtn.disabled = true;
+              const v = values();
+              if (!touched.has('floor') && saved.floor == null) v.floor = cached.floor; // the floor the preview used
+              let res;
+              try { res = await window.api.stashTeachCount(ln.apiId, value, v); } catch { res = { ok: false }; }
+              learnBtn.disabled = false;
+              if (res && res.ok) {
+                learnMsg.textContent = t('networth.line.debug_learn_ok', { value });
+                refreshPreview(); // the reader's answer with the newly learned digits
+              } else if (res && res.reason === 'segment-mismatch') {
+                learnMsg.textContent = t('networth.line.debug_learn_parts', { found: res.found, want: res.want });
+              } else {
+                learnMsg.textContent = t('networth.line.debug_learn_failed');
+              }
+            };
+            learnRow.appendChild(learnIn); learnRow.appendChild(learnBtn); learnRow.appendChild(learnMsg);
+            controls.appendChild(learnRow);
+          }
           if (ln.count != null && window.api.stashForgetDigits) {
             const forget = el('button', 'nw-dbg-forget', t('networth.line.forget_button'));
             forget.title = t('networth.line.forget_title');

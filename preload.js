@@ -53,7 +53,7 @@ contextBridge.exposeInMainWorld('api', {
   trade2AuthCheck: (league, force) => ipcRenderer.invoke('trade2-auth-check', { league, force }),
   setActiveTab: (which) => ipcRenderer.send('active-tab', which),
   stashCaptureStart: () => ipcRenderer.send('stash-capture-start'),
-  stashTeachCount: (apiId, value) => ipcRenderer.invoke('stash-teach-count', { apiId, value }),
+  stashTeachCount: (apiId, value, settings) => ipcRenderer.invoke('stash-teach-count', { apiId, value, settings }),
   stashAdjustOpen: (tab) => ipcRenderer.invoke('stash-adjust-open', tab),
   stashSlotDebugImage: (apiId, opts) => ipcRenderer.invoke('stash-slot-debug-image', apiId, opts),
   stashSlotSaveReadSettings: (apiId, settings) => ipcRenderer.invoke('stash-slot-save-read-settings', { apiId, settings }),
