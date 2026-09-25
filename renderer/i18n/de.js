@@ -660,6 +660,8 @@ window.I18N_CATALOGS.de = {
   "networth.line.confirm_done_title": "Gelernt - danke",
   "networth.line.confirm_failed_title": "Konnte aus diesem Bild nicht lernen (Ziffern berühren sich oder Icon überlappt) - beim nächsten Scan nochmal versuchen",
   "networth.line.confirm_title": "Bestätigen, dass diese Anzahl stimmt - lehrt den Leser daraus",
+  "networth.line.debug_contrast_val": "Kontrast {v}",
+  "networth.line.debug_pin_contrast_button": "Diesen Kontrast speichern",
   "networth.line.debug_pin_floor_button": "Diesen Floor speichern",
   "networth.line.debug_pin_strip_button": "Diesen Rand speichern",
   "networth.line.debug_preview": "würde lesen: {text} ({pct}%)",

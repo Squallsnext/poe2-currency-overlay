@@ -59,6 +59,7 @@ contextBridge.exposeInMainWorld('api', {
   stashSlotSetFloor: (apiId, floor) => ipcRenderer.invoke('stash-slot-set-floor', { apiId, floor }),
   stashSlotSetStripRight: (apiId, stripRight) => ipcRenderer.invoke('stash-slot-set-strip-right', { apiId, stripRight }),
   stashSlotSetDesat: (apiId, desatSat) => ipcRenderer.invoke('stash-slot-set-desat', { apiId, desatSat }),
+  stashSlotSetContrast: (apiId, contrast) => ipcRenderer.invoke('stash-slot-set-contrast', { apiId, contrast }),
   stashForgetDigits: (digits) => ipcRenderer.invoke('stash-forget-digits', { digits }),
   setStashShowOcrDebug: (on) => ipcRenderer.invoke('set-stash-show-ocr-debug', on),
   setStashDupTabs: (on) => ipcRenderer.invoke('set-stash-dup', on),

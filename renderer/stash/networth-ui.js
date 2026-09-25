@@ -382,15 +382,22 @@
           const satLabel = el('span', 'nw-dbg-floor-val', t('networth.line.debug_sat_val', { v: cached.desatSat }));
           const satSlider = el('input', 'nw-dbg-slider'); satSlider.type = 'range';
           satSlider.min = 5; satSlider.max = 120; satSlider.step = 5; satSlider.value = cached.desatSat;
+          // Contrast - how much darker a digit pixel's surroundings must get (the black
+          // outline around every stack count). 0 = off. Catches the bright icon spots that
+          // pass floor and saturation because they are bright AND grey, but have no outline.
+          const conRow = el('div', 'nw-dbg-floor-row');
+          const conLabel = el('span', 'nw-dbg-floor-val', t('networth.line.debug_contrast_val', { v: cached.contrast || 0 }));
+          const conSlider = el('input', 'nw-dbg-slider'); conSlider.type = 'range';
+          conSlider.min = 0; conSlider.max = 200; conSlider.step = 5; conSlider.value = cached.contrast || 0;
           let debounceT = null;
           const refreshPreview = () => {
             clearTimeout(debounceT);
             debounceT = setTimeout(async () => {
-              const res = await window.api.stashSlotDebugImage(ln.apiId, { floor: +slider.value, stripRight: +stripSlider.value, desatSat: +satSlider.value }).catch(() => null);
+              const res = await window.api.stashSlotDebugImage(ln.apiId, { floor: +slider.value, stripRight: +stripSlider.value, desatSat: +satSlider.value, contrast: +conSlider.value }).catch(() => null);
               if (!res || !res.ok) return;
               rawImg.src = res.rawUrl; binImg.src = res.binUrl;
               previewLabel.textContent = t('networth.line.debug_preview', { text: res.preview.text, pct: Math.round(res.preview.conf * 100) });
-              cached.floor = res.floor; cached.stripRight = res.stripRight; cached.desatSat = res.desatSat;
+              cached.floor = res.floor; cached.stripRight = res.stripRight; cached.desatSat = res.desatSat; cached.contrast = res.contrast;
               cached.rawUrl = res.rawUrl; cached.binUrl = res.binUrl; cached.preview = res.preview;
             }, 120);
           };
@@ -408,6 +415,10 @@
           satSlider.addEventListener('input', () => {
             satLabel.textContent = t('networth.line.debug_sat_val', { v: satSlider.value }); refreshPreview();
             if (cached.desatSatPinned) window.api.stashSlotSetDesat(ln.apiId, +satSlider.value).catch(() => {});
+          });
+          conSlider.addEventListener('input', () => {
+            conLabel.textContent = t('networth.line.debug_contrast_val', { v: conSlider.value }); refreshPreview();
+            if (cached.contrastPinned) window.api.stashSlotSetContrast(ln.apiId, +conSlider.value).catch(() => {});
           });
           floorRow.appendChild(slider); floorRow.appendChild(floorLabel);
           const pinBtn = el('button', 'nw-dbg-pin', cached.pinned ? t('networth.line.debug_unpin_button') : t('networth.line.debug_pin_floor_button'));
@@ -439,10 +450,21 @@
             render();
           };
           satRow.appendChild(satPinBtn);
+          conRow.appendChild(conSlider); conRow.appendChild(conLabel);
+          const conPinBtn = el('button', 'nw-dbg-pin', cached.contrastPinned ? t('networth.line.debug_unpin_button') : t('networth.line.debug_pin_contrast_button'));
+          conPinBtn.onclick = async (e) => {
+            e.stopPropagation();
+            conPinBtn.disabled = true;
+            try { await window.api.stashSlotSetContrast(ln.apiId, cached.contrastPinned ? null : +conSlider.value); } catch {}
+            delete dbgImgCache[ln.apiId];
+            render();
+          };
+          conRow.appendChild(conPinBtn);
           controls.appendChild(previewLabel);
           controls.appendChild(floorRow);
           controls.appendChild(stripRow);
           controls.appendChild(satRow);
+          if (window.api.stashSlotSetContrast) controls.appendChild(conRow);
           if (ln.count != null && window.api.stashForgetDigits) {
             const forget = el('button', 'nw-dbg-forget', t('networth.line.forget_button'));
             forget.title = t('networth.line.forget_title');

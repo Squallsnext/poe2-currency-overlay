@@ -665,6 +665,8 @@ window.I18N_CATALOGS.en = {
   "networth.line.confirm_done_title": "Learned - thanks",
   "networth.line.confirm_failed_title": "Could not learn from this frame (digits touching or overlapping an icon) - try again next scan",
   "networth.line.confirm_title": "Confirm this count is correct - teaches the reader from it",
+  "networth.line.debug_contrast_val": "contrast {v}",
+  "networth.line.debug_pin_contrast_button": "Save this contrast",
   "networth.line.debug_pin_floor_button": "Save this floor",
   "networth.line.debug_pin_strip_button": "Save this right edge",
   "networth.line.debug_preview": "would read: {text} ({pct}%)",

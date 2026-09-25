@@ -702,6 +702,48 @@
     return V;
   }
 
+  // Local-contrast gate: neighbourhood radius in REFERENCE px (callers scale it for a
+  // native-resolution buffer). Stack counts are flat white WITH a black outline, so a
+  // real digit pixel always has a dark pixel within ~2px; a bright spot in the icon art
+  // (a highlight, a white gem facet) is usually bright over a bright/mid surround. Floor
+  // and saturation both look at the pixel alone and can't tell those apart - this looks
+  // at how much darker the pixel's surroundings get.
+  const CONTRAST_RADIUS = 2;
+
+  // Keep a pixel of V only if it is at least `contrast` brighter than the darkest pixel
+  // within `radius` of it. The darkness is measured on the PLAIN max(R,G,B) channel, not
+  // on V - V zeroes every saturated pixel, and those artificial zeros would make every
+  // bright pixel next to coloured art look high-contrast. contrast 0 = off (V returned
+  // untouched), so a slot without an override reads exactly as before.
+  function contrastGate(V, buf, W, H, contrast, radius) {
+    if (!contrast) return V;
+    const r = Math.max(1, Math.round(radius == null ? CONTRAST_RADIUS : radius));
+    const L = valueChannelFromRGBA(buf, W, H);
+    // separable min filter (erode rows, then columns): O(W*H*r) instead of O(W*H*r^2)
+    const rowMin = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) {
+      const o = y * W;
+      for (let x = 0; x < W; x++) {
+        let m = 255;
+        const x0 = x - r < 0 ? 0 : x - r, x1 = x + r >= W ? W - 1 : x + r;
+        for (let k = x0; k <= x1; k++) if (L[o + k] < m) m = L[o + k];
+        rowMin[o + x] = m;
+      }
+    }
+    const out = new Uint8Array(V);
+    for (let y = 0; y < H; y++) {
+      const y0 = y - r < 0 ? 0 : y - r, y1 = y + r >= H ? H - 1 : y + r;
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        if (!out[i]) continue;
+        let m = 255;
+        for (let k = y0; k <= y1; k++) { const v = rowMin[k * W + x]; if (v < m) m = v; }
+        if (out[i] - m < contrast) out[i] = 0;
+      }
+    }
+    return out;
+  }
+
   // Plain max(R,G,B) value channel (kept for the reference file-screenshot path).
   function valueChannelFromRGBA(buf, W, H, bgra) {
     const V = new Uint8Array(W * H);
@@ -799,7 +841,7 @@
   return {
     otsu, crop, binarize, components, iou, slideMatch, greyOpening, resampleRGBA, resample,
     extractTemplates, readCell, readCellEx, readCellAdaptive, valueChannelFromRGBA, valueChannelDesatMax,
-    templatesFromJSON, bankFromJSON, DEFAULTS, DESAT_SAT, debugShrunkCell, detectDigitSpan,
+    templatesFromJSON, bankFromJSON, DEFAULTS, DESAT_SAT, contrastGate, CONTRAST_RADIUS, debugShrunkCell, detectDigitSpan,
     upscaleTemplate, upscaleTemplateBank,
   };
 });

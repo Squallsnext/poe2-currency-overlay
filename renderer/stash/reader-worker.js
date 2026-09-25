@@ -178,23 +178,25 @@ parentPort.on('message', (msg) => {
       V = DR.valueChannelDesatMax(buf, W, H); W2 = W; H2 = H;
       originX = 0; originY = 0;
     }
-    // A per-slot saturation override (see the OCR debug panel) needs the SAME channel
-    // built again with a different cutoff - cheap to recompute (one pass, same regime
-    // logic as above) and only paid for slots that actually have one pinned.
-    const vCache = new Map([[DR.DESAT_SAT, V]]);
-    function vFor(sat) {
-      if (vCache.has(sat)) return vCache.get(sat);
-      let Vx;
-      if (scale > EXTREME_SCALE || scale < 1 / EXTREME_SCALE) {
-        Vx = DR.valueChannelDesatMax(buf, W, H, sat);
-      } else if (Math.abs(scale - 1) > 0.15) {
+    // A per-slot saturation/contrast override (see the OCR debug panel) needs the SAME
+    // channel built again with different cutoffs - cheap to recompute (one pass, same
+    // regime logic as above) and only paid for slots that actually have one pinned.
+    // Keyed "sat|contrast"; contrast 0 is the default channel with no gate.
+    const vCache = new Map([[DR.DESAT_SAT + '|0', V]]);
+    function vFor(sat, contrast) {
+      const key = sat + '|' + (contrast || 0);
+      if (vCache.has(key)) return vCache.get(key);
+      // src: the buffer this regime reads from; px: how many buffer px one reference px
+      // is, so the contrast gate's neighbourhood covers the same outline at any scale
+      let src = buf, sw = W, sh = H, px = scale;
+      if (!(scale > EXTREME_SCALE || scale < 1 / EXTREME_SCALE) && Math.abs(scale - 1) > 0.15) {
         const kx = box.w / refBox.w, ky = box.h / refBox.h;
-        const norm = DR.resampleRGBA(buf, W, H, box.x - M * kx, box.y - M * ky, (refBox.w + 2 * M) * kx, (refBox.h + 2 * M) * ky, W2, H2);
-        Vx = DR.valueChannelDesatMax(norm, W2, H2, sat);
-      } else {
-        Vx = DR.valueChannelDesatMax(buf, W, H, sat);
+        src = DR.resampleRGBA(buf, W, H, box.x - M * kx, box.y - M * ky, (refBox.w + 2 * M) * kx, (refBox.h + 2 * M) * ky, W2, H2);
+        sw = W2; sh = H2; px = 1;
       }
-      vCache.set(sat, Vx);
+      let Vx = DR.valueChannelDesatMax(src, sw, sh, sat);
+      if (contrast) Vx = DR.contrastGate(Vx, src, sw, sh, contrast, DR.CONTRAST_RADIUS * px);
+      vCache.set(key, Vx);
       return Vx;
     }
     const P = paramsForScale(paramsFor(map), scale);
@@ -206,7 +208,9 @@ parentPort.on('message', (msg) => {
     const reads = []; let readCount = 0;
     for (const s of map.STATIC_SLOTS) {
       const ov = tabOverrides && tabOverrides[s.apiId];
-      const sx = ov ? ov.cx : s.cx, sy = ov ? ov.cy : s.cy;
+      // != null, not a bare `ov`: a floor/edge/saturation/contrast pin saves an override
+      // with NO position, and `ov.cx` would then put the read at NaN
+      const sx = ov && ov.cx != null ? ov.cx : s.cx, sy = ov && ov.cy != null ? ov.cy : s.cy;
       const pos = (originX || originY)
         ? { cx: sx - originX, cy: sy - originY }
         : TD.scalePos(sx, sy, refBox, box);
@@ -229,7 +233,8 @@ parentPort.on('message', (msg) => {
       // near-white gate as the digits confuses the sweep's own "most confident" pick
       // (a noisier floor can score higher purely by having more ink to be confident
       // about), and no amount of sweeping fixes that - only a floor chosen by eye does.
-      const Vs = ov && ov.desatSat != null ? vFor(ov.desatSat) : V;
+      const Vs = ov && (ov.desatSat != null || ov.contrast)
+        ? vFor(ov.desatSat != null ? ov.desatSat : DR.DESAT_SAT, ov.contrast || 0) : V;
       const r = ov && ov.floor != null
         ? DR.readCellEx(Vs, W2, H2, pos.cx, pos.cy, DIGITS_LIVE, Object.assign({}, Ps, { floor: ov.floor }), cellScale)
         : DR.readCellAdaptive(Vs, W2, H2, pos.cx, pos.cy, DIGITS_LIVE, Ps, cellScale);

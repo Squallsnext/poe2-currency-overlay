@@ -2204,7 +2204,12 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
     // THE PREVIEWED FLOOR/EDGE/SATURATION - not necessarily what a live read would settle on
     const desatSat = (opts && opts.desatSat != null) ? Math.round(opts.desatSat)
       : (ov && ov.desatSat != null ? ov.desatSat : DR.DESAT_SAT);
-    const V = DR.valueChannelDesatMax(Buffer.from(cap.bitmap), cap.W, cap.H, desatSat);
+    const contrast = (opts && opts.contrast != null) ? Math.round(opts.contrast)
+      : (ov && ov.contrast != null ? ov.contrast : 0);
+    const capBuf = Buffer.from(cap.bitmap);
+    let V = DR.valueChannelDesatMax(capBuf, cap.W, cap.H, desatSat);
+    // native capture buffer: one reference px is `scale` buffer px
+    if (contrast) V = DR.contrastGate(V, capBuf, cap.W, cap.H, contrast, DR.CONTRAST_RADIUS * scale);
     const { binarized } = DR.debugShrunkCell(V, cap.W, cap.H, pos.cx, pos.cy, Pf, scale);
     const binBuf = Buffer.alloc(binarized.w * binarized.h * 4);
     for (let i = 0; i < binarized.w * binarized.h; i++) {
@@ -2225,6 +2230,7 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
       ok: true, rawUrl, binUrl, floor, pinned: !!(ov && ov.floor != null),
       stripRight, stripRightPinned: !!(ov && ov.stripRight != null), stripWidth: P.stripWidth,
       desatSat, desatSatPinned: !!(ov && ov.desatSat != null),
+      contrast, contrastPinned: !!(ov && ov.contrast != null),
       preview: { text: previewText, conf: preview.conf },
     };
   } catch (err) {
@@ -2536,6 +2542,26 @@ ipcMain.handle('stash-slot-set-desat', (_e, { apiId, desatSat } = {}) => {
       if (cur) delete cur.desatSat;
     } else {
       mergeSlotOverrides(found.tab, { [apiId]: { desatSat: Math.round(desatSat) } });
+    }
+    saveConfig();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message || err) };
+  }
+});
+// Local contrast: a digit's white stroke always sits next to its black outline, a bright
+// spot in the icon art usually doesn't - so this separates them where floor (brightness)
+// and saturation (colour) can't, e.g. a white highlight on a grey/white icon. Per-slot,
+// like the other two, since the right cutoff depends on the art behind that slot.
+ipcMain.handle('stash-slot-set-contrast', (_e, { apiId, contrast } = {}) => {
+  try {
+    const found = findTabSlot(apiId);
+    if (!found) return { ok: false, reason: 'no-recent-capture' };
+    if (contrast == null) {
+      const cur = config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId];
+      if (cur) delete cur.contrast;
+    } else {
+      mergeSlotOverrides(found.tab, { [apiId]: { contrast: Math.round(contrast) } });
     }
     saveConfig();
     return { ok: true };
