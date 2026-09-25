@@ -144,7 +144,46 @@ preview and teach alike:
 - The right-edge trim slider was removed (it cuts off 4-digit counts); a reset also clears
   an old saved right edge.
 
-### 4.5 Other Net Worth changes
+### 4.5 Slot alignment tool ("Ausrichten")
+
+New in this fork. It started as a dev-only page written next to each scan's debug images
+(`stash-debug-live`, output "copy the deltas and send them to a developer"), which does not
+scale past one machine. It now opens as a real window from the app, and **Save writes
+straight into the config**, so a player whose setup misreads a slot fixes it themselves.
+
+**Where:** on a scanned tab card, the **"Ausrichten" / Align** button. It appears when the
+tab has at least one unread slot or one below 80 % confidence.
+
+**What it shows:** the captured stash panel with one box per stack-count reading window,
+coloured by the last read: red = unread, yellow = unsure (65–80 %), green = good (≥80 %).
+Only red/yellow boxes are shown by default ("also show good slots" reveals the rest).
+
+**How to use it:**
+- **Drag** a box so it sits on the number; **arrow keys** move the selected box by 1 px,
+  **Shift + arrow** by 5 px.
+- **Width / Height** resize **all** boxes at once (the hidden good ones too), so a box that
+  reaches into the neighbouring icon can be tightened for the whole tab.
+- **Save & apply** writes per-slot `cx, cy, stripWidth, up, dn` (reference-space) into
+  `stashSlotOverrides[tab][apiId]`; the next scan uses them. **Copy deltas** still copies
+  them as JSON for a developer.
+
+**Implementation:** `stash-adjust-open` / `stash-adjust-save` in `main.js` (window built by
+`buildAdjustWindowHtml`, preload `renderer/stash/adjust-preload.js`). Overrides are merged
+per slot (`mergeSlotOverrides`), so an alignment save and a debug-panel save (floor,
+filters…) never overwrite each other. Positions are in reference space, so they survive
+resolution changes as long as the panel is detected. New slots added to a tab map (e.g.
+the extra Exalted cells, 4.7) appear in the tool automatically.
+
+**Typical workflow for a bad slot:**
+1. Scan → the row is red or reads wrong.
+2. **Align** – is the box on the number? If not, drag it there and save. Rescan.
+3. Still wrong → OCR debug panel (4.4): tune the filters for that slot, check "would
+   read", **Save**. Rescan.
+4. Reads the right number but unsure (< 75 %) → **✓** or **Learn from this image**.
+5. Several slots with the same kind of background → **Copy** on the good one, **Paste** on
+   the others.
+
+### 4.6 Other Net Worth changes
 
 - Debug images of every scan (`writeStashDebug`, dev builds) are written only while the
   OCR debug switch is on.
@@ -154,9 +193,9 @@ preview and teach alike:
 - Supported resolutions list and hints mention 5120×2880.
 - Currency tab map recalibrated after the in-game UI text size was increased
   (`currency-tab-map.js`); slot alignment tool ("Ausrichten") writes per-slot
-  `cx/cy/stripWidth/up/dn` overrides.
+  `cx/cy/stripWidth/up/dn` overrides (see 4.5).
 
-### 4.6 Setup-specific – probably not for upstream as-is
+### 4.7 Setup-specific – probably not for upstream as-is
 
 - **Extra Exalted slots** `exalted-2..4` in the dynamic bottom rows of the currency tab
   (row 1 cell 1, row 2 cells 1–2), priced as Exalted via a new `priceAs` slot field and shown
@@ -174,7 +213,7 @@ preview and teach alike:
 |---|---|---|
 | `gamepadBindings` | `{ repriceRead: 2, repricePaste: 0 }` | Controller button per action |
 | `commandHotkeys[].gamepad` | – | Controller button per chat command |
-| `stashSlotOverrides[tab][apiId]` | – | Per-slot position + reader settings (see 4.3) |
+| `stashSlotOverrides[tab][apiId]` | – | Per-slot position (4.5) + reader settings (4.3) |
 | `stashShowOcrDebug` | `false` | Debug panel; also gates debug file writes |
 | `stashHiRes` | `false` | Global ×2 matching (4K/5K) |
 | `stashShowReliability` | `false` | "Often misread" row tints |
@@ -187,7 +226,7 @@ high-resolution templates; "Forget template" clears both.
 ## 6. Testing – what was and was not verified
 
 - **Verified in game** by the user (German client, 5K, DualSense): tablet price check,
-  controller read/paste, the debug panel workflow, ×2 matching on real slots (e.g. 348,
+  controller read/paste, the align tool, the debug panel workflow, ×2 matching on real slots (e.g. 348,
   261/262), the 262 → 62 fix, filters on difficult icons (white marble "4", gold skull
   highlights).
 - **Synthetic tests only** for the reader internals (digits drawn from the template bank
