@@ -2270,6 +2270,16 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
         matchScale: ov && ov.matchScale != null ? ov.matchScale : null,
       },
       preview: { text: previewText, conf: read.conf },
+      // how many templates this read compared against, and how many of them the user
+      // taught (per digit, at this matching scale) - the bank holds ONE representative
+      // per digit per source, the learned one being the median of up to 30 exemplars
+      templates: (() => {
+        const set = matchScale > 1 ? (learned && learned.byScale && learned.byScale[matchScale]) : learned;
+        const ex = (set && set.exemplars) || {};
+        const perDigit = {};
+        for (const d of Object.keys(ex).sort()) if (ex[d].length) perDigit[d] = ex[d].length;
+        return { total: Object.keys(bankInfo.bank).length, learned: perDigit };
+      })(),
       // what "automatic" means for each slider, for the panel's "Standard" button
       defaults: { matchScale: 1, localThr: 0, satPct: 100, bright: 0, gain: 100, desatSat: DR.DESAT_SAT, contrast: 0, minBlob: DR.DEFAULTS.minBlob },
     };

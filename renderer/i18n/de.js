@@ -693,6 +693,8 @@ window.I18N_CATALOGS.de = {
   "networth.line.debug_satpct_val": "Sättigung {v}% (0 = grau)",
   "networth.line.debug_save_button": "Speichern",
   "networth.line.debug_settings_toggle": "Einstellungen",
+  "networth.line.debug_templates": "Vorlagen im Vergleich: {n}",
+  "networth.line.debug_templates_learned": "gelernt {list}",
   "networth.line.debug_status_auto": "automatisch (nichts gespeichert)",
   "networth.line.debug_status_changed": "geändert, noch nicht gespeichert",
   "networth.line.debug_status_saved": "gespeichert",

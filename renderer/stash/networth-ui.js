@@ -432,9 +432,17 @@
             status.textContent = touched.size ? t('networth.line.debug_status_changed')
               : hasSaved ? t('networth.line.debug_status_saved') : t('networth.line.debug_status_auto');
           };
+          const tplLabel = el('span', 'nw-dbg-floor-val');
+          const showTemplates = (ti) => {
+            if (!ti) { tplLabel.textContent = ''; return; }
+            const parts = Object.keys(ti.learned || {}).map((d) => d + ': ' + ti.learned[d] + '×');
+            tplLabel.textContent = t('networth.line.debug_templates', { n: ti.total })
+              + (parts.length ? ' · ' + t('networth.line.debug_templates_learned', { list: parts.join(', ') }) : '');
+          };
           const showPreview = (p) => {
             previewLabel.textContent = t('networth.line.debug_preview', { text: p ? p.text : '?', pct: p ? Math.round(p.conf * 100) : 0 });
           };
+          showTemplates(cached.templates);
           showPreview(cached.preview);
           let debounceT = null;
           const refreshPreview = () => {
@@ -447,7 +455,8 @@
               if (!res || !res.ok) return;
               rawImg.src = res.rawUrl; filtImg.src = res.filtUrl; binImg.src = res.binUrl;
               showPreview(res.preview);
-              Object.assign(cached, { defaults: res.defaults, effFloor: res.effFloor, rawUrl: res.rawUrl, filtUrl: res.filtUrl, binUrl: res.binUrl, preview: res.preview });
+              showTemplates(res.templates);
+              Object.assign(cached, { templates: res.templates, defaults: res.defaults, effFloor: res.effFloor, rawUrl: res.rawUrl, filtUrl: res.filtUrl, binUrl: res.binUrl, preview: res.preview });
               for (const sp of specs) cached[sp.key] = res[sp.key];
               if (!touched.has('floor')) sliders.floor.s.value = res.floor;
               sliders.floor.mark();
@@ -541,6 +550,7 @@
           btnRow.appendChild(status);
           updateStatus();
           controls.appendChild(previewLabel);
+          controls.appendChild(tplLabel);
           controls.appendChild(topRow);
           for (const sp of specs) body.appendChild(sliders[sp.key].row);
           body.appendChild(presetRow);

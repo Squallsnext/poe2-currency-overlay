@@ -556,8 +556,20 @@
       return tied[0];
     });
     winners.sort((a, b) => b.score - a.score);
+    // Winners first, then every other candidate by score. A cluster is joined through
+    // ANY overlap chain, so at a loose iouThresh (the extreme-scale regime) weak junk
+    // candidates between two real digits can chain them into one cluster - and the old
+    // one-winner-per-cluster rule then silently dropped the runner-up even though it
+    // doesn't overlap the winner at all: "262" read "62" with the "2" matched at 0.96.
+    // Letting losers in afterwards, under the same no-overlap rule, keeps the winner's
+    // priority for the contested ink but recovers a real digit beside it.
+    const winnerSet = new Set(winners);
+    // only confident losers (a real digit scores ~0.9+; junk bridging clusters sits at
+    // the loose threshold), so this recovers digits without letting icon noise back in
+    const REST_MIN = 0.85;
+    const rest = cands.filter((c) => !winnerSet.has(c) && c.score >= REST_MIN).sort((a, b) => b.score - a.score);
     const accepted = [];
-    for (const c of winners) if (!overlaps(c.x, c.tw, accepted)) accepted.push(c);
+    for (const c of winners.concat(rest)) if (!overlaps(c.x, c.tw, accepted)) accepted.push(c);
 
     // GAP-FILL between and after digits (lower threshold second pass)
     gapFill(bin, templates, accepted, P);

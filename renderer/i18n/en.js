@@ -698,6 +698,8 @@ window.I18N_CATALOGS.en = {
   "networth.line.debug_satpct_val": "saturation {v}% (0 = grey)",
   "networth.line.debug_save_button": "Save",
   "networth.line.debug_settings_toggle": "Settings",
+  "networth.line.debug_templates": "templates compared: {n}",
+  "networth.line.debug_templates_learned": "learned {list}",
   "networth.line.debug_status_auto": "automatic (nothing saved)",
   "networth.line.debug_status_changed": "changed, not saved yet",
   "networth.line.debug_status_saved": "saved",
