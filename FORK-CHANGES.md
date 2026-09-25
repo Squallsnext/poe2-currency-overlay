@@ -199,6 +199,12 @@ the extra Exalted cells, 4.7) appear in the tool automatically.
 
 ### 4.6 Other Net Worth changes
 
+- **The Net Worth list survives a restart** (rows, counts, corrections, include/exclude,
+  order; `localStorage` key `nwRows.v1`). Before, it lived only in memory. Prices are the
+  ones from the scan; the captured screenshots are not kept, so the debug panel/Align for a
+  restored row asks for a rescan (this also fixes an endless re-request loop when a slot
+  had no capture).
+
 - Debug images of every scan (`writeStashDebug`, dev builds) are written only while the
   OCR debug switch is on.
 - "Often misread" row tints (`SLOT_RELIABILITY`) behind a new setting

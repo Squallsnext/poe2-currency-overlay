@@ -60,8 +60,31 @@
   // Rows land in CAPTURE order, not completion order. Reads run in a pool so a small tab
   // can finish before a big one grabbed earlier; main stamps each capture with a sequence
   // and the row is inserted against it.
+  // The scanned rows (counts, corrections, include/exclude, order) survive a restart.
+  // Before, the whole Net Worth list lived only in memory and was gone on every launch.
+  // Saved on every render (every change ends in one); prices are the ones from the scan -
+  // a rescan refreshes them. The captured screenshots are NOT kept (megabytes each), so
+  // the debug panel and "Align" for a restored row need that tab scanned again.
+  const ROWS_KEY = 'nwRows.v1';
+  function persistRows() {
+    try {
+      localStorage.setItem(ROWS_KEY, JSON.stringify({
+        nextId: state.nextId,
+        rows: state.rows.map((r) => ({ id: r.id, tab: r.tab, result: r.result, included: r.included, seq: r.seq, at: r.at })),
+      }));
+    } catch { /* storage blocked or full - the list just won't survive a restart */ }
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem(ROWS_KEY) || 'null');
+    if (saved && Array.isArray(saved.rows)) {
+      state.rows = saved.rows.filter((r) => r && r.result && Array.isArray(r.result.lines));
+      state.nextId = Math.max(saved.nextId || 1, ...state.rows.map((r) => r.id + 1), 1);
+      for (const r of state.rows) state.expanded[r.id] = false;
+    }
+  } catch { /* unreadable - start empty */ }
+
   function addRow(res) {
-    const row = { id: state.nextId++, tab: res.tab, result: res, included: true, seq: res.seq };
+    const row = { id: state.nextId++, tab: res.tab, result: res, included: true, seq: res.seq, at: Date.now() };
     const at = res.seq == null ? -1 : state.rows.findIndex((r) => r.seq != null && r.seq > res.seq);
     if (at < 0) state.rows.push(row); else state.rows.splice(at, 0, row);
     state.expanded[row.id] = false;
@@ -400,6 +423,10 @@
         const cached = dbgImgCache[ln.apiId];
         if (cached === 'loading') {
           dbg.textContent = '…';
+        } else if (cached && cached.ok === false) {
+          // no screenshot for this tab (restored after a restart, or it expired) - say so
+          // instead of re-requesting forever
+          dbg.textContent = cached.reason === 'no-recent-capture' ? t('networth.line.debug_need_rescan') : '…';
         } else if (cached && cached.ok) {
           const imgs = el('div', 'nw-dbg-imgs');
           // original | the greyscale the reader works from after colour limit/contrast
@@ -1010,6 +1037,7 @@
     if (state.modal) root.appendChild(modalEl());
     if (state.sample) root.appendChild(sampleModalEl());
     root.scrollTop = scrollTop;
+    persistRows();
   }
 
   // staged events from main drive live feedback (works even while hidden)
