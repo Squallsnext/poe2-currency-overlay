@@ -349,8 +349,8 @@
           dbg.textContent = '…';
         } else if (cached && cached.ok) {
           const imgs = el('div', 'nw-dbg-imgs');
-          // original | the original after saturation/contrast (removed pixels black) |
-          // the black/white cell the templates are matched against
+          // original | the greyscale the reader works from after colour limit/contrast
+          // (removed pixels black) | the black/white cell floor cuts from it
           const rawImg = el('img', 'nw-dbg-img'); rawImg.src = cached.rawUrl; rawImg.title = t('networth.line.debug_img_raw');
           const filtImg = el('img', 'nw-dbg-img'); filtImg.src = cached.filtUrl; filtImg.title = t('networth.line.debug_img_filtered');
           const binImg = el('img', 'nw-dbg-img'); binImg.src = cached.binUrl; binImg.title = t('networth.line.debug_img_binarized');

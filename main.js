@@ -2195,8 +2195,9 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
     const previewText = read.text === '?' ? '?' : bankInfo.unmap(read.text);
 
     // three views of the SAME window of the SAME buffer the reader used, so they line up
-    // pixel for pixel: the original, the original after saturation/contrast (before the
-    // black/white cut), and the binarized cell the templates are matched against
+    // pixel for pixel: the original, the greyscale channel the reader works from after
+    // colour limit/contrast (before the black/white cut), and the binarized cell the
+    // templates are matched against
     const cs = ch.cellScale;
     const stripL = P.stripLeft != null ? P.stripLeft : P.stripWidth;
     const stripR = P.stripRight != null ? P.stripRight : P.stripWidth;
@@ -2211,12 +2212,11 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
       for (let x = 0; x < cw; x++) {
         const si = (y0 + y) * ch.W2 + (x0 + x), sp = si * 4, dp = (y * cw + x) * 4;
         rawBuf[dp] = ch.orig[sp]; rawBuf[dp + 1] = ch.orig[sp + 1]; rawBuf[dp + 2] = ch.orig[sp + 2]; rawBuf[dp + 3] = 255;
-        // middle view starts from the brightness/contrast-adjusted source
-        const c0 = ch.src[sp], c1 = ch.src[sp + 1], c2 = ch.src[sp + 2];
-        // the original as the sliders leave it: a kept pixel keeps its colour, a pixel
-        // saturation/contrast removed goes black - which is exactly what it is to the
-        // reader from here on
-        if (ch.V[si]) { filtBuf[dp] = c0; filtBuf[dp + 1] = c1; filtBuf[dp + 2] = c2; }
+        // middle view: exactly what the reader works from - the brightness channel
+        // (max of R,G,B of the brightness/contrast-adjusted source), with every pixel the
+        // colour limit or contrast removed at 0 - the image floor then cuts into black/white
+        const v = ch.V[si];
+        filtBuf[dp] = v; filtBuf[dp + 1] = v; filtBuf[dp + 2] = v;
         filtBuf[dp + 3] = 255;
       }
     }
