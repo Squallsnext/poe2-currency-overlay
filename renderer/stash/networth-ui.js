@@ -29,6 +29,13 @@
   // In memory only (per app session) - pasting just moves the target's sliders, saving
   // is still an explicit "Speichern" there.
   let dbgClipboard = null;
+  // Re-fetch one slot's debug preview and only then re-render - deleting the cache first
+  // collapsed the panel to "…" for a moment, shifting everything below it
+  async function refreshDbgSlot(apiId) {
+    try { dbgImgCache[apiId] = (await window.api.stashSlotDebugImage(apiId)) || { ok: false }; }
+    catch { dbgImgCache[apiId] = { ok: false }; }
+    render();
+  }
   // Teaching (the row's ✓ and the panel's "learn from this image") only when the reader
   // reads the number right but UNSURE - below this confidence. A confident correct read
   // would only add a near-identical copy to the exemplar pool (the learned template is
@@ -336,7 +343,7 @@
                 const rr = await window.api.stashSlotDebugImage(ln.apiId);
                 if (rr && rr.ok && rr.preview && rr.preview.text === String(effCount(ln))) {
                   ln.conf = rr.preview.conf;
-                  delete dbgImgCache[ln.apiId];
+                  dbgImgCache[ln.apiId] = rr; // the fresh read doubles as the panel's data
                   render();
                 }
               } catch { /* keep the old percentage; the next scan updates it */ }
@@ -490,15 +497,13 @@
             const v = values(), out = {};
             for (const k of touched) out[k] = v[k];
             try { await window.api.stashSlotSaveReadSettings(ln.apiId, out); } catch {}
-            delete dbgImgCache[ln.apiId];
-            render();
+            await refreshDbgSlot(ln.apiId);
           };
           resetBtn.onclick = async (e) => {
             e.stopPropagation();
             resetBtn.disabled = true;
             try { await window.api.stashSlotSaveReadSettings(ln.apiId, null); } catch {}
-            delete dbgImgCache[ln.apiId];
-            render();
+            await refreshDbgSlot(ln.apiId);
           };
           // playground presets - they only move the sliders (preview), nothing is saved
           // until "Speichern": Standard = what automatic uses, Alle Filter aus = every
@@ -543,8 +548,7 @@
             const out = Object.assign({}, dbgClipboard);
             if (!('floor' in out)) out.floor = null; // source floor was automatic: keep it so
             try { await window.api.stashSlotSaveReadSettings(ln.apiId, out); } catch {}
-            delete dbgImgCache[ln.apiId];
-            render();
+            await refreshDbgSlot(ln.apiId);
           };
           presetRow.appendChild(stdBtn); presetRow.appendChild(offBtn);
           // always visible: preview, the open/close toggle and copy/paste (pasting onto
@@ -619,8 +623,7 @@
               e.stopPropagation();
               forget.disabled = true;
               try { await window.api.stashForgetDigits(String(ln.count)); } catch {}
-              delete dbgImgCache[ln.apiId];
-              render();
+              await refreshDbgSlot(ln.apiId);
             };
             body.appendChild(forget);
           }
@@ -901,6 +904,9 @@
 
   function render() {
     const root = $('networth-root'); if (!root) return;
+    // root is the scroll container: emptying it throws the scroll position away, so a
+    // save/paste in the OCR-debug panel used to jump the list - keep it
+    const scrollTop = root.scrollTop;
     root.innerHTML = '';
     const wrap = el('div', 'nw');
 
@@ -983,6 +989,7 @@
     root.appendChild(wrap);
     if (state.modal) root.appendChild(modalEl());
     if (state.sample) root.appendChild(sampleModalEl());
+    root.scrollTop = scrollTop;
   }
 
   // staged events from main drive live feedback (works even while hidden)
