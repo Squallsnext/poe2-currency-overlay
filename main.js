@@ -2181,13 +2181,14 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
     const gain = pick('gain', 100);
     const satPct = pick('satPct', 100);
     const minBlob = pick('minBlob', DR.DEFAULTS.minBlob);
+    const localThr = pick('localThr', 0);
     const floorIn = pick('floor', null);
     // exactly the live reader's path (read-pipeline.js): same regime, same position,
     // same params, same bank including learned corrections
     const bitmap = Buffer.from(cap.bitmap);
     const ch = RP.buildChannel(bitmap, cap.W, cap.H, cap.box, refBox, { sat: desatSat, contrast, bright, gain, satPct });
     const pos = RP.slotPos(ch, slot, ov, refBox, cap.box);
-    const P = Object.assign(RP.slotParams(map, ch.scale, ov), { minBlob });
+    const P = Object.assign(RP.slotParams(map, ch.scale, ov), { minBlob, localThr });
     let learned = null;
     try { learned = loadLearnedTemplates(); } catch { /* none yet */ }
     const bankInfo = RP.buildBank(require('./renderer/stash/digit-templates.json'), learned);
@@ -2235,7 +2236,7 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
       rawUrl: toUrl(rawBuf, cw, chh, UPSCALE),
       filtUrl: toUrl(filtBuf, cw, chh, UPSCALE),
       binUrl: toUrl(binBuf, binarized.w, binarized.h, 6),
-      floor, effFloor, desatSat, contrast, minBlob, bright, gain, satPct,
+      floor, effFloor, desatSat, contrast, minBlob, bright, gain, satPct, localThr,
       // what is saved for this slot right now (null = automatic), so the panel can tell
       // "slider moved, not saved yet" from "this is the saved value"
       saved: {
@@ -2246,10 +2247,11 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
         bright: ov && ov.bright != null ? ov.bright : null,
         gain: ov && ov.gain != null ? ov.gain : null,
         satPct: ov && ov.satPct != null ? ov.satPct : null,
+        localThr: ov && ov.localThr != null ? ov.localThr : null,
       },
       preview: { text: previewText, conf: read.conf },
       // what "automatic" means for each slider, for the panel's "Standard" button
-      defaults: { satPct: 100, bright: 0, gain: 100, desatSat: DR.DESAT_SAT, contrast: 0, minBlob: DR.DEFAULTS.minBlob },
+      defaults: { localThr: 0, satPct: 100, bright: 0, gain: 100, desatSat: DR.DESAT_SAT, contrast: 0, minBlob: DR.DEFAULTS.minBlob },
     };
   } catch (err) {
     return { ok: false, reason: 'error', error: String(err && err.message || err) };
@@ -2519,6 +2521,8 @@ ipcMain.handle('stash-adjust-save', (_e, { tab, deltas } = {}) => {
 //             cut - for highlights exactly as white as a digit, which no pixel filter can
 //   bright/gain  brightness/contrast of the colour source before every filter (test)
 //   satPct    real saturation of the colour source (0 = grey), before every filter
+//   localThr  >0 switches the black/white cut from one global floor to a local one:
+//             ink = a thin stroke standing out this much from its surroundings
 // settings === null resets the slot to automatic (also clears an old right-edge trim from
 // the earlier per-slider version, which no longer has a control of its own).
 ipcMain.handle('stash-slot-save-read-settings', (_e, { apiId, settings } = {}) => {
@@ -2527,14 +2531,14 @@ ipcMain.handle('stash-slot-save-read-settings', (_e, { apiId, settings } = {}) =
     if (!found) return { ok: false, reason: 'no-recent-capture' };
     if (settings == null) {
       const cur = config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId];
-      if (cur) { delete cur.floor; delete cur.desatSat; delete cur.contrast; delete cur.minBlob; delete cur.bright; delete cur.gain; delete cur.satPct; delete cur.stripRight; }
+      if (cur) { delete cur.floor; delete cur.desatSat; delete cur.contrast; delete cur.minBlob; delete cur.bright; delete cur.gain; delete cur.satPct; delete cur.localThr; delete cur.stripRight; }
     } else {
       // only the keys sent are touched: a value set to null goes back to automatic, a key
       // left out keeps whatever is saved (so saving just the speck filter leaves floor on
       // the adaptive sweep)
       const delta = {};
       const cur = (config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId]) || null;
-      for (const k of ['floor', 'desatSat', 'contrast', 'minBlob', 'bright', 'gain', 'satPct']) {
+      for (const k of ['floor', 'desatSat', 'contrast', 'minBlob', 'bright', 'gain', 'satPct', 'localThr']) {
         if (!(k in settings)) continue;
         if (settings[k] == null) { if (cur) delete cur[k]; } else delta[k] = Math.round(settings[k]);
       }

@@ -673,6 +673,8 @@ window.I18N_CATALOGS.en = {
   "networth.line.debug_img_binarized": "Black/white, what the digit templates are matched against",
   "networth.line.debug_img_filtered": "Greyscale as the reader gets it (black = filtered out). floor cuts the right image from this",
   "networth.line.debug_img_raw": "Original",
+  "networth.line.debug_local_off": "local cut: off (floor applies to everything)",
+  "networth.line.debug_local_val": "local cut: stroke {v} brighter than surroundings",
   "networth.line.debug_preset_off": "All filters off",
   "networth.line.debug_preset_off_title": "Every filter neutral: middle view = original. Preview only, nothing is saved until Save.",
   "networth.line.debug_preset_standard": "Standard",

@@ -161,6 +161,34 @@
     return out;
   }
 
+  // Local threshold - what the eye does: a digit is a THIN bright stroke inside a black
+  // outline. A white top-hat (V minus its grey opening with a kernel wider than a stroke)
+  // keeps exactly the bright structures narrower than the kernel and flattens anything
+  // wider to ~0 - so a digit stroke survives while a flat bright surface (white marble, a
+  // blue backdrop, a broad highlight) disappears, even where it is as bright as the digit,
+  // which no global floor can separate. (A plain "brighter than the neighbourhood mean"
+  // test was tried first: it also lights up the bright surface right next to the outline,
+  // drawing a halo around every digit.) A pixel is ink if it stands out by more than
+  // `offset` above that local base; `floor` still applies as a minimum brightness. Kernel in
+  // cell px (reference size, strokes ~2px): 5 is wider than any stroke, narrower than a
+  // digit's closed counters.
+  const LOCAL_KERNEL = 5;
+  function binarizeLocal(sub, offset, floor) {
+    const { data, w, h } = sub;
+    const opening = greyOpening(sub, LOCAL_KERNEL);
+    const b = new Uint8Array(data.length);
+    for (let i = 0; i < data.length; i++) {
+      const v = data[i];
+      if (v >= floor && v - opening.data[i] > offset) b[i] = 1;
+    }
+    return { data: b, w, h };
+  }
+
+  // the black/white cut as P asks for it: local when P.localThr is set, else global
+  function binarizeP(sub, P) {
+    return P.localThr ? binarizeLocal(sub, P.localThr, P.floor) : binarize(sub, P.floor);
+  }
+
   function binarize(sub, floor) {
     const thr = Math.max(otsu(sub.data), floor);
     const b = new Uint8Array(sub.data.length);
@@ -418,7 +446,7 @@
       sub = crop(V, W, H, cx - stripL, cy - P.up, cx + stripR, cy + P.dn);
     }
     if (!sub.w || !sub.h) return { text: '?', conf: 0, glyphs: [] };
-    const bin = dropSmallBlobs(binarize(sub, P.floor), P.minBlob);
+    const bin = dropSmallBlobs(binarizeP(sub, P), P.minBlob);
 
     // Auto-detect how far the real number extends and mask off everything past it -
     // skipped when a user has manually pinned stripRight for this exact slot (see the OCR
@@ -595,7 +623,7 @@
     } else {
       sub = crop(V, W, H, cx - stripL, cy - P.up, cx + stripR, cy + P.dn);
     }
-    return { shrunk: sub, binarized: dropSmallBlobs(binarize(sub, P.floor), P.minBlob) };
+    return { shrunk: sub, binarized: dropSmallBlobs(binarizeP(sub, P), P.minBlob) };
   }
 
   // Binarisation floors tried per cell by readCellAdaptive, spanning "dim glyph on bright
@@ -903,7 +931,7 @@
   }
 
   return {
-    otsu, crop, binarize, dropSmallBlobs, components, iou, slideMatch, greyOpening, resampleRGBA, resample,
+    otsu, crop, binarize, binarizeLocal, binarizeP, dropSmallBlobs, components, iou, slideMatch, greyOpening, resampleRGBA, resample,
     extractTemplates, readCell, readCellEx, readCellAdaptive, valueChannelFromRGBA, valueChannelDesatMax, adjustRGBA,
     templatesFromJSON, bankFromJSON, DEFAULTS, DESAT_SAT, contrastGate, CONTRAST_RADIUS, debugShrunkCell, detectDigitSpan,
     upscaleTemplate, upscaleTemplateBank,

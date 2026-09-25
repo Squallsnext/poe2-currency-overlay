@@ -668,6 +668,8 @@ window.I18N_CATALOGS.de = {
   "networth.line.debug_img_binarized": "Schwarz-Weiß, so wird es mit den Ziffer-Vorlagen verglichen",
   "networth.line.debug_img_filtered": "Graustufen, so bekommt es der Leser (schwarz = rausgefiltert). floor schneidet daraus das rechte Bild",
   "networth.line.debug_img_raw": "Original",
+  "networth.line.debug_local_off": "lokaler Schnitt: aus (floor gilt für alles)",
+  "networth.line.debug_local_val": "lokaler Schnitt: Strich {v} heller als Umgebung",
   "networth.line.debug_preset_off": "Alle Filter aus",
   "networth.line.debug_preset_off_title": "Alle Filter neutral: mittleres Bild = Original. Nur Vorschau, gespeichert wird erst mit Speichern.",
   "networth.line.debug_preset_standard": "Standard",

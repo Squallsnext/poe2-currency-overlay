@@ -382,6 +382,10 @@
             { key: 'desatSat', min: 5, max: 255, step: 5, fmt: (v) => t('networth.line.debug_sat_val', { v }) },
             { key: 'contrast', min: 0, max: 200, step: 5, fmt: (v) => t('networth.line.debug_contrast_val', { v }) },
             { key: 'floor', min: 60, max: 200, step: 5, fmt: floorFmt },
+            // local cut: 0 = off (one global floor for the whole cell); above 0 a pixel
+            // is ink only if it is a thin stroke standing out this much from its own
+            // surroundings - separates a white digit from white marble behind it
+            { key: 'localThr', min: 0, max: 100, step: 5, fmt: (v) => (+v ? t('networth.line.debug_local_val', { v }) : t('networth.line.debug_local_off')) },
             // speck size: after the black/white cut, drop white blobs smaller than this -
             // for icon highlights exactly as white/grey as a digit, which no pixel filter can
             { key: 'minBlob', min: 0, max: 30, step: 1, fmt: (v) => t('networth.line.debug_blob_val', { v }) },
@@ -473,7 +477,7 @@
           stdBtn.onclick = (e) => { e.stopPropagation(); if (cached.defaults) setAll(cached.defaults, false); };
           const offBtn = el('button', 'nw-dbg-pin', t('networth.line.debug_preset_off'));
           offBtn.title = t('networth.line.debug_preset_off_title');
-          offBtn.onclick = (e) => { e.stopPropagation(); setAll({ satPct: 100, bright: 0, gain: 100, desatSat: 255, contrast: 0, minBlob: 0 }, true); };
+          offBtn.onclick = (e) => { e.stopPropagation(); setAll({ satPct: 100, bright: 0, gain: 100, desatSat: 255, contrast: 0, minBlob: 0, localThr: 0 }, true); };
           presetRow.appendChild(stdBtn); presetRow.appendChild(offBtn);
           btnRow.appendChild(saveBtn);
           if (hasSaved) btnRow.appendChild(resetBtn);
