@@ -25,6 +25,10 @@
   // fresh capture (see onStashCaptured below) and per-slot after a teach/forget, since
   // either changes what the NEXT fetch of that slot would show.
   const dbgImgCache = {};
+  // OCR-debug "copy settings": slider values copied from one slot, to paste onto another.
+  // In memory only (per app session) - pasting just moves the target's sliders, saving
+  // is still an explicit "Speichern" there.
+  let dbgClipboard = null;
   const TAB_LABEL = { currency: t('networth.tab.currency'), abyss: t('networth.tab.abyss'), essence: t('networth.tab.essence'), runes: t('networth.tab.runes'), 'runes-kalguuran': t('networth.tab.runes_kalguuran'), ritual: t('networth.tab.ritual'), soulcore: t('networth.tab.soulcore'), idol: t('networth.tab.idol'), 'ancient-augment': t('networth.tab.ancient_augment'), delirium: t('networth.tab.delirium'), breach: t('networth.tab.breach'), expedition: t('networth.tab.expedition') };
   const MIRROR_ICON = 'https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lEdXBsaWNhdGUiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/26bc31680e/CurrencyDuplicate.png';
 
@@ -478,7 +482,24 @@
           const offBtn = el('button', 'nw-dbg-pin', t('networth.line.debug_preset_off'));
           offBtn.title = t('networth.line.debug_preset_off_title');
           offBtn.onclick = (e) => { e.stopPropagation(); setAll({ satPct: 100, bright: 0, gain: 100, desatSat: 255, contrast: 0, minBlob: 0, localThr: 0 }, true); };
+          // copy: every slider as shown, except an automatic floor - that stays automatic
+          // on the target too instead of becoming this slot's sweep result
+          const copyBtn = el('button', 'nw-dbg-pin', t('networth.line.debug_copy_button'));
+          copyBtn.title = t('networth.line.debug_copy_title');
+          const pasteBtn = el('button', 'nw-dbg-pin', t('networth.line.debug_paste_button'));
+          pasteBtn.title = t('networth.line.debug_paste_title');
+          copyBtn.onclick = (e) => {
+            e.stopPropagation();
+            const v = values();
+            if (!touched.has('floor') && saved.floor == null) delete v.floor;
+            dbgClipboard = v;
+            copyBtn.textContent = t('networth.line.debug_copied');
+            // no render(): it would rebuild this panel and drop unsaved slider changes;
+            // other panels' "Einfügen" reads dbgClipboard when clicked
+          };
+          pasteBtn.onclick = (e) => { e.stopPropagation(); if (dbgClipboard) setAll(dbgClipboard, true); };
           presetRow.appendChild(stdBtn); presetRow.appendChild(offBtn);
+          presetRow.appendChild(copyBtn); presetRow.appendChild(pasteBtn);
           btnRow.appendChild(saveBtn);
           if (hasSaved) btnRow.appendChild(resetBtn);
           btnRow.appendChild(status);
