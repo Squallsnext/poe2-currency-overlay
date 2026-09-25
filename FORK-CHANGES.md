@@ -180,6 +180,11 @@ Only red/yellow boxes are shown by default ("also show good slots" reveals the r
   tolerance is below the gap to the offset half-rows (~19 px), so neighbouring rows are
   never pulled in. Made for controller players, who cannot line boxes up by dragging onto
   the game's frame and always end up a few px off.
+- **Column align (key S):** select the top box of a column; every box below it whose centre
+  is within 25 reference px left/right takes the same x (y untouched). Wider than the row
+  tolerance because hand-placed boxes drift sideways more, still under half the column
+  spacing.
+- **Undo (Ctrl+Z)** for drags, nudges and both align actions (50 steps).
 - **Grid** toggle with adjustable spacing, plus a dashed guide line through the selected
   box's centre. Both settings are remembered.
 - **Save & apply** writes per-slot `cx, cy, stripWidth, up, dn` (reference-space) into
