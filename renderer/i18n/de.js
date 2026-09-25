@@ -673,6 +673,7 @@ window.I18N_CATALOGS.de = {
   "networth.line.debug_img_binarized": "Schwarz-Weiß, so wird es mit den Ziffer-Vorlagen verglichen",
   "networth.line.debug_img_filtered": "Graustufen, so bekommt es der Leser (schwarz = rausgefiltert). floor schneidet daraus das rechte Bild",
   "networth.line.debug_img_raw": "Original",
+  "networth.line.debug_learn_already": "liest schon sicher ({pct}%), nichts gelernt. Lernen erst unter 75% oder bei falscher Zahl",
   "networth.line.debug_learn_button": "Aus diesem Bild lernen",
   "networth.line.debug_learn_failed": "konnte nicht lernen, nochmal scannen",
   "networth.line.debug_learn_ok": "gelernt: {value}",

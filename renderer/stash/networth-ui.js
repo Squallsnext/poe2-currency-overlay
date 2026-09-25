@@ -29,6 +29,12 @@
   // In memory only (per app session) - pasting just moves the target's sliders, saving
   // is still an explicit "Speichern" there.
   let dbgClipboard = null;
+  // Teaching (the row's ✓ and the panel's "learn from this image") only when the reader
+  // reads the number right but UNSURE - below this confidence. A confident correct read
+  // would only add a near-identical copy to the exemplar pool (the learned template is
+  // the median of up to 30, so copies drown out variety instead of adding it). A WRONG
+  // read is always teachable, whatever its confidence.
+  const LEARN_BELOW = 0.75;
   // OCR-debug settings section open/closed - one choice for every slot's panel,
   // remembered across restarts. Closed by default: the sliders are only needed while
   // tuning, and a closed section keeps the list from jumping on every re-render.
@@ -309,7 +315,9 @@
         // actual correction. This is an explicit, deliberate "yes" from the user, so it's
         // safe to feed the same way: unlike the count field's blur handler, it can't fire
         // from an idle click that never checked the number.
-        if (cl === 'low' && effCount(ln) > 0 && window.api.stashTeachCount) {
+        // below LEARN_BELOW only: a read the reader is already sure of adds nothing but
+        // near-identical copies to the exemplar pool
+        if (pct < LEARN_BELOW * 100 && effCount(ln) > 0 && window.api.stashTeachCount) {
           const okBtn = el('button', 'nw-conf-confirm', '✓');
           okBtn.title = t('networth.line.confirm_title');
           okBtn.onclick = async (e) => {
@@ -572,6 +580,11 @@
               e.stopPropagation();
               const value = learnIn.value.replace(/[^0-9]/g, '');
               if (!value) return;
+              const pv = cached.preview;
+              if (pv && pv.text === value && pv.conf >= LEARN_BELOW) {
+                learnMsg.textContent = t('networth.line.debug_learn_already', { pct: Math.round(pv.conf * 100) });
+                return;
+              }
               learnBtn.disabled = true;
               const v = values();
               if (!touched.has('floor') && saved.floor == null) v.floor = cached.floor; // the floor the preview used

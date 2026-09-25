@@ -678,6 +678,7 @@ window.I18N_CATALOGS.en = {
   "networth.line.debug_img_binarized": "Black/white, what the digit templates are matched against",
   "networth.line.debug_img_filtered": "Greyscale as the reader gets it (black = filtered out). floor cuts the right image from this",
   "networth.line.debug_img_raw": "Original",
+  "networth.line.debug_learn_already": "already reads it confidently ({pct}%), nothing learned. Learns below 75% or on a wrong number",
   "networth.line.debug_learn_button": "Learn from this image",
   "networth.line.debug_learn_failed": "could not learn, scan again",
   "networth.line.debug_learn_ok": "learned: {value}",
