@@ -168,6 +168,37 @@
     return { data: b, w: sub.w, h: sub.h };
   }
 
+  // Remove white blobs smaller than minArea px (8-connected, so a digit's diagonal
+  // strokes stay one blob). A digit at reference size is 15+ px of ink; a highlight on the
+  // icon art that is as white and as grey as a digit - which saturation/contrast/floor
+  // therefore can't remove - is usually a speck of a few px. Size is what tells them apart.
+  // In place; minArea <= 1 is a no-op.
+  function dropSmallBlobs(bin, minArea) {
+    if (!minArea || minArea <= 1) return bin;
+    const { data, w, h } = bin;
+    const seen = new Uint8Array(data.length);
+    const stack = [], blob = [];
+    for (let i = 0; i < data.length; i++) {
+      if (!data[i] || seen[i]) continue;
+      stack.length = 0; blob.length = 0;
+      stack.push(i); seen[i] = 1;
+      while (stack.length) {
+        const j = stack.pop(); blob.push(j);
+        const x = j % w, y = (j - x) / w;
+        for (let dy = -1; dy <= 1; dy++) {
+          const yy = y + dy; if (yy < 0 || yy >= h) continue;
+          for (let dx = -1; dx <= 1; dx++) {
+            const xx = x + dx; if (xx < 0 || xx >= w) continue;
+            const k = yy * w + xx;
+            if (data[k] && !seen[k]) { seen[k] = 1; stack.push(k); }
+          }
+        }
+      }
+      if (blob.length < minArea) for (const j of blob) data[j] = 0;
+    }
+    return bin;
+  }
+
   // 4-connectivity connected components (scipy.ndimage.label default structure).
   // Returns [{ mask:{data,w,h}, x, area }] where mask is cropped to the bbox and
   // x is the component's min-x in strip coords.
@@ -387,7 +418,7 @@
       sub = crop(V, W, H, cx - stripL, cy - P.up, cx + stripR, cy + P.dn);
     }
     if (!sub.w || !sub.h) return { text: '?', conf: 0, glyphs: [] };
-    const bin = binarize(sub, P.floor);
+    const bin = dropSmallBlobs(binarize(sub, P.floor), P.minBlob);
 
     // Auto-detect how far the real number extends and mask off everything past it -
     // skipped when a user has manually pinned stripRight for this exact slot (see the OCR
@@ -564,7 +595,7 @@
     } else {
       sub = crop(V, W, H, cx - stripL, cy - P.up, cx + stripR, cy + P.dn);
     }
-    return { shrunk: sub, binarized: binarize(sub, P.floor) };
+    return { shrunk: sub, binarized: dropSmallBlobs(binarize(sub, P.floor), P.minBlob) };
   }
 
   // Binarisation floors tried per cell by readCellAdaptive, spanning "dim glyph on bright
@@ -839,7 +870,7 @@
   }
 
   return {
-    otsu, crop, binarize, components, iou, slideMatch, greyOpening, resampleRGBA, resample,
+    otsu, crop, binarize, dropSmallBlobs, components, iou, slideMatch, greyOpening, resampleRGBA, resample,
     extractTemplates, readCell, readCellEx, readCellAdaptive, valueChannelFromRGBA, valueChannelDesatMax,
     templatesFromJSON, bankFromJSON, DEFAULTS, DESAT_SAT, contrastGate, CONTRAST_RADIUS, debugShrunkCell, detectDigitSpan,
     upscaleTemplate, upscaleTemplateBank,

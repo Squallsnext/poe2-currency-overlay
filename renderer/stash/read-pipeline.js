@@ -62,6 +62,7 @@
   // Read params for one slot: tab defaults, scale tweaks, then the slot's own box override.
   function slotParams(map, scale, ov) {
     const P = paramsForScale(paramsFor(map), scale);
+    if (ov && ov.minBlob != null) P.minBlob = ov.minBlob;
     if (!ov || (ov.stripWidth == null && ov.up == null && ov.dn == null && ov.stripLeft == null && ov.stripRight == null)) return P;
     return Object.assign({}, P, {
       stripWidth: ov.stripWidth != null ? ov.stripWidth : P.stripWidth,

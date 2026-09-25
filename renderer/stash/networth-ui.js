@@ -364,9 +364,9 @@
           // a full re-render would drop slider focus mid-drag).
           const controls = el('div', 'nw-dbg-controls');
           const previewLabel = el('span', 'nw-dbg-preview');
-          const mkRow = (min, max, value, fmt) => {
+          const mkRow = (min, max, value, fmt, step) => {
             const row = el('div', 'nw-dbg-floor-row');
-            const s = el('input', 'nw-dbg-slider'); s.type = 'range'; s.min = min; s.max = max; s.step = 5; s.value = value;
+            const s = el('input', 'nw-dbg-slider'); s.type = 'range'; s.min = min; s.max = max; s.step = step || 5; s.value = value;
             const lab = el('span', 'nw-dbg-floor-val', fmt(value));
             row.appendChild(s); row.appendChild(lab);
             return { row, s, lab, fmt };
@@ -378,8 +378,11 @@
           const floorC = mkRow(60, 200, cached.floor, floorFmt);
           const satC = mkRow(5, 120, cached.desatSat, (v) => t('networth.line.debug_sat_val', { v }));
           const conC = mkRow(0, 200, cached.contrast, (v) => t('networth.line.debug_contrast_val', { v }));
+          // speck size: after the black/white cut, drop white blobs smaller than this -
+          // for icon highlights exactly as white/grey as a digit, which no pixel filter can
+          const blobC = mkRow(0, 30, cached.minBlob || 0, (v) => t('networth.line.debug_blob_val', { v }), 1);
           const saved = cached.saved || {};
-          const hasSaved = saved.floor != null || saved.desatSat != null || saved.contrast != null;
+          const hasSaved = saved.floor != null || saved.desatSat != null || saved.contrast != null || saved.minBlob != null;
           const btnRow = el('div', 'nw-dbg-floor-row');
           const saveBtn = el('button', 'nw-dbg-pin', t('networth.line.debug_save_button'));
           const resetBtn = el('button', 'nw-dbg-forget', t('networth.line.debug_reset_button'));
@@ -387,7 +390,8 @@
           const status = el('span', 'nw-dbg-floor-val');
           // saved = these exact slider values are what the reader uses for this slot
           const updateStatus = () => {
-            const same = hasSaved && +floorC.s.value === saved.floor && +satC.s.value === saved.desatSat && +conC.s.value === saved.contrast;
+            const same = hasSaved && +floorC.s.value === saved.floor && +satC.s.value === saved.desatSat && +conC.s.value === saved.contrast
+              && +blobC.s.value === (saved.minBlob || 0);
             saveBtn.disabled = same;
             status.textContent = same ? t('networth.line.debug_status_saved')
               : hasSaved ? t('networth.line.debug_status_changed') : t('networth.line.debug_status_auto');
@@ -400,22 +404,22 @@
           const refreshPreview = () => {
             clearTimeout(debounceT);
             debounceT = setTimeout(async () => {
-              const res = await window.api.stashSlotDebugImage(ln.apiId, { floor: +floorC.s.value, desatSat: +satC.s.value, contrast: +conC.s.value }).catch(() => null);
+              const res = await window.api.stashSlotDebugImage(ln.apiId, { floor: +floorC.s.value, desatSat: +satC.s.value, contrast: +conC.s.value, minBlob: +blobC.s.value }).catch(() => null);
               if (!res || !res.ok) return;
               rawImg.src = res.rawUrl; filtImg.src = res.filtUrl; binImg.src = res.binUrl;
               showPreview(res.preview);
-              Object.assign(cached, { floor: res.floor, effFloor: res.effFloor, desatSat: res.desatSat, contrast: res.contrast,
+              Object.assign(cached, { floor: res.floor, effFloor: res.effFloor, desatSat: res.desatSat, contrast: res.contrast, minBlob: res.minBlob,
                 rawUrl: res.rawUrl, filtUrl: res.filtUrl, binUrl: res.binUrl, preview: res.preview });
               floorC.lab.textContent = floorFmt(floorC.s.value);
             }, 120);
           };
-          for (const c of [floorC, satC, conC]) {
+          for (const c of [floorC, satC, conC, blobC]) {
             c.s.addEventListener('input', () => { c.lab.textContent = c.fmt(c.s.value); updateStatus(); refreshPreview(); });
           }
           saveBtn.onclick = async (e) => {
             e.stopPropagation();
             saveBtn.disabled = true;
-            try { await window.api.stashSlotSaveReadSettings(ln.apiId, { floor: +floorC.s.value, desatSat: +satC.s.value, contrast: +conC.s.value }); } catch {}
+            try { await window.api.stashSlotSaveReadSettings(ln.apiId, { floor: +floorC.s.value, desatSat: +satC.s.value, contrast: +conC.s.value, minBlob: +blobC.s.value }); } catch {}
             delete dbgImgCache[ln.apiId];
             render();
           };
@@ -434,6 +438,7 @@
           controls.appendChild(floorC.row);
           controls.appendChild(satC.row);
           controls.appendChild(conC.row);
+          controls.appendChild(blobC.row);
           controls.appendChild(btnRow);
           if (ln.count != null && window.api.stashForgetDigits) {
             const forget = el('button', 'nw-dbg-forget', t('networth.line.forget_button'));

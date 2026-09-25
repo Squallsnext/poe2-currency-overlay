@@ -2178,13 +2178,14 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
     const pick = (k, dflt) => (opts && opts[k] != null ? Math.round(opts[k]) : (ov && ov[k] != null ? ov[k] : dflt));
     const desatSat = pick('desatSat', DR.DESAT_SAT);
     const contrast = pick('contrast', 0);
+    const minBlob = pick('minBlob', 0);
     const floorIn = pick('floor', null);
     // exactly the live reader's path (read-pipeline.js): same regime, same position,
     // same params, same bank including learned corrections
     const bitmap = Buffer.from(cap.bitmap);
     const ch = RP.buildChannel(bitmap, cap.W, cap.H, cap.box, refBox, desatSat, contrast);
     const pos = RP.slotPos(ch, slot, ov, refBox, cap.box);
-    const P = RP.slotParams(map, ch.scale, ov);
+    const P = Object.assign(RP.slotParams(map, ch.scale, ov), { minBlob });
     let learned = null;
     try { learned = loadLearnedTemplates(); } catch { /* none yet */ }
     const bankInfo = RP.buildBank(require('./renderer/stash/digit-templates.json'), learned);
@@ -2231,13 +2232,14 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
       rawUrl: toUrl(rawBuf, cw, chh, UPSCALE),
       filtUrl: toUrl(filtBuf, cw, chh, UPSCALE),
       binUrl: toUrl(binBuf, binarized.w, binarized.h, 6),
-      floor, effFloor, desatSat, contrast,
+      floor, effFloor, desatSat, contrast, minBlob,
       // what is saved for this slot right now (null = automatic), so the panel can tell
       // "slider moved, not saved yet" from "this is the saved value"
       saved: {
         floor: ov && ov.floor != null ? ov.floor : null,
         desatSat: ov && ov.desatSat != null ? ov.desatSat : null,
         contrast: ov && ov.contrast != null ? ov.contrast : null,
+        minBlob: ov && ov.minBlob != null ? ov.minBlob : null,
       },
       preview: { text: previewText, conf: read.conf },
     };
@@ -2505,6 +2507,8 @@ ipcMain.handle('stash-adjust-save', (_e, { tab, deltas } = {}) => {
 //   desatSat  max colourfulness a digit pixel may have - lower cuts coloured icon art
 //   contrast  how much darker a digit pixel's surroundings must get (its black outline)
 //             - cuts bright grey/white icon spots, which floor and saturation can't
+//   minBlob   white specks smaller than this many px are dropped after the black/white
+//             cut - for highlights exactly as white as a digit, which no pixel filter can
 // settings === null resets the slot to automatic (also clears an old right-edge trim from
 // the earlier per-slider version, which no longer has a control of its own).
 ipcMain.handle('stash-slot-save-read-settings', (_e, { apiId, settings } = {}) => {
@@ -2513,10 +2517,10 @@ ipcMain.handle('stash-slot-save-read-settings', (_e, { apiId, settings } = {}) =
     if (!found) return { ok: false, reason: 'no-recent-capture' };
     if (settings == null) {
       const cur = config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId];
-      if (cur) { delete cur.floor; delete cur.desatSat; delete cur.contrast; delete cur.stripRight; }
+      if (cur) { delete cur.floor; delete cur.desatSat; delete cur.contrast; delete cur.minBlob; delete cur.stripRight; }
     } else {
       const delta = {};
-      for (const k of ['floor', 'desatSat', 'contrast']) if (settings[k] != null) delta[k] = Math.round(settings[k]);
+      for (const k of ['floor', 'desatSat', 'contrast', 'minBlob']) if (settings[k] != null) delta[k] = Math.round(settings[k]);
       mergeSlotOverrides(found.tab, { [apiId]: delta });
     }
     saveConfig();
