@@ -258,7 +258,28 @@ the extra Exalted cells, 4.7) appear in the tool automatically.
   (`currency-tab-map.js`); slot alignment tool ("Ausrichten") writes per-slot
   `cx/cy/stripWidth/up/dn` overrides (see 4.5).
 
-### 4.7 Setup-specific – probably not for upstream as-is
+### 4.7 Calibration window (4K/5K, taskbar)
+
+- **Exact capture size:** the screenshot size is taken from the capture Chromium actually
+  returns instead of `display.size × scaleFactor`, which on 5K/scaled displays came back a
+  few pixels short and skewed the calibration box.
+- **No taskbar offset:** the screenshot covers the full display, including the strip
+  Windows reserves for the taskbar. The calibration window was constrained to the work
+  area, so the image was drawn shifted against the pixels the user aligned. It now goes
+  real fullscreen on the display bounds (`setBounds(disp.bounds)` + `setFullScreen`).
+- **Separate X/Y scale** between capture pixels and window pixels, recomputed on resize,
+  so the box and magnifier stay accurate from top to bottom.
+- Diagnostics: an on-screen line with capture/window/display sizes, and
+  `userData/calibration-debug.log`.
+- **Not for upstream as-is:** the window's texts (`calibrate.html`, `calibrate.js`) were
+  rewritten directly in German instead of going through i18n, and the diagnostics line is
+  always shown. Both need an i18n pass / a debug gate before merging.
+
+**Needs testing:** verified only on one 5K display with the taskbar at the bottom. Not
+tested: 1080p/1440p, 150 %/200 % Windows scaling at other resolutions, taskbar left/right
+or auto-hide, multi-monitor with the game on a secondary display.
+
+### 4.8 Setup-specific – probably not for upstream as-is
 
 - **Extra Exalted slots** `exalted-2..4` in the dynamic bottom rows of the currency tab
   (row 1 cell 1, row 2 cells 1–2), priced as Exalted via a new `priceAs` slot field and shown
