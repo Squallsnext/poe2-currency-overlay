@@ -329,6 +329,17 @@
               okBtn.classList.add('nw-conf-confirm-done');
               okBtn.textContent = '✓';
               okBtn.title = t('networth.line.confirm_done_title');
+              // re-read this slot right away with the just-learned templates (same path as
+              // a scan, saved settings) so the percentage reflects the lesson now, not only
+              // after the next scan
+              try {
+                const rr = await window.api.stashSlotDebugImage(ln.apiId);
+                if (rr && rr.ok && rr.preview && rr.preview.text === String(effCount(ln))) {
+                  ln.conf = rr.preview.conf;
+                  delete dbgImgCache[ln.apiId];
+                  render();
+                }
+              } catch { /* keep the old percentage; the next scan updates it */ }
             } else {
               // Segmentation couldn't isolate one glyph per digit for this exact frame
               // (touching digits, icon bleed, ...) - the teach pipeline refuses rather
