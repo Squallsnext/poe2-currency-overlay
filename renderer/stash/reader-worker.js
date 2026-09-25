@@ -196,7 +196,7 @@ parentPort.on('message', (msg) => {
       const glyphs = (r.glyphs || []).map((g) => ({
         ch: bk.unmap(g.ch), source: bk.sourceOf(g.ch), score: g.score, gapFilled: g.gapFilled,
       }));
-      reads.push({ apiId: s.apiId, count: raw === '?' ? null : parseInt(raw, 10), conf: raw === '?' ? null : conf, rel, glyphs });
+      reads.push({ apiId: s.apiId, priceAs: s.priceAs || null, suffix: s.suffix || null, count: raw === '?' ? null : parseInt(raw, 10), conf: raw === '?' ? null : conf, rel, glyphs });
     }
     parentPort.postMessage({
       ok: true, tab, score: det.score, readCount, slotCount: map.STATIC_SLOTS.length, reads,

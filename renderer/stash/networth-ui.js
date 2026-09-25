@@ -309,7 +309,7 @@
       line.appendChild(tg);
       if (ln.icon) { const img = el('img', 'nw-ic'); img.src = ln.icon; img.onerror = () => img.remove(); line.appendChild(img); }
       else line.appendChild(el('div', 'nw-ic nw-ic-none'));
-      line.appendChild(el('div', 'nw-name', esc(window.gameName(ln.name)))); // feed is English; show the client's own name
+      line.appendChild(el('div', 'nw-name', esc(window.gameName(ln.name) + (ln.suffix || '')))); // feed is English; show the client's own name (+ "#2" for an extra slot of the same currency)
       if (state.showConfidence && ln.conf != null) {
         const pct = Math.round(ln.conf * 100);
         const cl = pct >= 88 ? 'ok' : (pct >= 80 ? 'mid' : 'low');

@@ -2617,8 +2617,11 @@ async function readStashFrame(shot, onDetected) {
 
     const lines = []; const flags = []; let total = 0;
     res.reads.forEach((r, i) => {
-      const info = prices[r.apiId] || {};
+      // priceAs: an extra slot holding a currency that already has its own slot (the
+      // overflow Exalted cells) is priced and named as that currency
+      const info = prices[r.priceAs || r.apiId] || {};
       const name = info.name || r.apiId;
+      const suffix = r.suffix || null;
       const price = typeof info.price === 'number' ? info.price : null;
       const icon = info.icon || null;
       // slot = read order = stash reading order (top-to-bottom, left-to-right)
@@ -2626,12 +2629,12 @@ async function readStashFrame(shot, onDetected) {
         // empty / unread slot: a 0-count line the UI shows (editable) only when
         // "Show missing" is on. flags kept for the read-count summary.
         flags.push({ apiId: r.apiId, name });
-        lines.push({ apiId: r.apiId, name, icon, count: 0, price, valueEx: price != null ? 0 : null, slot: i, missing: true, conf: null });
+        lines.push({ apiId: r.apiId, name, suffix, icon, count: 0, price, valueEx: price != null ? 0 : null, slot: i, missing: true, conf: null });
         return;
       }
       const valueEx = price != null ? r.count * price : null;
       if (valueEx != null) total += valueEx;
-      lines.push({ apiId: r.apiId, name, icon, count: r.count, price, valueEx, slot: i, conf: typeof r.conf === 'number' ? r.conf : null, rel: r.rel || null });
+      lines.push({ apiId: r.apiId, name, suffix, icon, count: r.count, price, valueEx, slot: i, conf: typeof r.conf === 'number' ? r.conf : null, rel: r.rel || null });
     });
     lines.sort((a, b) => (b.valueEx || 0) - (a.valueEx || 0));
     return {

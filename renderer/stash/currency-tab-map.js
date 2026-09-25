@@ -65,6 +65,15 @@
     { cx: 276.99, cy: 582.81, apiId: 'regal-shard' },
     { cx: 339.94, cy: 582.76, apiId: 'chance-shard' },
     { cx: 403.34, cy: 582.76, apiId: 'artificers-shard' },
+    // Extra Exalted stacks in the dynamic bottom rows - the user keeps overflow Exalted
+    // (15k+ total) there, so these cells are read as Exalted and priced like it
+    // (priceAs). Own apiIds so each keeps its own reader settings/alignment; the net worth
+    // total adds them up like any other line. Coords ESTIMATED from the old DYNAMIC_ROWS
+    // anchors plus the shift the static slots showed after the 2026-09-25 UI-text
+    // recalibration (~+2 x, +3 y) - fix with "Ausrichten" if a box sits off.
+    { cx: 129, cy: 653, apiId: 'exalted-2', priceAs: 'exalted', suffix: ' #2' },
+    { cx: 130, cy: 709, apiId: 'exalted-3', priceAs: 'exalted', suffix: ' #3' },
+    { cx: 183, cy: 709, apiId: 'exalted-4', priceAs: 'exalted', suffix: ' #4' },
   ];
 
   // Known static slots that were empty in the reference tab (coords TBD via a
@@ -72,6 +81,7 @@
   const EMPTY_STATIC_TODO = ['mirror', 'hinekoras-lock'];
 
   // The 2 dynamic bottom rows: contents are arbitrary -> icon match required.
+  // (Exception: the three cells read as extra Exalted stacks above.)
   // Row anchors (y) known; per-cell identification deferred to the icon matcher.
   const DYNAMIC_ROWS = [
     { y: 650, xs: [127, 184, 241, 299, 353, 412, 468] },
