@@ -667,7 +667,7 @@ window.I18N_CATALOGS.en = {
   "networth.line.confirm_title": "Confirm this count is correct - teaches the reader from it",
   "networth.line.debug_contrast_val": "contrast {v}",
   "networth.line.debug_img_binarized": "Black/white, what the digit templates are matched against",
-  "networth.line.debug_img_filtered": "After saturation + contrast (grey = kept, red = filtered out)",
+  "networth.line.debug_img_filtered": "After saturation + contrast (black = filtered out)",
   "networth.line.debug_img_raw": "Original",
   "networth.line.debug_preview": "would read: {text} ({pct}%)",
   "networth.line.debug_reset_button": "Back to automatic",

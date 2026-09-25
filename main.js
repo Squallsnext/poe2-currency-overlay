@@ -2193,8 +2193,8 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
     const previewText = read.text === '?' ? '?' : bankInfo.unmap(read.text);
 
     // three views of the SAME window of the SAME buffer the reader used, so they line up
-    // pixel for pixel: the original, the channel the sliders produce (before the black/
-    // white cut), and the binarized cell the templates are matched against
+    // pixel for pixel: the original, the original after saturation/contrast (before the
+    // black/white cut), and the binarized cell the templates are matched against
     const cs = ch.cellScale;
     const stripL = P.stripLeft != null ? P.stripLeft : P.stripWidth;
     const stripR = P.stripRight != null ? P.stripRight : P.stripWidth;
@@ -2210,17 +2210,10 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
         const si = (y0 + y) * ch.W2 + (x0 + x), sp = si * 4, dp = (y * cw + x) * 4;
         const c0 = ch.src[sp], c1 = ch.src[sp + 1], c2 = ch.src[sp + 2];
         rawBuf[dp] = c0; rawBuf[dp + 1] = c1; rawBuf[dp + 2] = c2; rawBuf[dp + 3] = 255;
-        const v = ch.V[si];
-        const lum = Math.max(c0, c1, c2);
-        if (v) {
-          // kept by saturation + contrast: grey at its brightness, so the floor cut in
-          // the third view can be judged against it
-          filtBuf[dp] = filtBuf[dp + 1] = filtBuf[dp + 2] = v;
-        } else if (lum >= floor) {
-          // bright enough to have been ink, but removed by saturation/contrast: red
-          // (bitmap is BGRA, so red is byte 2)
-          filtBuf[dp] = 0; filtBuf[dp + 1] = 0; filtBuf[dp + 2] = 200;
-        }
+        // the original as the sliders leave it: a kept pixel keeps its colour, a pixel
+        // saturation/contrast removed goes black - which is exactly what it is to the
+        // reader from here on
+        if (ch.V[si]) { filtBuf[dp] = c0; filtBuf[dp + 1] = c1; filtBuf[dp + 2] = c2; }
         filtBuf[dp + 3] = 255;
       }
     }
