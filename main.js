@@ -2420,9 +2420,11 @@ button#cancel{background:#3a3a3a;color:#eee}
     <label>Höhe <input id="gh" type="number" step="1"></label>
   </div>
   <label id="toggleok"><input id="showok" type="checkbox"> auch gute Felder zeigen</label>
-  <button id="rowalign" title="Alle Kästchen rechts vom ausgewählten, die höchstens 10 px höher oder tiefer sitzen, auf dieselbe Höhe setzen (nur die Höhe, links/rechts bleibt). Taste R">Reihe angleichen</button>
+  <button id="rowalign" title="Alle Kästchen rechts vom ausgewählten, die höchstens 10 px höher oder tiefer sitzen, auf dieselbe Höhe setzen (nur die Höhe, links/rechts bleibt). Taste R">Reihe angleichen →</button>
+  <button id="colalign" title="Alle Kästchen unter dem ausgewählten, die höchstens 25 px links oder rechts davon sitzen, auf dieselbe Spalte setzen (nur links/rechts, die Höhe bleibt). Taste S">Spalte angleichen ↓</button>
+  <button id="undo" title="Letztes Angleichen / Verschieben rückgängig machen. Strg+Z">Rückgängig</button>
   <label id="togglegrid"><input id="showgrid" type="checkbox"> Gitter <input id="gridstep" type="number" min="2" step="1" title="Gitterabstand in Pixeln"> px</label>
-  <span id="hint">Nur unsichere/falsche Felder werden standardmäßig gezeigt. Ziehen = verschieben, Pfeiltasten = 1px, Shift+Pfeil = 5px. Breite/Höhe = Größe für ALLE Kästchen auf einmal (auch die ausgeblendeten guten). Reihe angleichen (R): erstes Kästchen der Reihe auswählen, dann richten sich alle rechts davon in der Höhe danach aus. Gitter: gestrichelte Linie = Mitte des ausgewählten Kästchens.</span>
+  <span id="hint">Nur unsichere/falsche Felder werden standardmäßig gezeigt. Ziehen = verschieben, Pfeiltasten = 1px, Shift+Pfeil = 5px. Breite/Höhe = Größe für ALLE Kästchen auf einmal (auch die ausgeblendeten guten). Reihe angleichen (R): erstes Kästchen der Reihe auswählen, alle rechts davon übernehmen die Höhe. Spalte angleichen (S): oberstes Kästchen der Spalte auswählen, alle darunter übernehmen die Position links/rechts. Strg+Z = rückgängig. Gitter: gestrichelte Linie = Mitte des ausgewählten Kästchens.</span>
 </div>
 <div id="wrap" class="hide-ok"><img id="panel" src="data:image/png;base64,${data.panelBase64}"><div id="grid"></div><div id="guide"></div></div>
 <script>
@@ -2478,8 +2480,40 @@ function updateGuide(){
 // half-rows (~19), so a neighbouring row is never pulled in. Hidden good boxes on the
 // row move too - they are on the same line.
 const ROW_TOL = 10 * KY;
+// Undo: a snapshot of every box's position before each align/drag/nudge
+const history = [];
+function snapshot(){
+  history.push(DATA.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h })));
+  if (history.length > 50) history.shift();
+}
+function undo(){
+  const snap = history.pop(); if (!snap) return;
+  snap.forEach((p, i) => { Object.assign(DATA[i], p); const el = document.querySelector('.box[data-i="' + i + '"]'); if (el) place(el, DATA[i]); });
+  updateGuide();
+}
+// "Spalte angleichen": every box BELOW the selected one whose centre is within 25 reference
+// px left/right of it takes the selected box's horizontal position (x only). Wider than the
+// row tolerance because hand-placed boxes drift sideways more (30+ px at 5K seen), and still
+// under half the ~57-63 px column spacing, so the next column is not pulled in.
+const COL_TOL = 25 * KX;
+function alignCol(){
+  if (!selected) return;
+  snapshot();
+  const a = DATA[+selected.dataset.i];
+  const acx = a.x + a.w / 2, acy = a.y + a.h / 2;
+  for (let i = 0; i < DATA.length; i++) {
+    const r = DATA[i];
+    if (r === a) continue;
+    const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+    if (cy <= acy || Math.abs(cx - acx) > COL_TOL) continue;
+    r.x = acx - r.w / 2;
+    const el = document.querySelector('.box[data-i="' + i + '"]');
+    if (el) place(el, r);
+  }
+}
 function alignRow(){
   if (!selected) return;
+  snapshot();
   const a = DATA[+selected.dataset.i];
   const acx = a.x + a.w / 2, acy = a.y + a.h / 2;
   for (let i = 0; i < DATA.length; i++) {
@@ -2513,6 +2547,7 @@ DATA.forEach((r, i) => {
   el.innerHTML = '<div class="t">' + r.label.replace(/[&<>]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch])) + '</div>';
   place(el, r);
   el.addEventListener('pointerdown', (ev) => {
+    snapshot();
     select(el); el.setPointerCapture(ev.pointerId);
     drag = { i, sx: ev.clientX, sy: ev.clientY, x: r.x, y: r.y };
     ev.preventDefault();
@@ -2529,7 +2564,9 @@ DATA.forEach((r, i) => {
 document.addEventListener('keydown', (ev) => {
   if (ev.target && ev.target.tagName === 'INPUT') return; // typing a size/grid value
   if (!selected) return;
+  if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'z' || ev.key === 'Z')) { undo(); ev.preventDefault(); return; }
   if (ev.key === 'r' || ev.key === 'R') { alignRow(); ev.preventDefault(); return; }
+  if (ev.key === 's' || ev.key === 'S') { alignCol(); ev.preventDefault(); return; }
   const i = +selected.dataset.i, r = DATA[i];
   const n = ev.shiftKey ? 5 : 1;
   let dx = 0, dy = 0;
@@ -2538,6 +2575,7 @@ document.addEventListener('keydown', (ev) => {
   else if (ev.key === 'ArrowUp') dy = -n;
   else if (ev.key === 'ArrowDown') dy = n;
   else return;
+  if (!ev.repeat) snapshot(); // one undo step per key press, not per auto-repeat
   r.x += dx; r.y += dy;
   place(selected, r); updateGuide(); ev.preventDefault();
 });
@@ -2548,6 +2586,8 @@ document.getElementById('cancel').onclick = () => window.adjustApi.close();
 document.getElementById('save').onclick = () => window.adjustApi.save({ tab: TAB, deltas: deltas() });
 document.getElementById('showok').addEventListener('change', (ev) => wrap.classList.toggle('hide-ok', !ev.target.checked));
 document.getElementById('rowalign').onclick = () => alignRow();
+document.getElementById('colalign').onclick = () => alignCol();
+document.getElementById('undo').onclick = () => undo();
 // grid on/off and spacing are remembered for the next time the tool opens
 try { gridStep.value = localStorage.getItem('adjGridStep') || Math.max(4, Math.round(10 * KX)); } catch { gridStep.value = Math.max(4, Math.round(10 * KX)); }
 let gridOn = false; try { gridOn = localStorage.getItem('adjGridOn') === '1'; } catch {}
