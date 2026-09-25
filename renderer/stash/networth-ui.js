@@ -20,7 +20,7 @@
   const fmtDiv = (n) => n == null ? null : (n >= 100 ? Math.round(n) : n.toFixed(1)).toLocaleString('en-US') + ' ' + unit(t('networth.unit.div_label'), 'divine');
   const fmtCount = (n) => Number(n).toLocaleString('en-US');
 
-  const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, showOcrDebug: false, hiRes: false, showRel: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null, wizard: null, debugRows: new Set(), dbgLine: null };
+  const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, showOcrDebug: false, hiRes: false, showRel: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null, wizard: null, debugRows: new Set(), dbgLine: null, tabFix: null };
   // apiId -> {rawUrl, binUrl} | 'loading', for the OCR-debug toggle. Cleared on every
   // fresh capture (see onStashCaptured below) and per-slot after a teach/forget, since
   // either changes what the NEXT fetch of that slot would show.
@@ -374,6 +374,43 @@
     title.appendChild(el('span', 'nw-chev', open ? '▾' : '▸'));
     title.appendChild(document.createTextNode(labelFor(row)));
     head.appendChild(title);
+    // "Wrong tab?": pick what this tab really is. main keeps this capture's panel
+    // fingerprint for that tab (so it is recognised next time on this setup) and reads
+    // the same frame again as that tab.
+    if (window.api.stashCorrectTab) {
+      if (state.tabFix === row.id) {
+        const sel = el('select', 'nw-card-tabsel');
+        sel.appendChild(el('option', null, esc(t('networth.row.tabfix_pick'))));
+        for (const [k, label] of Object.entries(TAB_LABEL)) {
+          if (k === row.tab) continue;
+          const o = el('option', null, esc(label)); o.value = k; sel.appendChild(o);
+        }
+        sel.onclick = (e) => e.stopPropagation();
+        sel.onchange = async (e) => {
+          e.stopPropagation();
+          const toTab = sel.value; if (!toTab) return;
+          sel.disabled = true;
+          const res = await window.api.stashCorrectTab(row.tab, toTab).catch(() => null);
+          state.tabFix = null;
+          if (res && res.ok && !res.mismatch) {
+            row.tab = res.tab; row.result = res;
+            for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
+            state.notice = res.tab === toTab
+              ? { kind: 'ok', msg: t('networth.row.tabfix_done', { tabName: TAB_LABEL[toTab] || toTab }) }
+              : { kind: 'warn', msg: t('networth.row.tabfix_still', { tabName: TAB_LABEL[res.tab] || res.tab }) };
+          } else {
+            state.notice = { kind: 'warn', msg: t('networth.row.tabfix_failed') };
+          }
+          render();
+        };
+        head.appendChild(sel);
+      } else {
+        const fix = el('button', 'nw-card-tabfix', t('networth.row.tabfix_button'));
+        fix.title = t('networth.row.tabfix_title');
+        fix.onclick = (e) => { e.stopPropagation(); state.tabFix = row.id; render(); };
+        head.appendChild(fix);
+      }
+    }
 
     // On every scanned tab (it needs the captured frame, so it can only exist after a scan).
     // Used to appear only when a slot was flagged unsure - but a slot can read confidently

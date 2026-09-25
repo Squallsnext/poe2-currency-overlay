@@ -1926,3 +1926,6 @@ footer {
 .nw-line-dbg { flex: 0 0 auto; background: transparent; border: 1px solid var(--bd-16); border-radius: 4px; cursor: pointer; font-size: 11px; padding: 1px 5px; margin-left: 4px; opacity: .7; }
 .nw-line-dbg:hover { opacity: 1; border-color: var(--am-hi); }
 .nw-line-dbg-on { opacity: 1; border-color: var(--am-hi); background: color-mix(in srgb, var(--am-hi) 18%, transparent); }
+.nw-card-tabfix { flex: 0 0 auto; background: transparent; border: 1px solid var(--bd-16); color: var(--tx-dim); border-radius: 5px; font-size: 11px; padding: 2px 7px; cursor: pointer; }
+.nw-card-tabfix:hover { color: var(--am-hi); border-color: var(--am-hi); }
+.nw-card-tabsel { flex: 0 0 auto; font-size: 12px; background: var(--s-card, #1b1b1b); color: inherit; border: 1px solid var(--am-hi); border-radius: 5px; padding: 2px 4px; }

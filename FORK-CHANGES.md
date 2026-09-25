@@ -221,6 +221,13 @@ the extra Exalted cells, 4.7) appear in the tool automatically.
 
 ### 4.6 Other Net Worth changes
 
+- **"Wrong tab?"** on every tab card: tab detection correlates the panel's edge structure
+  against one baked fingerprint per tab, and on a setup unlike the baked one two tabs can
+  swap (Kalguuran runes were detected as Ancient Augment at 5K). The player picks the right
+  tab; that capture's fingerprint is stored as an extra detection template for it
+  (`stashUserTabSigs`, newest 3 per tab, merged into detection as `tab@uN`) and the same
+  frame is read again as that tab. The next scan of it on that setup is recognised.
+
 - **Setup wizard** ("Einrichtung starten", in the empty Net Worth view and in its settings):
   five steps that move on by themselves – 1. calibrate (skippable when auto-detect works),
   2. scan, 3. open Align and fit the boxes (advances when the alignment is saved; new
@@ -276,6 +283,7 @@ the extra Exalted cells, 4.7) appear in the tool automatically.
 | `stashSlotOverrides[tab][apiId]` | – | Per-slot position (4.5) + reader settings (4.3) |
 | `stashShowOcrDebug` | `false` | Debug panel; also gates debug file writes |
 | `stashHiRes` | `false` | Global ×2 matching (4K/5K) |
+| `stashUserTabSigs` | `{}` | Extra tab-detection fingerprints from "Wrong tab?" |
 | `stashShowReliability` | `false` | "Often misread" row tints |
 
 Learned templates (`userData/learned-digit-templates.json`) gained `byScale[ms]` for

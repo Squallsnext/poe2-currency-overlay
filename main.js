@@ -267,6 +267,7 @@ const DEFAULT_CONFIG = {
   stashShowMissing: false, // Net Worth: show empty/unread slots as editable x0 lines
   stashShowConfidence: false, // Net Worth: show the per-line OCR confidence %
   stashShowOcrDebug: false, // Net Worth: show the exact crop the reader saw, per line
+  stashUserTabSigs: {}, // Net Worth: extra tab-detection fingerprints the user taught via "wrong tab?" (tab -> [signature])
   stashShowReliability: false, // Net Worth: tint rows the shipped reliability table marks as often misread
   stashHiRes: false, // Net Worth: read counts at 2x resolution where the capture allows (4K/5K); per-slot setting wins
   commandHotkeys: [], // Hotkeys settings: [{command:'/hideout', accelerator:'F8'}] - whitelist-only safe chat commands, one key = one manual command
@@ -1764,7 +1765,7 @@ function runReaderWorker(bitmap, W, H, onDetected) {
     // keyed by tab, then apiId. The worker doesn't know the tab until it detects one, so
     // the whole map rides along and it looks up its own tab's entry.
     const slotOverrides = config.stashSlotOverrides || null;
-    w.postMessage({ bitmap: ab, W, H, calBox: config.stashCalibration || null, learnedTemplates, slotOverrides, hiRes: !!config.stashHiRes }, [ab]); // transfer the ~8MB frame, no copy
+    w.postMessage({ bitmap: ab, W, H, calBox: config.stashCalibration || null, learnedTemplates, slotOverrides, hiRes: !!config.stashHiRes, userTabSigs: config.stashUserTabSigs || null }, [ab]); // transfer the ~8MB frame, no copy
   });
 }
 
@@ -2691,6 +2692,33 @@ ipcMain.handle('stash-slot-save-read-settings', (_e, { apiId, settings } = {}) =
     }
     saveConfig();
     return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message || err) };
+  }
+});
+
+// "Wrong tab?": the player says which tab this capture really is. Its panel fingerprint
+// is kept as an extra detection template for that tab (so the next scan of it on this
+// setup is recognised), then the same frame is read again. Tab detection correlates the
+// panel's edge structure against ONE baked fingerprint per tab, and on a setup unlike the
+// one it was baked on two tabs can swap - Kalguuran runes came back as Ancient Augment.
+ipcMain.handle('stash-correct-tab', async (_e, { fromTab, toTab } = {}) => {
+  try {
+    if (!toTab || !TAB_MAPS[toTab]) return { ok: false, reason: 'unknown-tab' };
+    const cap = lastCaptureByTab.get(fromTab);
+    if (!cap) return { ok: false, reason: 'no-recent-capture' };
+    const TD = require('./renderer/stash/tab-detect.js');
+    const TT = require('./renderer/stash/tab-templates.json');
+    const sig = TD.panelSignature(Buffer.from(cap.bitmap), cap.W, cap.H, cap.box, TT.tw, TT.th);
+    config.stashUserTabSigs = config.stashUserTabSigs || {};
+    const list = config.stashUserTabSigs[toTab] || (config.stashUserTabSigs[toTab] = []);
+    list.push(Array.from(sig, (v) => Math.round(v * 10000)));
+    if (list.length > 3) list.shift(); // newest few only
+    saveConfig();
+    logToggle('stash-learn', `tab corrected: ${fromTab} -> ${toTab} (${list.length} fingerprint(s))`);
+    const res = await readStashFrame({ bitmap: cap.bitmap, W: cap.W, H: cap.H });
+    if (res && res.ok && !res.mismatch && res.tab !== fromTab) lastCaptureByTab.delete(fromTab);
+    return res;
   } catch (err) {
     return { ok: false, error: String(err && err.message || err) };
   }

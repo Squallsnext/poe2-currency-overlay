@@ -49,7 +49,20 @@ const MIN_SCORE = 0.3; // below this the panel isn't a recognized stash tab
 
 parentPort.on('message', (msg) => {
   try {
-    const { bitmap, W, H, calBox, learnedTemplates, slotOverrides, hiRes } = msg;
+    const { bitmap, W, H, calBox, learnedTemplates, slotOverrides, hiRes, userTabSigs } = msg;
+    // baked fingerprints plus the ones the player taught via "wrong tab?" (main.js
+    // stash-correct-tab), as extra keys "tab@u0".. that map back to their tab
+    const DETECT = { tw: TAB_TEMPLATES.tw, th: TAB_TEMPLATES.th, templates: Object.assign({}, TAB_TEMPLATES.templates) };
+    for (const tab of Object.keys(userTabSigs || {})) {
+      (userTabSigs[tab] || []).forEach((sig, i) => { DETECT.templates[tab + '@u' + i] = sig; });
+    }
+    const baseTab = (t) => (t ? String(t).split('@')[0] : t);
+    const detectTab = (box) => {
+      const d = TD.detect(buf, W, H, box, DETECT);
+      if (!d) return d;
+      d.tab = baseTab(d.tab); d.runnerUp = baseTab(d.runnerUp);
+      return d;
+    };
     const buf = Buffer.from(bitmap);
     const refBox = TAB_TEMPLATES.box;
     // Corrections taught since the last read (see main.js's stash-teach-count) join the
@@ -85,8 +98,8 @@ parentPort.on('message', (msg) => {
         if (!calBox) {
           box = autoBox; boxSource = 'auto';
         } else {
-          const autoDet = TD.detect(buf, W, H, autoBox, TAB_TEMPLATES);
-          const calDet = TD.detect(buf, W, H, calBox, TAB_TEMPLATES);
+          const autoDet = detectTab(autoBox);
+          const calDet = detectTab(calBox);
           const autoScore = autoDet ? autoDet.score : 0;
           const calScore = calDet ? calDet.score : 0;
           // the saved box keeps the tie: if it is as good, the user's choice stands
@@ -98,7 +111,7 @@ parentPort.on('message', (msg) => {
     } catch (e) { /* fall back to whatever calBox gave us */ }
 
     // 1) which tab? (template correlation, fill/darkness independent)
-    const det = TD.detect(buf, W, H, box, TAB_TEMPLATES);
+    const det = detectTab(box);
     if (!det || det.score < MIN_SCORE) {
       parentPort.postMessage({
         ok: true, mismatch: true, autoFound, readCount: 0, slotCount: 0,

@@ -55,6 +55,7 @@ contextBridge.exposeInMainWorld('api', {
   stashCaptureStart: () => ipcRenderer.send('stash-capture-start'),
   stashTeachCount: (apiId, value, settings) => ipcRenderer.invoke('stash-teach-count', { apiId, value, settings }),
   stashAdjustOpen: (tab) => ipcRenderer.invoke('stash-adjust-open', tab),
+  stashCorrectTab: (fromTab, toTab) => ipcRenderer.invoke('stash-correct-tab', { fromTab, toTab }),
   stashSlotDebugImage: (apiId, opts) => ipcRenderer.invoke('stash-slot-debug-image', apiId, opts),
   stashSlotSaveReadSettings: (apiId, settings) => ipcRenderer.invoke('stash-slot-save-read-settings', { apiId, settings }),
   stashForgetDigits: (digits) => ipcRenderer.invoke('stash-forget-digits', { digits }),
