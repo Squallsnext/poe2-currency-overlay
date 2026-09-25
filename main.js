@@ -2091,13 +2091,19 @@ ipcMain.handle('stash-teach-count', (_e, { apiId, value } = {}) => {
     if (!found) return { ok: false, reason: 'no-recent-capture' };
     const { tab, slot, cap } = found;
     const DR = require('./renderer/stash/digit-reader.js');
-    const TD = require('./renderer/stash/tab-detect.js');
+    const RP = require('./renderer/stash/read-pipeline.js');
     const TT = require('./renderer/stash/tab-templates.json');
     const refBox = TT.box;
-    const scale = cap.box.h / refBox.h;
-    const V = DR.valueChannelDesatMax(Buffer.from(cap.bitmap), cap.W, cap.H);
-    const pos = TD.scalePos(slot.cx, slot.cy, refBox, cap.box);
-    const { binarized } = DR.debugShrunkCell(V, cap.W, cap.H, pos.cx, pos.cy, DR.DEFAULTS, scale);
+    // cut the glyphs from the SAME image the live reader matches against (read-pipeline.js:
+    // same regime, same saved position and saturation/contrast/floor for this slot) - a
+    // template learned from a differently-processed crop never quite fits the real one
+    const ov = (config.stashSlotOverrides && config.stashSlotOverrides[tab] && config.stashSlotOverrides[tab][apiId]) || null;
+    const ch = RP.buildChannel(Buffer.from(cap.bitmap), cap.W, cap.H, cap.box, refBox,
+      ov && ov.desatSat != null ? ov.desatSat : DR.DESAT_SAT, ov && ov.contrast ? ov.contrast : 0);
+    const pos = RP.slotPos(ch, slot, ov, refBox, cap.box);
+    const P = RP.slotParams(TAB_MAPS[tab], ch.scale, ov);
+    const Pt = ov && ov.floor != null ? Object.assign({}, P, { floor: ov.floor }) : P;
+    const { binarized } = DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Pt, ch.cellScale);
     const comps = DR.components(binarized).sort((a, b) => a.x - b.x);
     if (comps.length !== value.length) {
       logToggle('stash-learn', `skip "${value}" for ${apiId}: found ${comps.length} glyph(s), expected ${value.length}`);
@@ -2162,76 +2168,82 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
     const { tab, slot, cap } = found;
     const map = TAB_MAPS[tab];
     const DR = require('./renderer/stash/digit-reader.js');
-    const TD = require('./renderer/stash/tab-detect.js');
+    const RP = require('./renderer/stash/read-pipeline.js');
     const TT = require('./renderer/stash/tab-templates.json');
     const refBox = TT.box;
-    const scale = cap.box.h / refBox.h;
     const ov = (config.stashSlotOverrides && config.stashSlotOverrides[tab] && config.stashSlotOverrides[tab][apiId]) || null;
-    const sx = ov && ov.cx != null ? ov.cx : slot.cx, sy = ov && ov.cy != null ? ov.cy : slot.cy;
-    const pos = TD.scalePos(sx, sy, refBox, cap.box);
-    const base = map && map.readParams ? Object.assign({}, DR.DEFAULTS, map.readParams) : DR.DEFAULTS;
-    const P = Object.assign({}, base, {
-      stripWidth: ov && ov.stripWidth != null ? ov.stripWidth : base.stripWidth,
-      up: ov && ov.up != null ? ov.up : base.up,
-      dn: ov && ov.dn != null ? ov.dn : base.dn,
-      stripLeft: ov && ov.stripLeft != null ? ov.stripLeft : undefined,
-      stripRight: ov && ov.stripRight != null ? ov.stripRight : undefined,
-    });
-    // the floor/right-edge being PREVIEWED: an explicit slider value while dragging, else
-    // this slot's saved pin if it has one, else the default (floor: the adaptive sweep's
-    // starting point, only a representative single-floor view since a live read with no
-    // pin actually sweeps several and keeps whichever wins; stripRight: symmetric, i.e.
-    // today's box, same as everyone else's).
-    const floor = (opts && opts.floor != null) ? Math.round(opts.floor) : (ov && ov.floor != null ? ov.floor : P.floor);
-    const stripRight = (opts && opts.stripRight != null) ? opts.stripRight : (P.stripRight != null ? P.stripRight : P.stripWidth);
-    const Pf = Object.assign({}, P, { floor, stripRight });
-    const UPSCALE = 6;
-    // native crop, generously padded, for a "does this even look like the number" gut
-    // check - AT THE PREVIEWED stripRight, so a trimmed box's raw view matches what the
-    // binarized view below is actually built from, not the untrimmed default.
-    const stripLeft = P.stripLeft != null ? P.stripLeft : P.stripWidth;
-    const nativeL = Math.round(stripLeft * scale), nativeR = Math.round(stripRight * scale);
-    const nativeUp = Math.round(P.up * scale), nativeDn = Math.round(P.dn * scale);
-    const img = nativeImage.createFromBitmap(Buffer.from(cap.bitmap), { width: cap.W, height: cap.H });
-    const cropRect = {
-      x: Math.max(0, Math.round(pos.cx - nativeL)), y: Math.max(0, Math.round(pos.cy - nativeUp)),
-      width: Math.min(cap.W, nativeL + nativeR), height: Math.min(cap.H, nativeUp + nativeDn),
-    };
-    const rawUrl = img.crop(cropRect)
-      .resize({ width: cropRect.width * UPSCALE, height: cropRect.height * UPSCALE, quality: 'good' })
-      .toDataURL();
-    // the binarized cell, i.e. what slideMatch actually compares templates against, AT
-    // THE PREVIEWED FLOOR/EDGE/SATURATION - not necessarily what a live read would settle on
-    const desatSat = (opts && opts.desatSat != null) ? Math.round(opts.desatSat)
-      : (ov && ov.desatSat != null ? ov.desatSat : DR.DESAT_SAT);
-    const contrast = (opts && opts.contrast != null) ? Math.round(opts.contrast)
-      : (ov && ov.contrast != null ? ov.contrast : 0);
-    const capBuf = Buffer.from(cap.bitmap);
-    let V = DR.valueChannelDesatMax(capBuf, cap.W, cap.H, desatSat);
-    // native capture buffer: one reference px is `scale` buffer px
-    if (contrast) V = DR.contrastGate(V, capBuf, cap.W, cap.H, contrast, DR.CONTRAST_RADIUS * scale);
-    const { binarized } = DR.debugShrunkCell(V, cap.W, cap.H, pos.cx, pos.cy, Pf, scale);
+    // the values being PREVIEWED: an explicit slider value while dragging, else this
+    // slot's saved value, else the default (floor: none, i.e. the adaptive sweep - the
+    // same thing a live read does, so an untouched panel shows the live read's answer)
+    const pick = (k, dflt) => (opts && opts[k] != null ? Math.round(opts[k]) : (ov && ov[k] != null ? ov[k] : dflt));
+    const desatSat = pick('desatSat', DR.DESAT_SAT);
+    const contrast = pick('contrast', 0);
+    const floorIn = pick('floor', null);
+    // exactly the live reader's path (read-pipeline.js): same regime, same position,
+    // same params, same bank including learned corrections
+    const bitmap = Buffer.from(cap.bitmap);
+    const ch = RP.buildChannel(bitmap, cap.W, cap.H, cap.box, refBox, desatSat, contrast);
+    const pos = RP.slotPos(ch, slot, ov, refBox, cap.box);
+    const P = RP.slotParams(map, ch.scale, ov);
+    let learned = null;
+    try { learned = loadLearnedTemplates(); } catch { /* none yet */ }
+    const bankInfo = RP.buildBank(require('./renderer/stash/digit-templates.json'), learned);
+    const read = RP.readSlot(ch, pos, bankInfo.bank, P, floorIn);
+    const floor = read.floor;
+    const previewText = read.text === '?' ? '?' : bankInfo.unmap(read.text);
+
+    // three views of the SAME window of the SAME buffer the reader used, so they line up
+    // pixel for pixel: the original, the channel the sliders produce (before the black/
+    // white cut), and the binarized cell the templates are matched against
+    const cs = ch.cellScale;
+    const stripL = P.stripLeft != null ? P.stripLeft : P.stripWidth;
+    const stripR = P.stripRight != null ? P.stripRight : P.stripWidth;
+    const x0 = Math.max(0, Math.round(pos.cx - stripL * cs)), x1 = Math.min(ch.W2, Math.round(pos.cx + stripR * cs));
+    const y0 = Math.max(0, Math.round(pos.cy - P.up * cs)), y1 = Math.min(ch.H2, Math.round(pos.cy + P.dn * cs));
+    const cw = Math.max(1, x1 - x0), chh = Math.max(1, y1 - y0);
+    const UPSCALE = Math.max(1, Math.round(6 / cs));
+    const toUrl = (b, w, h, k) => nativeImage.createFromBitmap(b, { width: w, height: h })
+      .resize({ width: w * k, height: h * k, quality: 'good' }).toDataURL();
+    const rawBuf = Buffer.alloc(cw * chh * 4), filtBuf = Buffer.alloc(cw * chh * 4);
+    for (let y = 0; y < chh; y++) {
+      for (let x = 0; x < cw; x++) {
+        const si = (y0 + y) * ch.W2 + (x0 + x), sp = si * 4, dp = (y * cw + x) * 4;
+        const c0 = ch.src[sp], c1 = ch.src[sp + 1], c2 = ch.src[sp + 2];
+        rawBuf[dp] = c0; rawBuf[dp + 1] = c1; rawBuf[dp + 2] = c2; rawBuf[dp + 3] = 255;
+        const v = ch.V[si];
+        const lum = Math.max(c0, c1, c2);
+        if (v) {
+          // kept by saturation + contrast: grey at its brightness, so the floor cut in
+          // the third view can be judged against it
+          filtBuf[dp] = filtBuf[dp + 1] = filtBuf[dp + 2] = v;
+        } else if (lum >= floor) {
+          // bright enough to have been ink, but removed by saturation/contrast: red
+          // (bitmap is BGRA, so red is byte 2)
+          filtBuf[dp] = 0; filtBuf[dp + 1] = 0; filtBuf[dp + 2] = 200;
+        }
+        filtBuf[dp + 3] = 255;
+      }
+    }
+    const { binarized } = DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Object.assign({}, P, { floor }), cs);
     const binBuf = Buffer.alloc(binarized.w * binarized.h * 4);
     for (let i = 0; i < binarized.w * binarized.h; i++) {
       const v = binarized.data[i] ? 255 : 0;
       binBuf[i * 4] = v; binBuf[i * 4 + 1] = v; binBuf[i * 4 + 2] = v; binBuf[i * 4 + 3] = 255;
     }
-    const binUrl = nativeImage.createFromBitmap(binBuf, { width: binarized.w, height: binarized.h })
-      .resize({ width: binarized.w * UPSCALE, height: binarized.h * UPSCALE, quality: 'good' })
-      .toDataURL();
-    // what THIS floor alone reads, so the slider gives immediate right/wrong feedback
-    // instead of just a cleaner-looking image that may or may not read any better
-    let RAW = require('./renderer/stash/digit-templates.json');
-    const bankInfo = DR.bankFromJSON(RAW);
-    const cellScale = scale > 1.5 || scale < 1 / 1.5 ? scale : 1;
-    const preview = DR.readCellEx(V, cap.W, cap.H, pos.cx, pos.cy, bankInfo.bank, Pf, cellScale);
-    const previewText = preview.text === '?' ? '?' : [...preview.text].map(bankInfo.unmap).join('');
     return {
-      ok: true, rawUrl, binUrl, floor, pinned: !!(ov && ov.floor != null),
-      stripRight, stripRightPinned: !!(ov && ov.stripRight != null), stripWidth: P.stripWidth,
-      desatSat, desatSatPinned: !!(ov && ov.desatSat != null),
-      contrast, contrastPinned: !!(ov && ov.contrast != null),
-      preview: { text: previewText, conf: preview.conf },
+      ok: true,
+      rawUrl: toUrl(rawBuf, cw, chh, UPSCALE),
+      filtUrl: toUrl(filtBuf, cw, chh, UPSCALE),
+      binUrl: toUrl(binBuf, binarized.w, binarized.h, 6),
+      floor, desatSat, contrast,
+      // what is saved for this slot right now (null = automatic), so the panel can tell
+      // "slider moved, not saved yet" from "this is the saved value"
+      saved: {
+        floor: ov && ov.floor != null ? ov.floor : null,
+        desatSat: ov && ov.desatSat != null ? ov.desatSat : null,
+        contrast: ov && ov.contrast != null ? ov.contrast : null,
+      },
+      preview: { text: previewText, conf: read.conf },
     };
   } catch (err) {
     return { ok: false, reason: 'error', error: String(err && err.message || err) };
@@ -2467,8 +2479,8 @@ ipcMain.handle('stash-adjust-open', (_e, tab) => {
 });
 ipcMain.on('stash-adjust-close', () => closeAdjustWin());
 // Per-apiId merge, not a per-tab replace: stash-adjust-save sends a full {cx,cy,
-// stripWidth,up,dn} for every slot it touches, but stash-slot-set-floor sends only
-// {floor} - a flat Object.assign at the tab level would let a floor-only save silently
+// stripWidth,up,dn} for every slot it touches, but stash-slot-save-read-settings sends only
+// {floor,desatSat,contrast} - a flat Object.assign at the tab level would let such a save silently
 // wipe out a previously-saved position fix for the same slot (and vice versa).
 function mergeSlotOverrides(tab, deltas) {
   config.stashSlotOverrides = config.stashSlotOverrides || {};
@@ -2489,79 +2501,27 @@ ipcMain.handle('stash-adjust-save', (_e, { tab, deltas } = {}) => {
     return { ok: false, error: String(err && err.message || err) };
   }
 });
-// The OCR-debug panel's floor slider: pin ONE binarisation threshold for this exact slot
-// instead of trusting the adaptive sweep, for the cases (bright background art) where the
-// sweep's own confidence measure is what is being fooled - see reader-worker.js.
-ipcMain.handle('stash-slot-set-floor', (_e, { apiId, floor } = {}) => {
+// The OCR-debug panel's "Speichern": floor, saturation and contrast for ONE slot, saved
+// together - the values are tuned together against one preview, so saving them one at a
+// time (and having to "unpin" one before changing it) only got in the way. Each one:
+//   floor     pins the black/white cut instead of the adaptive sweep, for bright art
+//             that fools the sweep's own confidence measure (see reader-worker.js)
+//   desatSat  max colourfulness a digit pixel may have - lower cuts coloured icon art
+//   contrast  how much darker a digit pixel's surroundings must get (its black outline)
+//             - cuts bright grey/white icon spots, which floor and saturation can't
+// settings === null resets the slot to automatic (also clears an old right-edge trim from
+// the earlier per-slider version, which no longer has a control of its own).
+ipcMain.handle('stash-slot-save-read-settings', (_e, { apiId, settings } = {}) => {
   try {
     const found = findTabSlot(apiId);
     if (!found) return { ok: false, reason: 'no-recent-capture' };
-    if (floor == null) {
-      // clear: drop back to the adaptive sweep
+    if (settings == null) {
       const cur = config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId];
-      if (cur) delete cur.floor;
+      if (cur) { delete cur.floor; delete cur.desatSat; delete cur.contrast; delete cur.stripRight; }
     } else {
-      mergeSlotOverrides(found.tab, { [apiId]: { floor: Math.round(floor) } });
-    }
-    saveConfig();
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: String(err && err.message || err) };
-  }
-});
-// The right-edge trim: a number is left-anchored and an item's icon sits to its right, so
-// pulling in ONLY the right edge removes that art from the search - unlike a floor, this
-// keeps working the moment the underlying pixels change (a different item's icon), because
-// it is a position, not a brightness guess.
-ipcMain.handle('stash-slot-set-strip-right', (_e, { apiId, stripRight } = {}) => {
-  try {
-    const found = findTabSlot(apiId);
-    if (!found) return { ok: false, reason: 'no-recent-capture' };
-    if (stripRight == null) {
-      const cur = config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId];
-      if (cur) delete cur.stripRight;
-    } else {
-      mergeSlotOverrides(found.tab, { [apiId]: { stripRight: Math.round(stripRight) } });
-    }
-    saveConfig();
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: String(err && err.message || err) };
-  }
-});
-// Confirmed live to matter on a slot with a grey/white icon (contrary to the usual case,
-// see the debug panel's own note) - a lower cutoff excludes some of the icon's near-white
-// pixels that the default gate still let through, at the cost of maybe clipping the
-// faintest anti-aliased digit edge too, hence per-slot rather than a global change.
-ipcMain.handle('stash-slot-set-desat', (_e, { apiId, desatSat } = {}) => {
-  try {
-    const found = findTabSlot(apiId);
-    if (!found) return { ok: false, reason: 'no-recent-capture' };
-    if (desatSat == null) {
-      const cur = config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId];
-      if (cur) delete cur.desatSat;
-    } else {
-      mergeSlotOverrides(found.tab, { [apiId]: { desatSat: Math.round(desatSat) } });
-    }
-    saveConfig();
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: String(err && err.message || err) };
-  }
-});
-// Local contrast: a digit's white stroke always sits next to its black outline, a bright
-// spot in the icon art usually doesn't - so this separates them where floor (brightness)
-// and saturation (colour) can't, e.g. a white highlight on a grey/white icon. Per-slot,
-// like the other two, since the right cutoff depends on the art behind that slot.
-ipcMain.handle('stash-slot-set-contrast', (_e, { apiId, contrast } = {}) => {
-  try {
-    const found = findTabSlot(apiId);
-    if (!found) return { ok: false, reason: 'no-recent-capture' };
-    if (contrast == null) {
-      const cur = config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId];
-      if (cur) delete cur.contrast;
-    } else {
-      mergeSlotOverrides(found.tab, { [apiId]: { contrast: Math.round(contrast) } });
+      const delta = {};
+      for (const k of ['floor', 'desatSat', 'contrast']) if (settings[k] != null) delta[k] = Math.round(settings[k]);
+      mergeSlotOverrides(found.tab, { [apiId]: delta });
     }
     saveConfig();
     return { ok: true };

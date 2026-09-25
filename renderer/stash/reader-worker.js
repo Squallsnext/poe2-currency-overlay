@@ -9,6 +9,7 @@
 // into the live box and OCRs each count. Pricing stays in main (needs network/cache).
 const { parentPort } = require('worker_threads');
 const DR = require('./digit-reader');
+const RP = require('./read-pipeline');
 const TD = require('./tab-detect');
 const PF = require('./panel-finder');
 const TAB_TEMPLATES = require('./tab-templates.json'); // { box (reference), tw, th, templates }
@@ -29,7 +30,6 @@ const TABS = {
 // multi-rendering bank: the base exemplars plus one set per baked capture, so a digit
 // drawn slightly differently on someone else's machine still has something to match
 const RAW_DIGIT_TEMPLATES = require('./digit-templates.json');
-const { bank: DIGITS, unmap: UNMAP, sourceOf: SOURCE_OF } = DR.bankFromJSON(RAW_DIGIT_TEMPLATES);
 const MIN_SCORE = 0.3; // below this the panel isn't a recognized stash tab
 
 // EXTREME_SCALE regime (5K+ displays, see below): tried using ONE scale-tagged variant
@@ -45,15 +45,7 @@ const MIN_SCORE = 0.3; // below this the panel isn't a recognized stash tab
 // clearing the bar. Measured on both captures together: 22/30 and 22/30 (0.70), 24/30
 // and 22/30 (0.66 - kept, best combined score without the wide night/morning gap that
 // showed up again below 0.64). Normal-scale captures are completely unaffected.
-function paramsForScale(basedOn, scale) {
-  const P = Object.assign({}, basedOn);
-  if (Math.abs(scale - 1) > 0.3) { P.preferWideOnTie = true; P.iouThresh = 0.66; }
-  return P;
-}
-
-// per-tab OCR params: DEFAULTS with any map.readParams override (e.g. Kalguuran runes
-// bleed art flush against the count -> tighter stripWidth).
-function paramsFor(m) { return m && m.readParams ? Object.assign({}, DR.DEFAULTS, m.readParams) : DR.DEFAULTS; }
+// (paramsForScale lives in read-pipeline.js now, shared with the debug preview)
 
 parentPort.on('message', (msg) => {
   try {
@@ -64,15 +56,8 @@ parentPort.on('message', (msg) => {
     // bank for just this one read - a fresh Worker per capture means no caching to worry
     // about, so the very next F7 press already benefits from a correction made seconds
     // earlier.
-    let DIGITS_LIVE = DIGITS, UNMAP_LIVE = UNMAP, SOURCE_OF_LIVE = SOURCE_OF;
-    if (learnedTemplates && learnedTemplates.templates && Object.keys(learnedTemplates.templates).length) {
-      const combined = {
-        templates: RAW_DIGIT_TEMPLATES.templates,
-        variants: (RAW_DIGIT_TEMPLATES.variants || []).concat([{ source: 'user-corrections', templates: learnedTemplates.templates }]),
-      };
-      const built = DR.bankFromJSON(combined);
-      DIGITS_LIVE = built.bank; UNMAP_LIVE = built.unmap; SOURCE_OF_LIVE = built.sourceOf;
-    }
+    const liveBank = RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates);
+    const DIGITS_LIVE = liveBank.bank, UNMAP_LIVE = liveBank.unmap, SOURCE_OF_LIVE = liveBank.sourceOf;
     // Find the panel by its coloured frame, which is what makes calibration optional: the
     // frame is a saturated rectangle on an otherwise brown UI, so it can be located
     // outright rather than asked for.
@@ -138,8 +123,6 @@ parentPort.on('message', (msg) => {
     // "160" as "1", while normalising the whole panel first reads the same pixels
     // correctly. Anything left of the old per-cell path would just re-introduce that.
     const scale = box.h / refBox.h;
-    const M = 24; // reference-px margin, so a slot's read strip never sits on the edge
-    let V, W2, H2, originX, originY, cellScale = 1;
     // EXTREME_SCALE: past this, the panel is so much bigger than reference (5K/8K
     // displays: a 2.8x+ box) that squashing the WHOLE panel down in one resample throws
     // away far more detail than anything below has ever been measured against. Read
@@ -149,7 +132,6 @@ parentPort.on('message', (msg) => {
     // rejected once already, at 1.33x/1.5x (see below) - it shredded digits there. This
     // is a different, much larger regime (untested either way), so it is gated behind
     // its own threshold rather than replacing the 1.15-1.5ish path that IS measured.
-    const EXTREME_SCALE = 1.5;
     // Threshold 0.15, not 0.005: measured on ground-truthed captures, the COUNT FONT
     // does not scale with the panel in the near-1 regime - a 1.07x panel (windowed
     // fullscreen, ultrawide, slightly-short game windows: the mass of real setups)
@@ -164,42 +146,18 @@ parentPort.on('message', (msg) => {
     // (1440p/ultrawide) multi-digit counts came back as confident nonsense, "1383" read
     // as "8" and "160" as "1", while normalising the whole panel first reads the same
     // pixels correctly.
-    if (scale > EXTREME_SCALE || scale < 1 / EXTREME_SCALE) {
-      V = DR.valueChannelDesatMax(buf, W, H); W2 = W; H2 = H;
-      originX = 0; originY = 0; cellScale = scale;
-    } else if (Math.abs(scale - 1) > 0.15) {
-      const kx = box.w / refBox.w, ky = box.h / refBox.h;
-      W2 = Math.round(refBox.w + 2 * M); H2 = Math.round(refBox.h + 2 * M);
-      const norm = DR.resampleRGBA(buf, W, H, box.x - M * kx, box.y - M * ky, (refBox.w + 2 * M) * kx, (refBox.h + 2 * M) * ky, W2, H2);
-      V = DR.valueChannelDesatMax(norm, W2, H2);
-      // reference-space slot coords -> normalised-panel coords
-      originX = refBox.x - M; originY = refBox.y - M;
-    } else {
-      V = DR.valueChannelDesatMax(buf, W, H); W2 = W; H2 = H;
-      originX = 0; originY = 0;
-    }
+    // (the regime switch itself lives in read-pipeline.js, shared with the debug
+    // preview and the teach step so all three see the same pixels)
+    const ch0 = RP.buildChannel(buf, W, H, box, refBox, DR.DESAT_SAT, 0);
     // A per-slot saturation/contrast override (see the OCR debug panel) needs the SAME
-    // channel built again with different cutoffs - cheap to recompute (one pass, same
-    // regime logic as above) and only paid for slots that actually have one pinned.
+    // channel built again with different cutoffs - only paid for slots that have one.
     // Keyed "sat|contrast"; contrast 0 is the default channel with no gate.
-    const vCache = new Map([[DR.DESAT_SAT + '|0', V]]);
-    function vFor(sat, contrast) {
+    const chCache = new Map([[DR.DESAT_SAT + '|0', ch0]]);
+    function chFor(sat, contrast) {
       const key = sat + '|' + (contrast || 0);
-      if (vCache.has(key)) return vCache.get(key);
-      // src: the buffer this regime reads from; px: how many buffer px one reference px
-      // is, so the contrast gate's neighbourhood covers the same outline at any scale
-      let src = buf, sw = W, sh = H, px = scale;
-      if (!(scale > EXTREME_SCALE || scale < 1 / EXTREME_SCALE) && Math.abs(scale - 1) > 0.15) {
-        const kx = box.w / refBox.w, ky = box.h / refBox.h;
-        src = DR.resampleRGBA(buf, W, H, box.x - M * kx, box.y - M * ky, (refBox.w + 2 * M) * kx, (refBox.h + 2 * M) * ky, W2, H2);
-        sw = W2; sh = H2; px = 1;
-      }
-      let Vx = DR.valueChannelDesatMax(src, sw, sh, sat);
-      if (contrast) Vx = DR.contrastGate(Vx, src, sw, sh, contrast, DR.CONTRAST_RADIUS * px);
-      vCache.set(key, Vx);
-      return Vx;
+      if (!chCache.has(key)) chCache.set(key, RP.buildChannel(buf, W, H, box, refBox, sat, contrast));
+      return chCache.get(key);
     }
-    const P = paramsForScale(paramsFor(map), scale);
     // per-apiId {cx,cy,stripWidth,up,dn} from the in-app "align" tool (see main.js's
     // stash-adjust-save) - a user's own fix for a slot the shipped map misplaces on their
     // setup. Coordinates are reference-space, same system map.STATIC_SLOTS uses, so they
@@ -208,36 +166,17 @@ parentPort.on('message', (msg) => {
     const reads = []; let readCount = 0;
     for (const s of map.STATIC_SLOTS) {
       const ov = tabOverrides && tabOverrides[s.apiId];
-      // != null, not a bare `ov`: a floor/edge/saturation/contrast pin saves an override
-      // with NO position, and `ov.cx` would then put the read at NaN
-      const sx = ov && ov.cx != null ? ov.cx : s.cx, sy = ov && ov.cy != null ? ov.cy : s.cy;
-      const pos = (originX || originY)
-        ? { cx: sx - originX, cy: sy - originY }
-        : TD.scalePos(sx, sy, refBox, box);
-      const Ps = ov && (ov.stripWidth != null || ov.up != null || ov.dn != null || ov.stripLeft != null || ov.stripRight != null)
-        ? Object.assign({}, P, {
-          stripWidth: ov.stripWidth != null ? ov.stripWidth : P.stripWidth,
-          up: ov.up != null ? ov.up : P.up,
-          dn: ov.dn != null ? ov.dn : P.dn,
-          // asymmetric override: a number is left-anchored and an item's icon sits to
-          // its right, so trimming the right edge alone removes that art from the
-          // search without shrinking how many digits the left side can still hold
-          stripLeft: ov.stripLeft != null ? ov.stripLeft : undefined,
-          stripRight: ov.stripRight != null ? ov.stripRight : undefined,
-        })
-        : P;
+      const ch = ov && (ov.desatSat != null || ov.contrast)
+        ? chFor(ov.desatSat != null ? ov.desatSat : DR.DESAT_SAT, ov.contrast || 0) : ch0;
+      const pos = RP.slotPos(ch, s, ov, refBox, box);
       // adaptive: pick the binarisation threshold per cell rather than trusting one
       // global floor, which only ever suited the capture the templates came from - UNLESS
-      // a user pinned a floor for this exact slot (see main.js's stash-slot-set-floor,
+      // a user saved a floor for this exact slot (see main.js's stash-slot-save-read-settings,
       // the OCR-debug panel's slider): background art bright enough to pass the same
       // near-white gate as the digits confuses the sweep's own "most confident" pick
       // (a noisier floor can score higher purely by having more ink to be confident
       // about), and no amount of sweeping fixes that - only a floor chosen by eye does.
-      const Vs = ov && (ov.desatSat != null || ov.contrast)
-        ? vFor(ov.desatSat != null ? ov.desatSat : DR.DESAT_SAT, ov.contrast || 0) : V;
-      const r = ov && ov.floor != null
-        ? DR.readCellEx(Vs, W2, H2, pos.cx, pos.cy, DIGITS_LIVE, Object.assign({}, Ps, { floor: ov.floor }), cellScale)
-        : DR.readCellAdaptive(Vs, W2, H2, pos.cx, pos.cy, DIGITS_LIVE, Ps, cellScale);
+      const r = RP.readSlot(ch, pos, DIGITS_LIVE, RP.slotParams(map, scale, ov), ov && ov.floor != null ? ov.floor : null);
       const raw = r.text === '?' ? '?' : UNMAP_LIVE(r.text); // alt keys back to digits
       const conf = r.conf;
       if (raw !== '?') readCount++;
@@ -254,7 +193,7 @@ parentPort.on('message', (msg) => {
     parentPort.postMessage({
       ok: true, tab, score: det.score, readCount, slotCount: map.STATIC_SLOTS.length, reads,
       boxSource, panelCoverage, autoFound, box,
-      digitBank: DIGITS_LIVE === DIGITS ? 'merged' : 'merged+learned', scale: +scale.toFixed(3),
+      digitBank: liveBank.variantCount > (RAW_DIGIT_TEMPLATES.variants || []).length ? 'merged+learned' : 'merged', scale: +scale.toFixed(3),
       detect: { tab: det.tab, score: det.score, runnerUp: det.runnerUp, runnerScore: det.runnerScore },
     });
   } catch (err) {

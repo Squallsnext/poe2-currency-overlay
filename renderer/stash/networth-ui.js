@@ -349,122 +349,87 @@
           dbg.textContent = '…';
         } else if (cached && cached.ok) {
           const imgs = el('div', 'nw-dbg-imgs');
-          const rawImg = el('img', 'nw-dbg-img'); rawImg.src = cached.rawUrl; rawImg.title = 'raw';
-          const binImg = el('img', 'nw-dbg-img'); binImg.src = cached.binUrl; binImg.title = 'binarized';
-          imgs.appendChild(rawImg); imgs.appendChild(binImg);
+          // original | what the sliders make of it (grey = kept, red = removed by
+          // saturation/contrast) | the black/white cell the templates are matched against
+          const rawImg = el('img', 'nw-dbg-img'); rawImg.src = cached.rawUrl; rawImg.title = t('networth.line.debug_img_raw');
+          const filtImg = el('img', 'nw-dbg-img'); filtImg.src = cached.filtUrl; filtImg.title = t('networth.line.debug_img_filtered');
+          const binImg = el('img', 'nw-dbg-img'); binImg.src = cached.binUrl; binImg.title = t('networth.line.debug_img_binarized');
+          imgs.appendChild(rawImg); imgs.appendChild(filtImg); imgs.appendChild(binImg);
           dbg.appendChild(imgs);
 
+          // Three sliders tuned together against ONE live preview, saved together with ONE
+          // button - the preview runs the live reader's exact path (read-pipeline.js), so
+          // "würde lesen" is what the next scan will read with these values. Every slider
+          // re-requests the preview with ALL current values (debounced IPC, not render() -
+          // a full re-render would drop slider focus mid-drag).
           const controls = el('div', 'nw-dbg-controls');
-          // Floor + right-edge sliders - bright background art (an item's icon) can fool
-          // the adaptive sweep's own confidence measure (see reader-worker.js) by
-          // brightness alone, and it sits to the right of a left-anchored number, so the
-          // two controls attack the same problem from different angles: floor separates by
-          // brightness where that still works, stripRight removes the art from the search
-          // outright where it does not. Both sliders re-request the SAME preview call with
-          // BOTH current values every time (debounced IPC, not the app's own render() - a
-          // full re-render would drop slider focus mid-drag), so adjusting one never
-          // silently discards an unsaved drag on the other.
-          const previewLabel = el('span', 'nw-dbg-preview',
-            t('networth.line.debug_preview', { text: cached.preview ? cached.preview.text : '?', pct: cached.preview ? Math.round(cached.preview.conf * 100) : 0 }));
-          const floorRow = el('div', 'nw-dbg-floor-row');
-          const floorLabel = el('span', 'nw-dbg-floor-val', 'floor ' + cached.floor);
-          const slider = el('input', 'nw-dbg-slider'); slider.type = 'range'; slider.min = 60; slider.max = 200; slider.step = 5; slider.value = cached.floor;
-          const stripRow = el('div', 'nw-dbg-floor-row');
-          const stripLabel = el('span', 'nw-dbg-floor-val', t('networth.line.debug_strip_right_val', { px: cached.stripRight }));
-          const stripSlider = el('input', 'nw-dbg-slider'); stripSlider.type = 'range';
-          stripSlider.min = 4; stripSlider.max = Math.max(4, cached.stripWidth); stripSlider.step = 1; stripSlider.value = cached.stripRight;
-          // Saturation - PREVIEW ONLY, no pin/save yet. An icon that is itself grey/white
-          // (marble, bone, ash...) gives this gate nothing to key off, so before wiring a
-          // third per-slot override into the live reader (which shares one value channel
-          // across the whole scan - a bigger change than floor/stripRight were), this lets
-          // the theory be checked against the actual slot instead of taken on faith.
-          const satRow = el('div', 'nw-dbg-floor-row');
-          const satLabel = el('span', 'nw-dbg-floor-val', t('networth.line.debug_sat_val', { v: cached.desatSat }));
-          const satSlider = el('input', 'nw-dbg-slider'); satSlider.type = 'range';
-          satSlider.min = 5; satSlider.max = 120; satSlider.step = 5; satSlider.value = cached.desatSat;
-          // Contrast - how much darker a digit pixel's surroundings must get (the black
-          // outline around every stack count). 0 = off. Catches the bright icon spots that
-          // pass floor and saturation because they are bright AND grey, but have no outline.
-          const conRow = el('div', 'nw-dbg-floor-row');
-          const conLabel = el('span', 'nw-dbg-floor-val', t('networth.line.debug_contrast_val', { v: cached.contrast || 0 }));
-          const conSlider = el('input', 'nw-dbg-slider'); conSlider.type = 'range';
-          conSlider.min = 0; conSlider.max = 200; conSlider.step = 5; conSlider.value = cached.contrast || 0;
+          const previewLabel = el('span', 'nw-dbg-preview');
+          const mkRow = (min, max, value, fmt) => {
+            const row = el('div', 'nw-dbg-floor-row');
+            const s = el('input', 'nw-dbg-slider'); s.type = 'range'; s.min = min; s.max = max; s.step = 5; s.value = value;
+            const lab = el('span', 'nw-dbg-floor-val', fmt(value));
+            row.appendChild(s); row.appendChild(lab);
+            return { row, s, lab, fmt };
+          };
+          const floorC = mkRow(60, 200, cached.floor, (v) => 'floor ' + v);
+          const satC = mkRow(5, 120, cached.desatSat, (v) => t('networth.line.debug_sat_val', { v }));
+          const conC = mkRow(0, 200, cached.contrast, (v) => t('networth.line.debug_contrast_val', { v }));
+          const saved = cached.saved || {};
+          const hasSaved = saved.floor != null || saved.desatSat != null || saved.contrast != null;
+          const btnRow = el('div', 'nw-dbg-floor-row');
+          const saveBtn = el('button', 'nw-dbg-pin', t('networth.line.debug_save_button'));
+          const resetBtn = el('button', 'nw-dbg-forget', t('networth.line.debug_reset_button'));
+          resetBtn.title = t('networth.line.debug_reset_title');
+          const status = el('span', 'nw-dbg-floor-val');
+          // saved = these exact slider values are what the reader uses for this slot
+          const updateStatus = () => {
+            const same = hasSaved && +floorC.s.value === saved.floor && +satC.s.value === saved.desatSat && +conC.s.value === saved.contrast;
+            saveBtn.disabled = same;
+            status.textContent = same ? t('networth.line.debug_status_saved')
+              : hasSaved ? t('networth.line.debug_status_changed') : t('networth.line.debug_status_auto');
+          };
+          const showPreview = (p) => {
+            previewLabel.textContent = t('networth.line.debug_preview', { text: p ? p.text : '?', pct: p ? Math.round(p.conf * 100) : 0 });
+          };
+          showPreview(cached.preview);
           let debounceT = null;
           const refreshPreview = () => {
             clearTimeout(debounceT);
             debounceT = setTimeout(async () => {
-              const res = await window.api.stashSlotDebugImage(ln.apiId, { floor: +slider.value, stripRight: +stripSlider.value, desatSat: +satSlider.value, contrast: +conSlider.value }).catch(() => null);
+              const res = await window.api.stashSlotDebugImage(ln.apiId, { floor: +floorC.s.value, desatSat: +satC.s.value, contrast: +conC.s.value }).catch(() => null);
               if (!res || !res.ok) return;
-              rawImg.src = res.rawUrl; binImg.src = res.binUrl;
-              previewLabel.textContent = t('networth.line.debug_preview', { text: res.preview.text, pct: Math.round(res.preview.conf * 100) });
-              cached.floor = res.floor; cached.stripRight = res.stripRight; cached.desatSat = res.desatSat; cached.contrast = res.contrast;
-              cached.rawUrl = res.rawUrl; cached.binUrl = res.binUrl; cached.preview = res.preview;
+              rawImg.src = res.rawUrl; filtImg.src = res.filtUrl; binImg.src = res.binUrl;
+              showPreview(res.preview);
+              Object.assign(cached, { floor: res.floor, desatSat: res.desatSat, contrast: res.contrast,
+                rawUrl: res.rawUrl, filtUrl: res.filtUrl, binUrl: res.binUrl, preview: res.preview });
             }, 120);
           };
-          // Once pinned, further drags just keep saving - re-clicking "set" after every
-          // nudge was the friction being reported, and the whole point of a pin is "trust
-          // my number", so a pinned slider staying in sync with itself is not a surprise.
-          slider.addEventListener('input', () => {
-            floorLabel.textContent = 'floor ' + slider.value; refreshPreview();
-            if (cached.pinned) window.api.stashSlotSetFloor(ln.apiId, +slider.value).catch(() => {});
-          });
-          stripSlider.addEventListener('input', () => {
-            stripLabel.textContent = t('networth.line.debug_strip_right_val', { px: stripSlider.value }); refreshPreview();
-            if (cached.stripRightPinned) window.api.stashSlotSetStripRight(ln.apiId, +stripSlider.value).catch(() => {});
-          });
-          satSlider.addEventListener('input', () => {
-            satLabel.textContent = t('networth.line.debug_sat_val', { v: satSlider.value }); refreshPreview();
-            if (cached.desatSatPinned) window.api.stashSlotSetDesat(ln.apiId, +satSlider.value).catch(() => {});
-          });
-          conSlider.addEventListener('input', () => {
-            conLabel.textContent = t('networth.line.debug_contrast_val', { v: conSlider.value }); refreshPreview();
-            if (cached.contrastPinned) window.api.stashSlotSetContrast(ln.apiId, +conSlider.value).catch(() => {});
-          });
-          floorRow.appendChild(slider); floorRow.appendChild(floorLabel);
-          const pinBtn = el('button', 'nw-dbg-pin', cached.pinned ? t('networth.line.debug_unpin_button') : t('networth.line.debug_pin_floor_button'));
-          pinBtn.onclick = async (e) => {
+          for (const c of [floorC, satC, conC]) {
+            c.s.addEventListener('input', () => { c.lab.textContent = c.fmt(c.s.value); updateStatus(); refreshPreview(); });
+          }
+          saveBtn.onclick = async (e) => {
             e.stopPropagation();
-            pinBtn.disabled = true;
-            try { await window.api.stashSlotSetFloor(ln.apiId, cached.pinned ? null : +slider.value); } catch {}
+            saveBtn.disabled = true;
+            try { await window.api.stashSlotSaveReadSettings(ln.apiId, { floor: +floorC.s.value, desatSat: +satC.s.value, contrast: +conC.s.value }); } catch {}
             delete dbgImgCache[ln.apiId];
             render();
           };
-          floorRow.appendChild(pinBtn);
-          stripRow.appendChild(stripSlider); stripRow.appendChild(stripLabel);
-          const stripPinBtn = el('button', 'nw-dbg-pin', cached.stripRightPinned ? t('networth.line.debug_unpin_button') : t('networth.line.debug_pin_strip_button'));
-          stripPinBtn.onclick = async (e) => {
+          resetBtn.onclick = async (e) => {
             e.stopPropagation();
-            stripPinBtn.disabled = true;
-            try { await window.api.stashSlotSetStripRight(ln.apiId, cached.stripRightPinned ? null : +stripSlider.value); } catch {}
+            resetBtn.disabled = true;
+            try { await window.api.stashSlotSaveReadSettings(ln.apiId, null); } catch {}
             delete dbgImgCache[ln.apiId];
             render();
           };
-          stripRow.appendChild(stripPinBtn);
-          satRow.appendChild(satSlider); satRow.appendChild(satLabel);
-          const satPinBtn = el('button', 'nw-dbg-pin', cached.desatSatPinned ? t('networth.line.debug_unpin_button') : t('networth.line.debug_pin_sat_button'));
-          satPinBtn.onclick = async (e) => {
-            e.stopPropagation();
-            satPinBtn.disabled = true;
-            try { await window.api.stashSlotSetDesat(ln.apiId, cached.desatSatPinned ? null : +satSlider.value); } catch {}
-            delete dbgImgCache[ln.apiId];
-            render();
-          };
-          satRow.appendChild(satPinBtn);
-          conRow.appendChild(conSlider); conRow.appendChild(conLabel);
-          const conPinBtn = el('button', 'nw-dbg-pin', cached.contrastPinned ? t('networth.line.debug_unpin_button') : t('networth.line.debug_pin_contrast_button'));
-          conPinBtn.onclick = async (e) => {
-            e.stopPropagation();
-            conPinBtn.disabled = true;
-            try { await window.api.stashSlotSetContrast(ln.apiId, cached.contrastPinned ? null : +conSlider.value); } catch {}
-            delete dbgImgCache[ln.apiId];
-            render();
-          };
-          conRow.appendChild(conPinBtn);
+          btnRow.appendChild(saveBtn);
+          if (hasSaved) btnRow.appendChild(resetBtn);
+          btnRow.appendChild(status);
+          updateStatus();
           controls.appendChild(previewLabel);
-          controls.appendChild(floorRow);
-          controls.appendChild(stripRow);
-          controls.appendChild(satRow);
-          if (window.api.stashSlotSetContrast) controls.appendChild(conRow);
+          controls.appendChild(floorC.row);
+          controls.appendChild(satC.row);
+          controls.appendChild(conC.row);
+          controls.appendChild(btnRow);
           if (ln.count != null && window.api.stashForgetDigits) {
             const forget = el('button', 'nw-dbg-forget', t('networth.line.forget_button'));
             forget.title = t('networth.line.forget_title');

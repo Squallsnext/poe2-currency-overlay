@@ -1264,6 +1264,7 @@ footer {
 .nw-dbg-pin { background: transparent; border: 1px solid var(--am-hi); color: var(--am-hi); cursor: pointer;
   font-size: 11px; padding: 2px 8px; border-radius: 4px; }
 .nw-dbg-pin:hover { background: color-mix(in srgb, var(--am-hi) 15%, transparent); }
+.nw-dbg-pin:disabled { opacity: .45; cursor: default; background: transparent; }
 .nw-dbg-forget { background: transparent; border: 1px solid var(--red2); color: var(--red2); cursor: pointer;
   font-size: 11px; padding: 2px 8px; border-radius: 4px; align-self: flex-start; }
 .nw-dbg-forget:hover { background: color-mix(in srgb, var(--red2) 15%, transparent); }
