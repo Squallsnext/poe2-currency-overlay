@@ -2246,6 +2246,8 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
         gain: ov && ov.gain != null ? ov.gain : null,
       },
       preview: { text: previewText, conf: read.conf },
+      // what "automatic" means for each slider, for the panel's "Standard" button
+      defaults: { bright: 0, gain: 100, desatSat: DR.DESAT_SAT, contrast: 0, minBlob: DR.DEFAULTS.minBlob },
     };
   } catch (err) {
     return { ok: false, reason: 'error', error: String(err && err.message || err) };

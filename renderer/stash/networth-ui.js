@@ -376,7 +376,7 @@
             // brightness/contrast of the colour source before every filter (test)
             { key: 'bright', min: -100, max: 50, step: 5, fmt: (v) => t('networth.line.debug_bright_val', { v }) },
             { key: 'gain', min: 40, max: 150, step: 5, fmt: (v) => t('networth.line.debug_gain_val', { v }) },
-            { key: 'desatSat', min: 5, max: 120, step: 5, fmt: (v) => t('networth.line.debug_sat_val', { v }) },
+            { key: 'desatSat', min: 5, max: 255, step: 5, fmt: (v) => t('networth.line.debug_sat_val', { v }) },
             { key: 'contrast', min: 0, max: 200, step: 5, fmt: (v) => t('networth.line.debug_contrast_val', { v }) },
             { key: 'floor', min: 60, max: 200, step: 5, fmt: floorFmt },
             // speck size: after the black/white cut, drop white blobs smaller than this -
@@ -426,7 +426,7 @@
               if (!res || !res.ok) return;
               rawImg.src = res.rawUrl; filtImg.src = res.filtUrl; binImg.src = res.binUrl;
               showPreview(res.preview);
-              Object.assign(cached, { effFloor: res.effFloor, rawUrl: res.rawUrl, filtUrl: res.filtUrl, binUrl: res.binUrl, preview: res.preview });
+              Object.assign(cached, { defaults: res.defaults, effFloor: res.effFloor, rawUrl: res.rawUrl, filtUrl: res.filtUrl, binUrl: res.binUrl, preview: res.preview });
               for (const sp of specs) cached[sp.key] = res[sp.key];
               if (!touched.has('floor')) sliders.floor.s.value = res.floor;
               sliders.floor.mark();
@@ -452,12 +452,33 @@
             delete dbgImgCache[ln.apiId];
             render();
           };
+          // playground presets - they only move the sliders (preview), nothing is saved
+          // until "Speichern": Standard = what automatic uses, Alle Filter aus = every
+          // filter neutral, so the middle view shows the plain original
+          const setAll = (vals, markTouched) => {
+            for (const sp of specs) {
+              if (!(sp.key in vals)) continue;
+              sliders[sp.key].s.value = vals[sp.key];
+              if (markTouched) touched.add(sp.key); else touched.delete(sp.key);
+              sliders[sp.key].mark();
+            }
+            updateStatus(); refreshPreview();
+          };
+          const presetRow = el('div', 'nw-dbg-floor-row');
+          const stdBtn = el('button', 'nw-dbg-pin', t('networth.line.debug_preset_standard'));
+          stdBtn.title = t('networth.line.debug_preset_standard_title');
+          stdBtn.onclick = (e) => { e.stopPropagation(); if (cached.defaults) setAll(cached.defaults, false); };
+          const offBtn = el('button', 'nw-dbg-pin', t('networth.line.debug_preset_off'));
+          offBtn.title = t('networth.line.debug_preset_off_title');
+          offBtn.onclick = (e) => { e.stopPropagation(); setAll({ bright: 0, gain: 100, desatSat: 255, contrast: 0, minBlob: 0 }, true); };
+          presetRow.appendChild(stdBtn); presetRow.appendChild(offBtn);
           btnRow.appendChild(saveBtn);
           if (hasSaved) btnRow.appendChild(resetBtn);
           btnRow.appendChild(status);
           updateStatus();
           controls.appendChild(previewLabel);
           for (const sp of specs) controls.appendChild(sliders[sp.key].row);
+          controls.appendChild(presetRow);
           controls.appendChild(btnRow);
           if (ln.count != null && window.api.stashForgetDigits) {
             const forget = el('button', 'nw-dbg-forget', t('networth.line.forget_button'));
