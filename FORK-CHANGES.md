@@ -151,6 +151,12 @@ New in this fork. It started as a dev-only page written next to each scan's debu
 scale past one machine. It now opens as a real window from the app, and **Save writes
 straight into the config**, so a player whose setup misreads a slot fixes it themselves.
 
+**Why it matters:** the built-in calibration expects the player to line the capture up with
+the stash panel's green frame. Controller players (and the controller UI) don't get that
+frame, so every tab ended up a few px off the grid and slots read wrong. The align tool
+fixes the reading boxes directly on the captured image instead. Verified in game on the
+Currency and Ritual tabs at 5K.
+
 **Where:** on every scanned tab card, the **"Ausrichten" / Align** button (it needs the
 captured frame, so it exists only after a scan of that tab). The supported tabs are listed
 in the empty Net Worth view and in its settings.
