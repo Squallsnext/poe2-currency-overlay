@@ -5,6 +5,31 @@
 // Keep entries in Drew's voice, short, no em-dashes. Add the new version on top
 // each cut; the popup and the history viewer both read from here automatically.
 window.RELEASE_NOTES = [
+  // Fork entry (German client + controller). Its version string is not the app version,
+  // so it never triggers the "What's new" popup - it only shows in the Release notes viewer.
+  {
+    version: '3.0.7 · Fork (DE + Controller)',
+    date: '2026-09-25',
+    notes: [
+      "German client:",
+      "Rare Overseer Tablets (Aufseher-Tafel) price check works. The search sent the German base name to the English trade site, which answered 'Unknown item base type'.",
+      "Unique items from a German client are found on trade again.",
+      "German 'Außergewöhnlich' (exceptional) items are parsed, and the Dexterity requirement line is read.",
+      "Controller (DualSense, USB):",
+      "Every hotkey can also be put on a controller button. New: a close-only overlay button.",
+      "Reprice with a controller: Square reads the price, Cross pastes the result (only right after a successful read).",
+      "Reprice:",
+      "A price only counts once two frames in a row agree. A half-drawn dialog read 14 as 11.",
+      "Faster: shorter waits between looks, no debug screenshot on every look.",
+      "Net Worth:",
+      "Setup wizard for controller players and custom UI sizes: calibrate, scan, align, check.",
+      "Align tool on every scanned tab: drag boxes onto the numbers, row align (R), grid.",
+      "OCR debug panel: see what the reader sees, tune filters per slot, learn digits from the image, copy/paste settings.",
+      "High resolution reading for 4K/5K (setting). 5120x2880 is supported.",
+      "A digit that lost to junk candidates is no longer dropped (262 read as 62).",
+      "The list survives a restart. 'Often misread' tints are off by default (setting).",
+    ],
+  },
   {
     version: '3.0.7',
     date: '2026-09-18',

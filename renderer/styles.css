@@ -1911,3 +1911,14 @@ footer {
 .fb-sysinfo-list { margin: 6px 0 0 22px; padding: 7px 9px; max-height: 150px; overflow: auto;
   background: color-mix(in srgb, var(--scrim) 28%, transparent); border: 1px solid var(--bd-09); border-radius: 5px;
   font: 10px/1.45 ui-monospace, Consolas, monospace; color: var(--tx-dim); white-space: pre-wrap; }
+
+/* Net Worth setup wizard */
+.nw-wizard { border: 1px solid var(--am-hi); border-radius: 8px; padding: 10px 12px; margin: 8px 0 12px;
+  background: color-mix(in srgb, var(--am-hi) 6%, transparent); display: flex; flex-direction: column; gap: 8px; }
+.nw-wizard-head { display: flex; align-items: center; gap: 10px; }
+.nw-wizard-title { font-weight: 700; color: var(--am-hi); }
+.nw-wizard-step { font-size: 12px; color: var(--tx-dim); flex: 1 1 auto; }
+.nw-wizard-x { background: transparent; border: 0; color: var(--tx-dim); font-size: 18px; cursor: pointer; line-height: 1; }
+.nw-wizard-x:hover { color: var(--am-hi); }
+.nw-wizard-body { font-size: 13px; line-height: 1.5; }
+.nw-wizard-btns { display: flex; gap: 8px; flex-wrap: wrap; }

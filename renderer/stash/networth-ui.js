@@ -20,7 +20,7 @@
   const fmtDiv = (n) => n == null ? null : (n >= 100 ? Math.round(n) : n.toFixed(1)).toLocaleString('en-US') + ' ' + unit(t('networth.unit.div_label'), 'divine');
   const fmtCount = (n) => Number(n).toLocaleString('en-US');
 
-  const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, showOcrDebug: false, hiRes: false, showRel: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null };
+  const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, showOcrDebug: false, hiRes: false, showRel: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null, wizard: null };
   // apiId -> {rawUrl, binUrl} | 'loading', for the OCR-debug toggle. Cleared on every
   // fresh capture (see onStashCaptured below) and per-slot after a teach/forget, since
   // either changes what the NEXT fetch of that slot would show.
@@ -98,6 +98,84 @@
     if (ti < 0) { state.rows.push(moved); return; }
     if (!before) ti++;
     state.rows.splice(ti, 0, moved);
+  }
+
+  // ---------- setup wizard ("Einrichtung") ----------
+  // Guides a player through what a controller player (or anyone with a non-standard UI
+  // size) otherwise has to discover alone: calibrate the panel, scan a tab, open "Align"
+  // and put the reading boxes on the numbers, rescan and check. Each step advances on its
+  // own when the thing it asks for has happened (calibrated / scanned / alignment saved),
+  // so the player never has to guess whether a step "took". In memory only.
+  function startWizard() {
+    state.wizard = { step: 1, tab: null, lastScan: null, mismatch: false };
+    const settings = document.getElementById('settings');
+    if (settings) settings.classList.add('hidden');
+    const tabBtn = document.getElementById('tab-networth');
+    if (tabBtn && !tabBtn.classList.contains('active')) tabBtn.click();
+    render();
+  }
+  function wizardOnScan(res) {
+    const w = state.wizard; if (!w) return;
+    if (!res || !res.ok) return;
+    if (res.mismatch) { w.mismatch = true; return; }
+    w.mismatch = false;
+    w.tab = res.tab;
+    w.lastScan = res;
+    if (w.step <= 2) w.step = 3;
+    else if (w.step === 4) w.step = 5;
+  }
+  function wizardCard() {
+    const w = state.wizard;
+    const card = el('div', 'nw-wizard');
+    const head = el('div', 'nw-wizard-head');
+    head.appendChild(el('span', 'nw-wizard-title', t('networth.wizard.title')));
+    head.appendChild(el('span', 'nw-wizard-step', t('networth.wizard.step_of', { n: w.step, total: 5 })));
+    const close = el('button', 'nw-wizard-x', '×');
+    close.title = t('networth.wizard.close');
+    close.onclick = () => { state.wizard = null; render(); };
+    head.appendChild(close);
+    card.appendChild(head);
+    const body = el('div', 'nw-wizard-body');
+    const btns = el('div', 'nw-wizard-btns');
+    const btn = (label, fn, ghost) => { const b = el('button', 'nw-set-btn' + (ghost ? ' nw-set-btn-ghost' : ''), label); b.onclick = (e) => { e.stopPropagation(); fn(); }; btns.appendChild(b); return b; };
+    const tabName = w.tab ? (TAB_LABEL[w.tab] || w.tab) : '';
+    if (w.step === 1) {
+      body.innerHTML = t('networth.wizard.s1', { tabs: esc(Object.values(TAB_LABEL).join(', ')) });
+      btn(t('networth.wizard.s1_calibrate'), () => { try { window.api.stashCalibrateStart(); } catch {} });
+      btn(t('networth.wizard.s1_skip'), () => { w.step = 2; render(); }, true);
+    } else if (w.step === 2) {
+      body.innerHTML = t('networth.wizard.s2', { hotkey: esc(state.hotkey) })
+        + (w.mismatch ? '<br><b>' + t('networth.wizard.s2_mismatch') + '</b>' : '');
+      btn(t('networth.wizard.scan'), () => capture());
+      if (w.mismatch) btn(t('networth.wizard.back_calibrate'), () => { w.step = 1; w.mismatch = false; render(); }, true);
+    } else if (w.step === 3) {
+      body.innerHTML = t('networth.wizard.s3', { tab: esc(tabName) });
+      btn(t('networth.wizard.s3_open'), async () => {
+        const r = await window.api.stashAdjustOpen(w.tab).catch(() => ({ ok: false }));
+        if (!r || !r.ok) { w.step = 2; render(); } // no capture any more - scan again
+      });
+      btn(t('networth.wizard.s3_skip'), () => { w.step = 4; render(); }, true);
+    } else if (w.step === 4) {
+      body.innerHTML = t('networth.wizard.s4', { tab: esc(tabName), hotkey: esc(state.hotkey) });
+      btn(t('networth.wizard.scan'), () => capture());
+    } else {
+      const lines = ((w.lastScan && w.lastScan.lines) || []).filter((ln) => !ln.missing);
+      const weak = lines.filter((ln) => ln.conf != null && ln.conf < 0.80).length;
+      body.innerHTML = t('networth.wizard.s5', { tab: esc(tabName), read: lines.length, weak })
+        + '<br>' + (weak ? t('networth.wizard.s5_weak') : t('networth.wizard.s5_good'));
+      if (weak && !state.showOcrDebug) {
+        btn(t('networth.wizard.s5_debug'), () => {
+          state.showOcrDebug = true; try { window.api.setStashShowOcrDebug(true); } catch {}
+          state.showConfidence = true; try { window.api.setStashShowConfidence(true); } catch {}
+          render();
+        });
+      }
+      btn(t('networth.wizard.s5_next_tab'), () => { w.step = 2; w.tab = null; w.lastScan = null; render(); }, true);
+      btn(t('networth.wizard.done'), () => { state.wizard = null; render(); }, true);
+    }
+    card.appendChild(body);
+    card.appendChild(btns);
+    return card;
   }
 
   function capture() {
@@ -242,6 +320,10 @@
       ? t('networth.settings.cal_desc_calibrated')
       : t('networth.settings.cal_desc_default')));
     const btns = el('div', 'nw-set-cal-btns');
+    const wzBtn = el('button', 'nw-set-btn', t('networth.wizard.start'));
+    wzBtn.title = t('networth.wizard.start_title');
+    wzBtn.onclick = () => startWizard();
+    btns.appendChild(wzBtn);
     const calBtn = el('button', 'nw-set-btn', state.calibrated ? t('networth.settings.cal_button_recalibrate') : t('networth.settings.cal_button_calibrate'));
     calBtn.onclick = () => { try { window.api.stashCalibrateStart(); } catch {} };
     btns.appendChild(calBtn);
@@ -980,6 +1062,7 @@
     controls.appendChild(gear);
     header.appendChild(controls);
     wrap.appendChild(header);
+    if (state.wizard) wrap.appendChild(wizardCard());
     { const xb = experimentalBanner(); if (xb) wrap.appendChild(xb); }
     { const lg = reliabilityLegend(); if (lg) wrap.appendChild(lg); }
 
@@ -992,6 +1075,11 @@
         + t('networth.empty.explain') + '<br>'
         + t('networth.empty.supported_tabs', { tabs: esc(Object.values(TAB_LABEL).join(', ')) })
         ));
+      if (!state.wizard) {
+        const wz = el('button', 'nw-set-btn', t('networth.wizard.start'));
+        wz.onclick = () => startWizard();
+        wrap.appendChild(wz);
+      }
     } else {
       for (const row of state.rows) wrap.appendChild(rowCard(row));
       // Dropping BELOW the last card had no target at all: every handler sat on a card, so
@@ -1059,6 +1147,7 @@
       // the cache so the next render re-fetches instead of showing the previous capture's
       // crop under this scan's numbers
       for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
+      wizardOnScan(res);
       applyResult(res);
     });
     if (window.api.onStashQueued) window.api.onStashQueued((info) => {
@@ -1066,12 +1155,17 @@
       if (!state.queued) { state.busy = false; state.phase = 'idle'; state.pendingTab = null; }
       render();
     });
+    if (window.api.onStashAdjusted) window.api.onStashAdjusted(() => {
+      if (state.wizard && state.wizard.step === 3) { state.wizard.step = 4; render(); }
+    });
     if (window.api.onStashCalibrated) window.api.onStashCalibrated((res) => {
       state.busy = false; state.phase = 'idle'; state.pendingTab = null; state.calibrated = true;
       const scale = res && typeof res.calScale === 'number' ? res.calScale : 1;
       const small = scale < 0.92;
       const smallMsg = small ? t('networth.calibrate.small_panel_warning', { scalePercent: Math.round(scale * 100) }) : '';
+      if (state.wizard && state.wizard.step === 1) state.wizard.step = 2; // calibrated - now scan
       if (res && res.ok && !res.mismatch) {
+        wizardOnScan(res);
         applyResult(res);
         state.notice = { kind: small ? 'warn' : 'ok', msg: t('networth.calibrate.success', { tabName: TAB_LABEL[res.tab] || res.tab, readCount: res.readCount, slotCount: res.slotCount, smallPanelWarning: smallMsg }) };
       } else {

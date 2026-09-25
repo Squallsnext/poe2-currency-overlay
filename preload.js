@@ -105,6 +105,7 @@ contextBridge.exposeInMainWorld('api', {
   stashCalibrateStart: () => ipcRenderer.send('stash-calibrate-start'),
   clearStashCalibration: () => ipcRenderer.invoke('clear-stash-calibration'),
   onStashCalibrated: (cb) => ipcRenderer.on('stash-calibrated', (_e, res) => cb(res)),
+  onStashAdjusted: (cb) => ipcRenderer.on('stash-adjusted', (_e, info) => cb(info)),
   onStashCapturing: (cb) => ipcRenderer.on('stash-capturing', () => cb()),
   onStashDetected: (cb) => ipcRenderer.on('stash-detected', (_e, tab) => cb(tab)),
   onStashCaptured: (cb) => ipcRenderer.on('stash-captured', (_e, res) => cb(res)),

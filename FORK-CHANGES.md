@@ -204,6 +204,16 @@ the extra Exalted cells, 4.7) appear in the tool automatically.
 
 ### 4.6 Other Net Worth changes
 
+- **Setup wizard** ("Einrichtung starten", in the empty Net Worth view and in its settings):
+  five steps that move on by themselves – 1. calibrate (skippable when auto-detect works),
+  2. scan, 3. open Align and fit the boxes (advances when the alignment is saved; new
+  `stash-adjusted` event), 4. rescan, 5. result with the number of unsure slots and a
+  one-click switch to OCR debug + confidence. "Next tab" repeats 2–5. Aimed at controller
+  players, who otherwise have to discover calibration, Align and the debug panel alone.
+- **Release notes:** a fork entry in the in-app Release notes viewer lists these changes,
+  including the German client fixes. Its version string differs from the app version, so it
+  never triggers the "What's new" popup.
+
 - **Ritual tab:** slot R1-3 "Call of the Shadows" (`call-of-the-shadows`) added – it was one
   of the unmapped empties. Position extrapolated from the row spacing and confirmed in game
   (reads ×1 at 96 %).

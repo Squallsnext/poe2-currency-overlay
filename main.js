@@ -2603,6 +2603,8 @@ ipcMain.handle('stash-adjust-save', (_e, { tab, deltas } = {}) => {
     if (!tab || !deltas) return { ok: false };
     mergeSlotOverrides(tab, deltas);
     closeAdjustWin();
+    // tell the Net Worth view (its setup wizard moves on to "rescan and check")
+    try { if (win && !win.isDestroyed()) win.webContents.send('stash-adjusted', { tab }); } catch {}
     logToggle('stash-learn', `alignment saved for ${tab}: ${Object.keys(deltas).length} slot(s)`);
     return { ok: true };
   } catch (err) {
