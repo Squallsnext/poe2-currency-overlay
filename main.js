@@ -2404,7 +2404,12 @@ button#cancel{background:#3a3a3a;color:#eee}
 #wrap.hide-ok .box.ok{display:none}
 .box.sel{outline:2px solid #fff;z-index:3}
 .box .t{position:absolute;left:0;top:-22px;white-space:nowrap;font:700 16px Consolas,monospace;color:inherit;text-shadow:0 0 4px #000,0 0 4px #000}
-#toggleok{display:flex;align-items:center;gap:5px;font-size:13px;color:#cfc3aa}
+#toggleok,#togglegrid{display:flex;align-items:center;gap:5px;font-size:13px;color:#cfc3aa}
+#togglegrid input[type=number]{width:52px;background:#0b0b0b;color:#ddd;border:1px solid #555;border-radius:6px;padding:4px 6px;font:12px Consolas,monospace}
+#grid{position:absolute;inset:0;pointer-events:none;display:none;z-index:2}
+#wrap.show-grid #grid{display:block}
+#guide{position:absolute;left:0;right:0;height:0;border-top:1px dashed #6fd3ff;pointer-events:none;display:none;z-index:4}
+#wrap.show-grid #guide{display:block}
 </style>
 <div id="bar">
   <button id="save">Speichern &amp; übernehmen</button>
@@ -2415,9 +2420,11 @@ button#cancel{background:#3a3a3a;color:#eee}
     <label>Höhe <input id="gh" type="number" step="1"></label>
   </div>
   <label id="toggleok"><input id="showok" type="checkbox"> auch gute Felder zeigen</label>
-  <span id="hint">Nur unsichere/falsche Felder werden standardmäßig gezeigt. Ziehen = verschieben, Pfeiltasten = 1px, Shift+Pfeil = 5px. Breite/Höhe = Größe für ALLE Kästchen auf einmal (auch die ausgeblendeten guten).</span>
+  <button id="rowalign" title="Alle Kästchen rechts vom ausgewählten, die höchstens 10 px höher oder tiefer sitzen, auf dieselbe Höhe setzen (nur die Höhe, links/rechts bleibt). Taste R">Reihe angleichen</button>
+  <label id="togglegrid"><input id="showgrid" type="checkbox"> Gitter <input id="gridstep" type="number" min="2" step="1" title="Gitterabstand in Pixeln"> px</label>
+  <span id="hint">Nur unsichere/falsche Felder werden standardmäßig gezeigt. Ziehen = verschieben, Pfeiltasten = 1px, Shift+Pfeil = 5px. Breite/Höhe = Größe für ALLE Kästchen auf einmal (auch die ausgeblendeten guten). Reihe angleichen (R): erstes Kästchen der Reihe auswählen, dann richten sich alle rechts davon in der Höhe danach aus. Gitter: gestrichelte Linie = Mitte des ausgewählten Kästchens.</span>
 </div>
-<div id="wrap" class="hide-ok"><img id="panel" src="data:image/png;base64,${data.panelBase64}"></div>
+<div id="wrap" class="hide-ok"><img id="panel" src="data:image/png;base64,${data.panelBase64}"><div id="grid"></div><div id="guide"></div></div>
 <script>
 const REF_BOX = ${JSON.stringify(data.refBox)};
 const WIDTH = ${data.width};
@@ -2448,6 +2455,42 @@ function deltas(){
 function select(el){
   document.querySelectorAll('.box.sel').forEach(x => x.classList.remove('sel'));
   selected = el; if (el) el.classList.add('sel');
+  updateGuide();
+}
+// Grid overlay + a guide line through the selected box's centre - for lining boxes up by
+// eye, which a controller player can't do by dragging onto the game's own frame.
+const gridEl = document.getElementById('grid'), guideEl = document.getElementById('guide');
+const gridStep = document.getElementById('gridstep');
+function drawGrid(){
+  const g = Math.max(2, +gridStep.value || 10);
+  gridEl.style.backgroundImage =
+    'repeating-linear-gradient(to right, rgba(111,211,255,.28) 0 1px, transparent 1px ' + g + 'px),'
+    + 'repeating-linear-gradient(to bottom, rgba(111,211,255,.28) 0 1px, transparent 1px ' + g + 'px)';
+}
+function updateGuide(){
+  if (!selected) return;
+  const r = DATA[+selected.dataset.i];
+  guideEl.style.top = Math.round(r.y + r.h / 2) + 'px';
+}
+// "Reihe angleichen": every box to the RIGHT of the selected one whose centre sits within
+// 10 reference px above/below it takes the selected box's height (y only - x untouched).
+// Scaled to this capture, and well under the gap between real rows (~60) and the offset
+// half-rows (~19), so a neighbouring row is never pulled in. Hidden good boxes on the
+// row move too - they are on the same line.
+const ROW_TOL = 10 * KY;
+function alignRow(){
+  if (!selected) return;
+  const a = DATA[+selected.dataset.i];
+  const acx = a.x + a.w / 2, acy = a.y + a.h / 2;
+  for (let i = 0; i < DATA.length; i++) {
+    const r = DATA[i];
+    if (r === a) continue;
+    const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+    if (cx <= acx || Math.abs(cy - acy) > ROW_TOL) continue;
+    r.y = acy - r.h / 2;
+    const el = document.querySelector('.box[data-i="' + i + '"]');
+    if (el) place(el, r);
+  }
 }
 // One shared size for every box, same reasoning as the dev tool this is built on: the
 // real reader applies a single strip/up/dn per tab, only the CENTER differs per slot.
@@ -2478,13 +2521,15 @@ DATA.forEach((r, i) => {
     if (!drag || drag.i !== i) return;
     r.x = drag.x + (ev.clientX - drag.sx);
     r.y = drag.y + (ev.clientY - drag.sy);
-    place(el, r);
+    place(el, r); updateGuide();
   });
   el.addEventListener('pointerup', () => { drag = null; });
   wrap.appendChild(el);
 });
 document.addEventListener('keydown', (ev) => {
+  if (ev.target && ev.target.tagName === 'INPUT') return; // typing a size/grid value
   if (!selected) return;
+  if (ev.key === 'r' || ev.key === 'R') { alignRow(); ev.preventDefault(); return; }
   const i = +selected.dataset.i, r = DATA[i];
   const n = ev.shiftKey ? 5 : 1;
   let dx = 0, dy = 0;
@@ -2494,7 +2539,7 @@ document.addEventListener('keydown', (ev) => {
   else if (ev.key === 'ArrowDown') dy = n;
   else return;
   r.x += dx; r.y += dy;
-  place(selected, r); ev.preventDefault();
+  place(selected, r); updateGuide(); ev.preventDefault();
 });
 document.getElementById('copy').onclick = async () => {
   try { await navigator.clipboard.writeText(JSON.stringify(deltas(), null, 2)); } catch {}
@@ -2502,6 +2547,16 @@ document.getElementById('copy').onclick = async () => {
 document.getElementById('cancel').onclick = () => window.adjustApi.close();
 document.getElementById('save').onclick = () => window.adjustApi.save({ tab: TAB, deltas: deltas() });
 document.getElementById('showok').addEventListener('change', (ev) => wrap.classList.toggle('hide-ok', !ev.target.checked));
+document.getElementById('rowalign').onclick = () => alignRow();
+// grid on/off and spacing are remembered for the next time the tool opens
+try { gridStep.value = localStorage.getItem('adjGridStep') || Math.max(4, Math.round(10 * KX)); } catch { gridStep.value = Math.max(4, Math.round(10 * KX)); }
+let gridOn = false; try { gridOn = localStorage.getItem('adjGridOn') === '1'; } catch {}
+document.getElementById('showgrid').checked = gridOn; wrap.classList.toggle('show-grid', gridOn); drawGrid();
+document.getElementById('showgrid').addEventListener('change', (ev) => {
+  wrap.classList.toggle('show-grid', ev.target.checked);
+  try { localStorage.setItem('adjGridOn', ev.target.checked ? '1' : '0'); } catch {}
+});
+gridStep.addEventListener('input', () => { drawGrid(); try { localStorage.setItem('adjGridStep', gridStep.value); } catch {} });
 if (DATA.length) select(document.querySelector('.box:not(.ok)') || document.querySelector('.box'));
 gwInput.value = DATA.length ? Math.round(DATA[0].w) : 0;
 ghInput.value = DATA.length ? Math.round(DATA[0].h) : 0;

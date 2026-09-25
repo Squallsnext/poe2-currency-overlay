@@ -151,8 +151,9 @@ New in this fork. It started as a dev-only page written next to each scan's debu
 scale past one machine. It now opens as a real window from the app, and **Save writes
 straight into the config**, so a player whose setup misreads a slot fixes it themselves.
 
-**Where:** on a scanned tab card, the **"Ausrichten" / Align** button. It appears when the
-tab has at least one unread slot or one below 80 % confidence.
+**Where:** on every scanned tab card, the **"Ausrichten" / Align** button (it needs the
+captured frame, so it exists only after a scan of that tab). The supported tabs are listed
+in the empty Net Worth view and in its settings.
 
 **What it shows:** the captured stash panel with one box per stack-count reading window,
 coloured by the last read: red = unread, yellow = unsure (65–80 %), green = good (≥80 %).
@@ -163,6 +164,13 @@ Only red/yellow boxes are shown by default ("also show good slots" reveals the r
   **Shift + arrow** by 5 px.
 - **Width / Height** resize **all** boxes at once (the hidden good ones too), so a box that
   reaches into the neighbouring icon can be tightened for the whole tab.
+- **Row align (key R):** select the first box of a row; every box to its right whose centre
+  is within 10 reference px above/below takes the same height (y only, x untouched). The
+  tolerance is below the gap to the offset half-rows (~19 px), so neighbouring rows are
+  never pulled in. Made for controller players, who cannot line boxes up by dragging onto
+  the game's frame and always end up a few px off.
+- **Grid** toggle with adjustable spacing, plus a dashed guide line through the selected
+  box's centre. Both settings are remembered.
 - **Save & apply** writes per-slot `cx, cy, stripWidth, up, dn` (reference-space) into
   `stashSlotOverrides[tab][apiId]`; the next scan uses them. **Copy deltas** still copies
   them as JSON for a developer.

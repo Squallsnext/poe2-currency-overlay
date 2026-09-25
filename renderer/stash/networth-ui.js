@@ -177,6 +177,10 @@
     resIn.appendChild(el('label', null, t('networth.settings.supported_res_label')));
     resIn.appendChild(el('span', 'set-sub', '1920×1080, 2560×1440, 5120×2880'));
     res.appendChild(resIn);
+    const tabsIn = el('div', 'set-inline');
+    tabsIn.appendChild(el('label', null, t('networth.settings.supported_tabs_label')));
+    tabsIn.appendChild(el('span', 'set-sub', esc(Object.values(TAB_LABEL).join(', '))));
+    res.appendChild(tabsIn);
     root.appendChild(res);
 
     // The submission's PERMANENT home. The banner on the tab can be dismissed;
@@ -265,11 +269,12 @@
     title.appendChild(document.createTextNode(labelFor(row)));
     head.appendChild(title);
 
-    // Only offered when something on this tab actually needs it - a slot the reader
-    // itself flags as low-confidence or unread. Opens the same drag-to-fix tool the
-    // dev-only debug output has had for a while, as a real window; saving writes
-    // straight into config so the fix applies from the very next scan.
-    if ((r.lines || []).some((ln) => ln.missing || (ln.conf != null && ln.conf < 0.80)) && window.api.stashAdjustOpen) {
+    // On every scanned tab (it needs the captured frame, so it can only exist after a scan).
+    // Used to appear only when a slot was flagged unsure - but a slot can read confidently
+    // AND sit a few px off, and a tab that reads fine today is exactly the one worth
+    // aligning before the next icon change. Opens the drag-to-fix tool as a real window;
+    // saving writes straight into config so the fix applies from the very next scan.
+    if (window.api.stashAdjustOpen) {
       const adj = el('button', 'nw-card-adjust', t('networth.row.adjust_label'));
       adj.title = t('networth.row.adjust_title');
       adj.onclick = async (e) => {
@@ -958,6 +963,7 @@
       wrap.appendChild(el('div', 'nw-empty',
         t('networth.empty.instructions', { hotkey: esc(state.hotkey) }) + '<br>'
         + t('networth.empty.explain') + '<br>'
+        + t('networth.empty.supported_tabs', { tabs: esc(Object.values(TAB_LABEL).join(', ')) })
         ));
     } else {
       for (const row of state.rows) wrap.appendChild(rowCard(row));
