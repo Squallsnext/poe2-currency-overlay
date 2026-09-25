@@ -57,7 +57,13 @@ parentPort.on('message', (msg) => {
     // about, so the very next F7 press already benefits from a correction made seconds
     // earlier.
     const liveBank = RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates);
-    const DIGITS_LIVE = liveBank.bank, UNMAP_LIVE = liveBank.unmap, SOURCE_OF_LIVE = liveBank.sourceOf;
+    // high-resolution slots (matchScale 2, see read-pipeline.js) need the bank at that
+    // scale - built once per scale, only if some slot asks for it
+    const bankCache = new Map([[1, liveBank]]);
+    const bankFor = (ms) => {
+      if (!bankCache.has(ms)) bankCache.set(ms, RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates, ms));
+      return bankCache.get(ms);
+    };
     // Find the panel by its coloured frame, which is what makes calibration optional: the
     // frame is a saturated rectangle on an otherwise brown UI, so it can be located
     // outright rather than asked for.
@@ -175,8 +181,11 @@ parentPort.on('message', (msg) => {
       // near-white gate as the digits confuses the sweep's own "most confident" pick
       // (a noisier floor can score higher purely by having more ink to be confident
       // about), and no amount of sweeping fixes that - only a floor chosen by eye does.
-      const r = RP.readSlot(ch, pos, DIGITS_LIVE, RP.slotParams(map, scale, ov), ov && ov.floor != null ? ov.floor : null);
-      const raw = r.text === '?' ? '?' : UNMAP_LIVE(r.text); // alt keys back to digits
+      const Ps = RP.slotParams(map, scale, ov);
+      const ms = RP.effectiveMatchScale(ch, Ps);
+      const bk = bankFor(ms);
+      const r = RP.readSlot(ch, pos, bk.bank, RP.paramsAtScale(Ps, ms), ov && ov.floor != null ? ov.floor : null);
+      const raw = r.text === '?' ? '?' : bk.unmap(r.text); // alt keys back to digits
       const conf = r.conf;
       if (raw !== '?') readCount++;
       // pass the measured reliability of this slot through, so the UI can flag the
@@ -185,7 +194,7 @@ parentPort.on('message', (msg) => {
       // DEBUG: which template each accepted glyph came from and at what score, so a
       // misread can be inspected instead of guessed at - see stash-debug-live's strips.svg.
       const glyphs = (r.glyphs || []).map((g) => ({
-        ch: UNMAP_LIVE(g.ch), source: SOURCE_OF_LIVE(g.ch), score: g.score, gapFilled: g.gapFilled,
+        ch: bk.unmap(g.ch), source: bk.sourceOf(g.ch), score: g.score, gapFilled: g.gapFilled,
       }));
       reads.push({ apiId: s.apiId, count: raw === '?' ? null : parseInt(raw, 10), conf: raw === '?' ? null : conf, rel, glyphs });
     }

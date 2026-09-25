@@ -2103,16 +2103,25 @@ ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings } = {}) => {
     const ov = settings ? Object.assign({}, saved, settings) : saved;
     const ch = RP.buildChannel(Buffer.from(cap.bitmap), cap.W, cap.H, cap.box, refBox, RP.channelOpts(ov));
     const pos = RP.slotPos(ch, slot, ov, refBox, cap.box);
-    const P = RP.slotParams(TAB_MAPS[tab], ch.scale, ov);
+    const P0 = RP.slotParams(TAB_MAPS[tab], ch.scale, ov);
+    const ms = RP.effectiveMatchScale(ch, P0);
+    const P = RP.paramsAtScale(P0, ms);
     const Pt = ov && ov.floor != null ? Object.assign({}, P, { floor: ov.floor }) : P;
     const { binarized } = DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Pt, ch.cellScale);
-    const comps = DR.components(binarized).sort((a, b) => a.x - b.x);
+    const comps = DR.components(binarized, ms).sort((a, b) => a.x - b.x);
     if (comps.length !== value.length) {
       logToggle('stash-learn', `skip "${value}" for ${apiId}: found ${comps.length} glyph(s), expected ${value.length}`);
       return { ok: false, reason: 'segment-mismatch', found: comps.length, want: value.length };
     }
 
-    const learned = loadLearnedTemplates();
+    const learnedAll = loadLearnedTemplates();
+    // a glyph cut at matchScale 2 is twice the size of a reference one - it goes to its
+    // own set (byScale[ms]) that only high-resolution reads use
+    let learned = learnedAll;
+    if (ms > 1) {
+      learnedAll.byScale = learnedAll.byScale || {};
+      learned = learnedAll.byScale[ms] || (learnedAll.byScale[ms] = {});
+    }
     learned.exemplars = learned.exemplars || {};
     // Re-crop each glyph centred on the strip's own vertical middle, NOT on the
     // component's natural ink bounding box. readCellEx's slideMatch always searches a
@@ -2150,8 +2159,8 @@ ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings } = {}) => {
       inks.sort((a, b) => (a.ink - b.ink) || (a.i - b.i));
       learned.templates[ch] = glyphs[inks[Math.floor(glyphs.length / 2)].i];
     }
-    saveLearnedTemplates(learned);
-    logToggle('stash-learn', `taught "${value}" for ${apiId} (${tab}) - ${comps.length} glyph(s), ${Object.keys(learned.templates).length} digit(s) known`);
+    saveLearnedTemplates(learnedAll);
+    logToggle('stash-learn', `taught "${value}" for ${apiId} (${tab}) at x${ms} - ${comps.length} glyph(s), ${Object.keys(learned.templates).length} digit(s) known`);
     return { ok: true, digits: comps.length };
   } catch (err) {
     logToggle('stash-learn', 'ERROR ' + (err && err.message || err));
@@ -2185,16 +2194,20 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
     const satPct = pick('satPct', 100);
     const minBlob = pick('minBlob', DR.DEFAULTS.minBlob);
     const localThr = pick('localThr', 0);
+    const matchScaleIn = pick('matchScale', 1);
     const floorIn = pick('floor', null);
     // exactly the live reader's path (read-pipeline.js): same regime, same position,
     // same params, same bank including learned corrections
     const bitmap = Buffer.from(cap.bitmap);
     const ch = RP.buildChannel(bitmap, cap.W, cap.H, cap.box, refBox, { sat: desatSat, contrast, bright, gain, satPct });
     const pos = RP.slotPos(ch, slot, ov, refBox, cap.box);
-    const P = Object.assign(RP.slotParams(map, ch.scale, ov), { minBlob, localThr });
+    const P0 = Object.assign(RP.slotParams(map, ch.scale, ov), { minBlob, localThr, matchScale: matchScaleIn });
+    // high-resolution matching where the regime allows it (see read-pipeline.js)
+    const matchScale = RP.effectiveMatchScale(ch, P0);
+    const P = RP.paramsAtScale(P0, matchScale);
     let learned = null;
     try { learned = loadLearnedTemplates(); } catch { /* none yet */ }
-    const bankInfo = RP.buildBank(require('./renderer/stash/digit-templates.json'), learned);
+    const bankInfo = RP.buildBank(require('./renderer/stash/digit-templates.json'), learned, matchScale);
     const read = RP.readSlot(ch, pos, bankInfo.bank, P, floorIn);
     const floor = read.floor;
     const previewText = read.text === '?' ? '?' : bankInfo.unmap(read.text);
@@ -2240,6 +2253,9 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
       filtUrl: toUrl(filtBuf, cw, chh, UPSCALE),
       binUrl: toUrl(binBuf, binarized.w, binarized.h, 6),
       floor, effFloor, desatSat, contrast, minBlob, bright, gain, satPct, localThr,
+      // matchScale as asked for (slider), effective one actually used, and the most
+      // this capture allows (1 = not available in this regime)
+      matchScale: matchScaleIn, matchScaleUsed: matchScale, matchScaleMax: ch.cellScale > 1 ? Math.max(1, Math.floor(ch.cellScale)) : 1,
       // what is saved for this slot right now (null = automatic), so the panel can tell
       // "slider moved, not saved yet" from "this is the saved value"
       saved: {
@@ -2251,10 +2267,11 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
         gain: ov && ov.gain != null ? ov.gain : null,
         satPct: ov && ov.satPct != null ? ov.satPct : null,
         localThr: ov && ov.localThr != null ? ov.localThr : null,
+        matchScale: ov && ov.matchScale != null ? ov.matchScale : null,
       },
       preview: { text: previewText, conf: read.conf },
       // what "automatic" means for each slider, for the panel's "Standard" button
-      defaults: { localThr: 0, satPct: 100, bright: 0, gain: 100, desatSat: DR.DESAT_SAT, contrast: 0, minBlob: DR.DEFAULTS.minBlob },
+      defaults: { matchScale: 1, localThr: 0, satPct: 100, bright: 0, gain: 100, desatSat: DR.DESAT_SAT, contrast: 0, minBlob: DR.DEFAULTS.minBlob },
     };
   } catch (err) {
     return { ok: false, reason: 'error', error: String(err && err.message || err) };
@@ -2276,6 +2293,10 @@ ipcMain.handle('stash-forget-digits', (_e, { digits } = {}) => {
     for (const ch of new Set(chars)) {
       if (learned.exemplars[ch]) { removed += learned.exemplars[ch].length; delete learned.exemplars[ch]; }
       delete learned.templates[ch];
+      for (const sc of Object.values(learned.byScale || {})) {
+        if (sc.exemplars && sc.exemplars[ch]) { removed += sc.exemplars[ch].length; delete sc.exemplars[ch]; }
+        if (sc.templates) delete sc.templates[ch];
+      }
     }
     saveLearnedTemplates(learned);
     logToggle('stash-learn', `forgot ${[...new Set(chars)].join(',')} - ${removed} exemplar(s) removed`);
@@ -2524,6 +2545,7 @@ ipcMain.handle('stash-adjust-save', (_e, { tab, deltas } = {}) => {
 //             cut - for highlights exactly as white as a digit, which no pixel filter can
 //   bright/gain  brightness/contrast of the colour source before every filter (test)
 //   satPct    real saturation of the colour source (0 = grey), before every filter
+//   matchScale 2 = match at twice reference resolution (5K-class captures only)
 //   localThr  >0 switches the black/white cut from one global floor to a local one:
 //             ink = a thin stroke standing out this much from its surroundings
 // settings === null resets the slot to automatic (also clears an old right-edge trim from
@@ -2534,14 +2556,14 @@ ipcMain.handle('stash-slot-save-read-settings', (_e, { apiId, settings } = {}) =
     if (!found) return { ok: false, reason: 'no-recent-capture' };
     if (settings == null) {
       const cur = config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId];
-      if (cur) { delete cur.floor; delete cur.desatSat; delete cur.contrast; delete cur.minBlob; delete cur.bright; delete cur.gain; delete cur.satPct; delete cur.localThr; delete cur.stripRight; }
+      if (cur) { delete cur.floor; delete cur.desatSat; delete cur.contrast; delete cur.minBlob; delete cur.bright; delete cur.gain; delete cur.satPct; delete cur.localThr; delete cur.matchScale; delete cur.stripRight; }
     } else {
       // only the keys sent are touched: a value set to null goes back to automatic, a key
       // left out keeps whatever is saved (so saving just the speck filter leaves floor on
       // the adaptive sweep)
       const delta = {};
       const cur = (config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId]) || null;
-      for (const k of ['floor', 'desatSat', 'contrast', 'minBlob', 'bright', 'gain', 'satPct', 'localThr']) {
+      for (const k of ['floor', 'desatSat', 'contrast', 'minBlob', 'bright', 'gain', 'satPct', 'localThr', 'matchScale']) {
         if (!(k in settings)) continue;
         if (settings[k] == null) { if (cur) delete cur[k]; } else delta[k] = Math.round(settings[k]);
       }

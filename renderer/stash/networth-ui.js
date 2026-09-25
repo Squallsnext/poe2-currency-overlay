@@ -392,6 +392,10 @@
             { key: 'localThr', min: 0, max: 100, step: 5, fmt: (v) => (+v ? t('networth.line.debug_local_val', { v }) : t('networth.line.debug_local_off')) },
             // speck size: after the black/white cut, drop white blobs smaller than this -
             // for icon highlights exactly as white/grey as a digit, which no pixel filter can
+            // matching resolution: x2 keeps twice the detail on high-res (5K-class)
+            // captures; greyed out where the capture has no extra pixels to give
+            { key: 'matchScale', min: 1, max: 2, step: 1, fmt: (v) => ((cached.matchScaleMax || 1) < 2
+              ? t('networth.line.debug_res_unavailable') : t('networth.line.debug_res_val', { v })) },
             { key: 'minBlob', min: 0, max: 30, step: 1, fmt: (v) => t('networth.line.debug_blob_val', { v }) },
           ];
           const touched = new Set();
@@ -403,6 +407,7 @@
             const lab = el('span', 'nw-dbg-floor-val');
             const mark = () => { lab.textContent = sp.fmt(s.value) + (saved[sp.key] != null && !touched.has(sp.key) ? ' •' : ''); };
             mark();
+            if (sp.key === 'matchScale' && (cached.matchScaleMax || 1) < 2) s.disabled = true;
             row.appendChild(s); row.appendChild(lab);
             sliders[sp.key] = { row, s, lab, mark };
           }

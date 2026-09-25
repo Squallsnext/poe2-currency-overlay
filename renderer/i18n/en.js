@@ -690,6 +690,8 @@ window.I18N_CATALOGS.en = {
   "networth.line.debug_preset_standard": "Standard",
   "networth.line.debug_preset_standard_title": "Sliders to the values automatic uses. Preview only.",
   "networth.line.debug_preview": "would read: {text} ({pct}%)",
+  "networth.line.debug_res_unavailable": "resolution ×1 (higher only on 4K/5K)",
+  "networth.line.debug_res_val": "resolution ×{v} (×2 = twice as fine, learns its own templates)",
   "networth.line.debug_reset_button": "Back to automatic",
   "networth.line.debug_reset_title": "Delete the saved values for this slot, the reader decides on its own again. • = saved",
   "networth.line.debug_sat_val": "colour limit {v}",

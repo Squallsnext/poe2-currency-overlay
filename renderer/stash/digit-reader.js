@@ -173,9 +173,9 @@
   // cell px (reference size, strokes ~2px): 5 is wider than any stroke, narrower than a
   // digit's closed counters.
   const LOCAL_KERNEL = 5;
-  function binarizeLocal(sub, offset, floor) {
+  function binarizeLocal(sub, offset, floor, kernel) {
     const { data, w, h } = sub;
-    const opening = greyOpening(sub, LOCAL_KERNEL);
+    const opening = greyOpening(sub, kernel || LOCAL_KERNEL);
     const b = new Uint8Array(data.length);
     for (let i = 0; i < data.length; i++) {
       const v = data[i];
@@ -186,7 +186,10 @@
 
   // the black/white cut as P asks for it: local when P.localThr is set, else global
   function binarizeP(sub, P) {
-    return P.localThr ? binarizeLocal(sub, P.localThr, P.floor) : binarize(sub, P.floor);
+    // kernel is in cell px: at matchScale 2 a stroke is twice as wide, so is the kernel
+    // (kept odd for the rank filter)
+    const k = P.matchScale > 1 ? (Math.round(LOCAL_KERNEL * P.matchScale) | 1) : LOCAL_KERNEL;
+    return P.localThr ? binarizeLocal(sub, P.localThr, P.floor, k) : binarize(sub, P.floor);
   }
 
   function binarize(sub, floor) {
@@ -230,7 +233,9 @@
   // 4-connectivity connected components (scipy.ndimage.label default structure).
   // Returns [{ mask:{data,w,h}, x, area }] where mask is cropped to the bbox and
   // x is the component's min-x in strip coords.
-  function components(bin) {
+  // S = cell scale relative to reference (matchScale): every size limit grows with it
+  function components(bin, S) {
+    S = S || 1;
     const { data, w, h } = bin;
     const lbl = new Int32Array(w * h);
     const stack = [];
@@ -253,8 +258,8 @@
         if (py < h - 1) { const q = p + w; if (data[q] && !lbl[q]) { lbl[q] = n; stack.push(q); } }
       }
       const bw = xMax - xMin + 1, bh = yMax - yMin + 1;
-      // digit-sized: height 7-16, width 1-13, area>=5
-      if (bh >= 7 && bh <= 16 && bw >= 1 && bw <= 13 && area >= 5) {
+      // digit-sized: height 7-16, width 1-13, area>=5 (reference px, times S)
+      if (bh >= 7 * S && bh <= 16 * S && bw >= 1 && bw <= 13 * S && area >= 5 * S * S) {
         const mask = new Uint8Array(bw * bh);
         for (let yy = yMin; yy <= yMax; yy++)
           for (let xx = xMin; xx <= xMax; xx++)
@@ -402,14 +407,15 @@
   // whatever sits past it (typically an item icon bleeding into the wide capture strip)
   // can be masked out of the search outright instead of hoping a threshold or a post-hoc
   // filter catches it once it has already been mismatched as a digit.
-  function detectDigitSpan(bin) {
-    const comps = components(bin).sort((a, b) => a.x - b.x);
+  function detectDigitSpan(bin, S) {
+    S = S || 1;
+    const comps = components(bin, S).sort((a, b) => a.x - b.x);
     if (!comps.length) return null;
     let endX = comps[0].x + comps[0].mask.w;
     let count = 1;
     for (let i = 1; i < comps.length; i++) {
       const gap = comps[i].x - endX;
-      if (gap > MAX_DIGIT_GAP) break;
+      if (gap > MAX_DIGIT_GAP * S) break;
       endX = comps[i].x + comps[i].mask.w;
       count++;
     }
@@ -447,6 +453,9 @@
     }
     if (!sub.w || !sub.h) return { text: '?', conf: 0, glyphs: [] };
     const bin = dropSmallBlobs(binarizeP(sub, P), P.minBlob);
+    // cell scale vs reference (matchScale): the pixel limits below were measured on
+    // reference-size digits and grow with it
+    const S = P.matchScale > 1 ? P.matchScale : 1;
 
     // Auto-detect how far the real number extends and mask off everything past it -
     // skipped when a user has manually pinned stripRight for this exact slot (see the OCR
@@ -454,9 +463,9 @@
     // not the detector". A few reference px of margin keeps a slightly-wider-than-expected
     // last digit (or its own anti-aliased edge) from being clipped by the mask itself.
     if (P.stripRight == null && !P.noAutoRight) {
-      const span = detectDigitSpan(bin);
+      const span = detectDigitSpan(bin, S);
       if (span) {
-        const cutX = Math.min(bin.w, span.endX + 3);
+        const cutX = Math.min(bin.w, span.endX + 3 * S);
         for (let y = 0; y < bin.h; y++)
           for (let x = cutX; x < bin.w; x++) bin.data[y * bin.w + x] = 0;
       }
@@ -564,12 +573,12 @@
       if (c.x === minX && c.ch === '1') {
         let hasLeftInk = false;
         if (c.x > 0) {
-          const x0 = Math.max(0, c.x - 2);
+          const x0 = Math.max(0, c.x - 2 * S);
           for (let y = 0; y < bin.h && !hasLeftInk; y++)
             for (let x = x0; x < c.x; x++) if (bin.data[y * bin.w + x]) { hasLeftInk = true; break; }
         }
-        if (!hasLeftInk && c.x > 2) {
-          const near = accepted.some(o => o.ch === '1' && o.x !== c.x && Math.abs(o.x - c.x) <= 4);
+        if (!hasLeftInk && c.x > 2 * S) {
+          const near = accepted.some(o => o.ch === '1' && o.x !== c.x && Math.abs(o.x - c.x) <= 4 * S);
           if (near) continue;
         }
       }
@@ -584,7 +593,7 @@
     // that happened to score above threshold on its own, read as a stray "1".
     for (let i = 1; i < filtered.length; i++) {
       const gap = filtered[i].x - (filtered[i - 1].x + (filtered[i - 1].tw || 0));
-      if (gap > MAX_DIGIT_GAP) { filtered.length = i; break; }
+      if (gap > MAX_DIGIT_GAP * S) { filtered.length = i; break; }
     }
     if (!filtered.length) return { text: '?', conf: 0, glyphs: [] };
     // confidence = mean IoU match score of the accepted glyphs (gap-filled ones default
@@ -617,9 +626,12 @@
     const stripR = P.stripRight != null ? P.stripRight : P.stripWidth;
     let sub;
     if (scale !== 1) {
+      // same shrink as readCellEx, matchScale included, so the view/teach cell IS the
+      // cell that gets matched
+      const targetScale = scale / (P.matchScale || 1);
       const swL = Math.round(stripL * scale), swR = Math.round(stripR * scale), up = Math.round(P.up * scale), dn = Math.round(P.dn * scale);
       const raw = crop(V, W, H, cx - swL, cy - up, cx + swR, cy + dn);
-      sub = resample(raw, Math.max(1, Math.round(raw.w / scale)), Math.max(1, Math.round(raw.h / scale)));
+      sub = resample(raw, Math.max(1, Math.round(raw.w / targetScale)), Math.max(1, Math.round(raw.h / targetScale)));
     } else {
       sub = crop(V, W, H, cx - stripL, cy - P.up, cx + stripR, cy + P.dn);
     }
@@ -682,6 +694,7 @@
   }
 
   function gapFill(bin, templates, accepted, P) {
+    const S = P.matchScale > 1 ? P.matchScale : 1;
     const sorted = accepted.slice().sort((a, b) => a.x - b.x);
     const stripW = bin.w;
     const gapThresh = Math.max(0.70, P.iouThresh - 0.06);
@@ -703,7 +716,7 @@
     for (let i = 0; i < sorted.length - 1; i++) {
       const gs = sorted[i].x + sorted[i].tw, ge = sorted[i + 1].x;
       const gw = ge - gs;
-      if (gw >= 4 && gw <= 15 && regionInk(gs, ge) > 20) {
+      if (gw >= 4 * S && gw <= 15 * S && regionInk(gs, ge) > 20 * S * S) {
         const region = subStrip(gs, ge);
         const gc = collect(region, templates, gapThresh, P).map(c => ({ ...c, x: gs + c.x }));
         gc.sort((a, b) => b.score - a.score);
@@ -716,10 +729,10 @@
       const last = sorted[sorted.length - 1];
       const lastEnd = last.x + last.tw;
       const gwA = stripW - lastEnd;
-      if (gwA >= 4 && gwA <= 15) {
+      if (gwA >= 4 * S && gwA <= 15 * S) {
         const ink = regionInk(lastEnd, stripW);
         const density = gwA > 0 ? ink / gwA : 0;
-        if (ink > 120 && density > 12) {
+        if (ink > 120 * S * S && density > 12 * S) {
           const region = subStrip(lastEnd, stripW);
           const gc = collect(region, templates, gapThresh, P).map(c => ({ ...c, x: lastEnd + c.x }));
           gc.sort((a, b) => b.score - a.score);

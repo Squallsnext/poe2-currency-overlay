@@ -82,6 +82,7 @@
     const P = paramsForScale(paramsFor(map), scale);
     if (ov && ov.minBlob != null) P.minBlob = ov.minBlob;
     if (ov && ov.localThr) P.localThr = ov.localThr;
+    if (ov && ov.matchScale > 1) P.matchScale = ov.matchScale;
     if (!ov || (ov.stripWidth == null && ov.up == null && ov.dn == null && ov.stripLeft == null && ov.stripRight == null)) return P;
     return Object.assign({}, P, {
       stripWidth: ov.stripWidth != null ? ov.stripWidth : P.stripWidth,
@@ -92,15 +93,49 @@
     });
   }
 
-  // shipped multi-rendering bank, plus the user's learned corrections as one more variant
-  function buildBank(rawTemplates, learned) {
+  // shipped multi-rendering bank, plus the user's learned corrections as one more variant.
+  // matchScale > 1 (high-resolution matching, see effectiveMatchScale): every reference-
+  // size template is blown up by that factor to fit the bigger cell, and templates the
+  // user taught AT that scale (learned.byScale[ms]) join as-is - those carry the real
+  // detail a blown-up 9px template can't.
+  function buildBank(rawTemplates, learned, matchScale) {
+    const ms = matchScale > 1 ? Math.round(matchScale) : 1;
+    const variants = (rawTemplates.variants || []).slice();
     if (learned && learned.templates && Object.keys(learned.templates).length) {
-      return DR.bankFromJSON({
-        templates: rawTemplates.templates,
-        variants: (rawTemplates.variants || []).concat([{ source: 'user-corrections', templates: learned.templates }]),
-      });
+      variants.push({ source: 'user-corrections', templates: learned.templates });
     }
-    return DR.bankFromJSON(rawTemplates);
+    const scaled = ms > 1 && learned && learned.byScale && learned.byScale[ms] && learned.byScale[ms].templates;
+    const scaledSrc = 'user-corrections@x' + ms;
+    if (scaled && Object.keys(scaled).length) variants.push({ source: scaledSrc, templates: scaled });
+    const built = DR.bankFromJSON({ templates: rawTemplates.templates, variants });
+    if (ms > 1) {
+      for (const key of Object.keys(built.bank)) {
+        if (built.sourceOf(key) !== scaledSrc) built.bank[key] = DR.upscaleTemplate(built.bank[key], ms);
+      }
+    }
+    return built;
+  }
+
+  // High-resolution matching only exists where the reader crops the NATIVE frame per
+  // cell (the extreme-scale regime, e.g. 5K: cellScale ~2.7) - there it can shrink the
+  // cell to 2x reference instead of 1x and keep twice the detail. Elsewhere the frame is
+  // already at (or normalised to) reference size, so there is nothing to gain: 1.
+  // Capped so the cell is never blown UP past its native pixels.
+  function effectiveMatchScale(ch, P) {
+    const ms = P.matchScale > 1 ? Math.round(P.matchScale) : 1;
+    if (ms === 1 || ch.cellScale <= 1) return 1;
+    return Math.max(1, Math.min(ms, Math.floor(ch.cellScale)));
+  }
+
+  // P adjusted for the matching scale: everything the reader measures in cell px
+  // (vertical search window, speck area) grows with the cell
+  function paramsAtScale(P, ms) {
+    if (ms === 1) return Object.assign({}, P, { matchScale: 1 });
+    return Object.assign({}, P, {
+      matchScale: ms,
+      dyLo: Math.round((P.dyLo || 0) * ms), dyHi: Math.round((P.dyHi || 0) * ms),
+      minBlob: (P.minBlob || 0) * ms * ms,
+    });
   }
 
   // The read itself: a pinned floor reads at exactly that floor, otherwise the adaptive
@@ -115,5 +150,5 @@
     return Object.assign({}, r, { floor: r.floor != null ? r.floor : P.floor });
   }
 
-  return { EXTREME_SCALE, MARGIN, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
+  return { EXTREME_SCALE, MARGIN, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
 });

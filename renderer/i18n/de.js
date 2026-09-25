@@ -685,6 +685,8 @@ window.I18N_CATALOGS.de = {
   "networth.line.debug_preset_standard": "Standard",
   "networth.line.debug_preset_standard_title": "Regler auf die Werte, die die Automatik benutzt. Nur Vorschau.",
   "networth.line.debug_preview": "würde lesen: {text} ({pct}%)",
+  "networth.line.debug_res_unavailable": "Auflösung ×1 (höher nur bei 4K/5K möglich)",
+  "networth.line.debug_res_val": "Auflösung ×{v} (×2 = doppelt so fein, eigene Vorlagen lernen)",
   "networth.line.debug_reset_button": "Zurück auf automatisch",
   "networth.line.debug_reset_title": "Gespeicherte Werte für dieses Feld löschen, der Leser entscheidet wieder selbst. • = gespeichert",
   "networth.line.debug_sat_val": "Farb-Grenze {v}",
