@@ -29,6 +29,11 @@
   // In memory only (per app session) - pasting just moves the target's sliders, saving
   // is still an explicit "Speichern" there.
   let dbgClipboard = null;
+  // OCR-debug settings section open/closed - one choice for every slot's panel,
+  // remembered across restarts. Closed by default: the sliders are only needed while
+  // tuning, and a closed section keeps the list from jumping on every re-render.
+  let dbgSettingsOpen = false;
+  try { dbgSettingsOpen = localStorage.getItem('nwDbgSettingsOpen') === '1'; } catch { /* storage blocked */ }
   const TAB_LABEL = { currency: t('networth.tab.currency'), abyss: t('networth.tab.abyss'), essence: t('networth.tab.essence'), runes: t('networth.tab.runes'), 'runes-kalguuran': t('networth.tab.runes_kalguuran'), ritual: t('networth.tab.ritual'), soulcore: t('networth.tab.soulcore'), idol: t('networth.tab.idol'), 'ancient-augment': t('networth.tab.ancient_augment'), delirium: t('networth.tab.delirium'), breach: t('networth.tab.breach'), expedition: t('networth.tab.expedition') };
   const MIRROR_ICON = 'https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lEdXBsaWNhdGUiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/26bc31680e/CurrencyDuplicate.png';
 
@@ -502,17 +507,45 @@
             // no render(): it would rebuild this panel and drop unsaved slider changes;
             // other panels' "Einfügen" reads dbgClipboard when clicked
           };
-          pasteBtn.onclick = (e) => { e.stopPropagation(); if (dbgClipboard) setAll(dbgClipboard, true); };
+          // paste = take over AND save in one go - it's meant for rolling one good setting
+          // out over many slots quickly, often with the settings section closed
+          pasteBtn.onclick = async (e) => {
+            e.stopPropagation();
+            if (!dbgClipboard) return;
+            pasteBtn.disabled = true;
+            const out = Object.assign({}, dbgClipboard);
+            if (!('floor' in out)) out.floor = null; // source floor was automatic: keep it so
+            try { await window.api.stashSlotSaveReadSettings(ln.apiId, out); } catch {}
+            delete dbgImgCache[ln.apiId];
+            render();
+          };
           presetRow.appendChild(stdBtn); presetRow.appendChild(offBtn);
-          presetRow.appendChild(copyBtn); presetRow.appendChild(pasteBtn);
+          // always visible: preview, the open/close toggle and copy/paste (pasting onto
+          // a slot doesn't need its sliders open - "Speichern" does, and lives inside)
+          const topRow = el('div', 'nw-dbg-floor-row');
+          const body = el('div', 'nw-dbg-body');
+          body.hidden = !dbgSettingsOpen;
+          const toggleBtn = el('button', 'nw-dbg-pin', (dbgSettingsOpen ? '▾ ' : '▸ ') + t('networth.line.debug_settings_toggle'));
+          toggleBtn.onclick = (e) => {
+            e.stopPropagation();
+            dbgSettingsOpen = !dbgSettingsOpen;
+            try { localStorage.setItem('nwDbgSettingsOpen', dbgSettingsOpen ? '1' : '0'); } catch { /* storage blocked */ }
+            // flip every open panel in place - no render(), which would drop unsaved drags
+            for (const b of document.querySelectorAll('.nw-dbg-body')) b.hidden = !dbgSettingsOpen;
+            for (const b of document.querySelectorAll('.nw-dbg-toggle')) b.textContent = (dbgSettingsOpen ? '▾ ' : '▸ ') + t('networth.line.debug_settings_toggle');
+          };
+          toggleBtn.classList.add('nw-dbg-toggle');
+          topRow.appendChild(toggleBtn); topRow.appendChild(copyBtn); topRow.appendChild(pasteBtn);
           btnRow.appendChild(saveBtn);
           if (hasSaved) btnRow.appendChild(resetBtn);
           btnRow.appendChild(status);
           updateStatus();
           controls.appendChild(previewLabel);
-          for (const sp of specs) controls.appendChild(sliders[sp.key].row);
-          controls.appendChild(presetRow);
-          controls.appendChild(btnRow);
+          controls.appendChild(topRow);
+          for (const sp of specs) body.appendChild(sliders[sp.key].row);
+          body.appendChild(presetRow);
+          body.appendChild(btnRow);
+          controls.appendChild(body);
           // "learn from this image": teach the digit templates from exactly the black/
           // white cell on screen, with the CURRENT slider values (saved or not) - for the
           // case where the right image shows a clean number the reader still misreads.
@@ -545,7 +578,7 @@
               }
             };
             learnRow.appendChild(learnIn); learnRow.appendChild(learnBtn); learnRow.appendChild(learnMsg);
-            controls.appendChild(learnRow);
+            body.appendChild(learnRow);
           }
           if (ln.count != null && window.api.stashForgetDigits) {
             const forget = el('button', 'nw-dbg-forget', t('networth.line.forget_button'));
@@ -557,7 +590,7 @@
               delete dbgImgCache[ln.apiId];
               render();
             };
-            controls.appendChild(forget);
+            body.appendChild(forget);
           }
           dbg.appendChild(controls);
         } else {
