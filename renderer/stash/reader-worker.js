@@ -49,7 +49,7 @@ const MIN_SCORE = 0.3; // below this the panel isn't a recognized stash tab
 
 parentPort.on('message', (msg) => {
   try {
-    const { bitmap, W, H, calBox, learnedTemplates, slotOverrides } = msg;
+    const { bitmap, W, H, calBox, learnedTemplates, slotOverrides, hiRes } = msg;
     const buf = Buffer.from(bitmap);
     const refBox = TAB_TEMPLATES.box;
     // Corrections taught since the last read (see main.js's stash-teach-count) join the
@@ -171,7 +171,9 @@ parentPort.on('message', (msg) => {
     const tabOverrides = (slotOverrides && slotOverrides[tab]) || null;
     const reads = []; let readCount = 0;
     for (const s of map.STATIC_SLOTS) {
-      const ov = tabOverrides && tabOverrides[s.apiId];
+      const ovSaved = tabOverrides && tabOverrides[s.apiId];
+      // global "high resolution" switch: matchScale 2 unless the slot chose its own
+      const ov = hiRes && (!ovSaved || ovSaved.matchScale == null) ? Object.assign({}, ovSaved, { matchScale: 2 }) : ovSaved;
       const ch = chFor(ov);
       const pos = RP.slotPos(ch, s, ov, refBox, box);
       // adaptive: pick the binarisation threshold per cell rather than trusting one

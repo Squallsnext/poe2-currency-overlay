@@ -20,7 +20,7 @@
   const fmtDiv = (n) => n == null ? null : (n >= 100 ? Math.round(n) : n.toFixed(1)).toLocaleString('en-US') + ' ' + unit(t('networth.unit.div_label'), 'divine');
   const fmtCount = (n) => Number(n).toLocaleString('en-US');
 
-  const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, showOcrDebug: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null };
+  const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, showOcrDebug: false, hiRes: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null };
   // apiId -> {rawUrl, binUrl} | 'loading', for the OCR-debug toggle. Cleared on every
   // fresh capture (see onStashCaptured below) and per-slot after a teach/forget, since
   // either changes what the NEXT fetch of that slot would show.
@@ -49,7 +49,7 @@
   const TAB_LABEL = { currency: t('networth.tab.currency'), abyss: t('networth.tab.abyss'), essence: t('networth.tab.essence'), runes: t('networth.tab.runes'), 'runes-kalguuran': t('networth.tab.runes_kalguuran'), ritual: t('networth.tab.ritual'), soulcore: t('networth.tab.soulcore'), idol: t('networth.tab.idol'), 'ancient-augment': t('networth.tab.ancient_augment'), delirium: t('networth.tab.delirium'), breach: t('networth.tab.breach'), expedition: t('networth.tab.expedition') };
   const MIRROR_ICON = 'https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lEdXBsaWNhdGUiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/26bc31680e/CurrencyDuplicate.png';
 
-  if (window.api && window.api.getConfig) window.api.getConfig().then((c) => { state.dup = !!(c && c.stashDupTabs); state.sortLayout = !!(c && c.stashSortLayout); state.showMissing = !!(c && c.stashShowMissing); state.showConfidence = !!(c && c.stashShowConfidence); state.showOcrDebug = !!(c && c.stashShowOcrDebug); state.calibrated = !!(c && c.stashCalibration); state.hotkey = (c && c.stashHotkey) || 'F7'; state.bannerHidden = !!(c && c.stashBannerHidden); render(); }).catch(() => {});
+  if (window.api && window.api.getConfig) window.api.getConfig().then((c) => { state.dup = !!(c && c.stashDupTabs); state.sortLayout = !!(c && c.stashSortLayout); state.showMissing = !!(c && c.stashShowMissing); state.showConfidence = !!(c && c.stashShowConfidence); state.showOcrDebug = !!(c && c.stashShowOcrDebug); state.hiRes = !!(c && c.stashHiRes); state.calibrated = !!(c && c.stashCalibration); state.hotkey = (c && c.stashHotkey) || 'F7'; state.bannerHidden = !!(c && c.stashBannerHidden); render(); }).catch(() => {});
 
   const rowsOfType = (tab) => state.rows.filter((r) => r.tab === tab);
   function labelFor(row) {
@@ -153,6 +153,15 @@
     toggles.appendChild(mkToggle(state.showOcrDebug, t('networth.settings.toggle_ocr_debug_label'),
       t('networth.settings.toggle_ocr_debug_sub'),
       (v) => { state.showOcrDebug = v; try { window.api.setStashShowOcrDebug(v); } catch {} }));
+    // one switch for every slot's matching resolution - on a slower PC one click turns
+    // the (heavier) 2x read off everywhere instead of slot by slot
+    toggles.appendChild(mkToggle(state.hiRes, t('networth.settings.toggle_hires_label'),
+      t('networth.settings.toggle_hires_sub'),
+      (v) => {
+        state.hiRes = v;
+        try { window.api.setStashHiRes(v); } catch {}
+        for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k]; // previews re-read with the new default
+      }));
     root.appendChild(toggles);
     // Settings above, recovery tools below - the divider keeps users from reading
     // calibration/submission as steps they are meant to take. Same shape as the Reprice

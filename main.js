@@ -267,6 +267,7 @@ const DEFAULT_CONFIG = {
   stashShowMissing: false, // Net Worth: show empty/unread slots as editable x0 lines
   stashShowConfidence: false, // Net Worth: show the per-line OCR confidence %
   stashShowOcrDebug: false, // Net Worth: show the exact crop the reader saw, per line
+  stashHiRes: false, // Net Worth: read counts at 2x resolution where the capture allows (4K/5K); per-slot setting wins
   commandHotkeys: [], // Hotkeys settings: [{command:'/hideout', accelerator:'F8'}] - whitelist-only safe chat commands, one key = one manual command
   stashCalibration: null, // Net Worth: {x,y,w,h} panel box from one-time calibration; null = assume reference res
   stashSlotOverrides: {}, // per-tab, per-apiId {cx,cy,stripWidth,up,dn} from the in-app "align" tool; overrides the shipped map for slots a user's setup misreads
@@ -1762,12 +1763,14 @@ function runReaderWorker(bitmap, W, H, onDetected) {
     // keyed by tab, then apiId. The worker doesn't know the tab until it detects one, so
     // the whole map rides along and it looks up its own tab's entry.
     const slotOverrides = config.stashSlotOverrides || null;
-    w.postMessage({ bitmap: ab, W, H, calBox: config.stashCalibration || null, learnedTemplates, slotOverrides }, [ab]); // transfer the ~8MB frame, no copy
+    w.postMessage({ bitmap: ab, W, H, calBox: config.stashCalibration || null, learnedTemplates, slotOverrides, hiRes: !!config.stashHiRes }, [ab]); // transfer the ~8MB frame, no copy
   });
 }
 
 function writeStashDebug(shot, res) {
-  if (app.isPackaged || !shot) return;
+  // dev builds only, and only while the Net Worth "OCR debug" switch is on - otherwise
+  // every scan wrote a set of images to disk nobody asked for
+  if (app.isPackaged || !shot || !config.stashShowOcrDebug) return;
   try {
     const dir = path.join(app.getPath('userData'), 'stash-debug');
     fs.mkdirSync(dir, { recursive: true });
@@ -2075,6 +2078,13 @@ function saveLearnedTemplates(data) {
 const MAX_EXEMPLARS_PER_DIGIT = 30; // bounded so the file doesn't grow forever
 // Shared by stash-teach-count, stash-slot-debug-image: which recent capture actually has
 // this apiId, and where its slot sits in that map.
+// A slot's saved override with the global defaults folded in: the "high resolution"
+// switch (stashHiRes) sets matchScale 2 for every slot that hasn't chosen its own.
+function slotOverride(tab, apiId) {
+  const ov = (config.stashSlotOverrides && config.stashSlotOverrides[tab] && config.stashSlotOverrides[tab][apiId]) || null;
+  if (config.stashHiRes && (!ov || ov.matchScale == null)) return Object.assign({}, ov, { matchScale: 2 });
+  return ov;
+}
 function findTabSlot(apiId) {
   for (const [name, cap] of lastCaptureByTab) {
     const map = TAB_MAPS[name];
@@ -2099,7 +2109,7 @@ ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings } = {}) => {
     // template learned from a differently-processed crop never quite fits the real one
     // `settings` (from the OCR-debug panel's "learn" button): the panel's CURRENT slider
     // values, saved or not - so it learns from exactly the black/white image on screen
-    const saved = (config.stashSlotOverrides && config.stashSlotOverrides[tab] && config.stashSlotOverrides[tab][apiId]) || null;
+    const saved = slotOverride(tab, apiId);
     const ov = settings ? Object.assign({}, saved, settings) : saved;
     const ch = RP.buildChannel(Buffer.from(cap.bitmap), cap.W, cap.H, cap.box, refBox, RP.channelOpts(ov));
     const pos = RP.slotPos(ch, slot, ov, refBox, cap.box);
@@ -2182,7 +2192,7 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
     const RP = require('./renderer/stash/read-pipeline.js');
     const TT = require('./renderer/stash/tab-templates.json');
     const refBox = TT.box;
-    const ov = (config.stashSlotOverrides && config.stashSlotOverrides[tab] && config.stashSlotOverrides[tab][apiId]) || null;
+    const ov = slotOverride(tab, apiId);
     // the values being PREVIEWED: an explicit slider value while dragging, else this
     // slot's saved value, else the default (floor: none, i.e. the adaptive sweep - the
     // same thing a live read does, so an untouched panel shows the live read's answer)
@@ -2267,7 +2277,7 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
         gain: ov && ov.gain != null ? ov.gain : null,
         satPct: ov && ov.satPct != null ? ov.satPct : null,
         localThr: ov && ov.localThr != null ? ov.localThr : null,
-        matchScale: ov && ov.matchScale != null ? ov.matchScale : null,
+        matchScale: (() => { const own = config.stashSlotOverrides && config.stashSlotOverrides[tab] && config.stashSlotOverrides[tab][apiId]; return own && own.matchScale != null ? own.matchScale : null; })(),
       },
       preview: { text: previewText, conf: read.conf },
       // how many templates this read compared against, and how many of them the user
@@ -2281,7 +2291,7 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
         return { total: Object.keys(bankInfo.bank).length, learned: perDigit };
       })(),
       // what "automatic" means for each slider, for the panel's "Standard" button
-      defaults: { matchScale: 1, localThr: 0, satPct: 100, bright: 0, gain: 100, desatSat: DR.DESAT_SAT, contrast: 0, minBlob: DR.DEFAULTS.minBlob },
+      defaults: { matchScale: config.stashHiRes ? 2 : 1, localThr: 0, satPct: 100, bright: 0, gain: 100, desatSat: DR.DESAT_SAT, contrast: 0, minBlob: DR.DEFAULTS.minBlob },
     };
   } catch (err) {
     return { ok: false, reason: 'error', error: String(err && err.message || err) };
@@ -2708,6 +2718,7 @@ ipcMain.handle('set-stash-sort', (_e, on) => { config.stashSortLayout = !!on; sa
 ipcMain.handle('set-stash-show-missing', (_e, on) => { config.stashShowMissing = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-show-confidence', (_e, on) => { config.stashShowConfidence = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-show-ocr-debug', (_e, on) => { config.stashShowOcrDebug = !!on; saveConfig(); return true; });
+ipcMain.handle('set-stash-hi-res', (_e, on) => { config.stashHiRes = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-banner-hidden', (_e, on) => { config.stashBannerHidden = !!on; saveConfig(); return true; });
 // Grab one frame of a region and return it as a data URL, opening the capture stream if
 // it is not already up. Used by the calibration preview and the test read.
