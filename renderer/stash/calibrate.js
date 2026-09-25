@@ -8,6 +8,17 @@
   const hguide = document.getElementById('hguide');
   const coordsEl = document.getElementById('coords');
   const debugEl = document.getElementById('debug');
+  // Texts come from the app's catalogs (loaded by calibrate.html) in the UI language main
+  // passes in calib-init; missing keys fall back to English, then to the key itself.
+  let uiLang = 'en';
+  function t(key) {
+    const C = window.I18N_CATALOGS || {};
+    const cur = C[uiLang] || {}, en = C.en || {};
+    return cur[key] !== undefined ? cur[key] : (en[key] !== undefined ? en[key] : key);
+  }
+  function applyI18n() {
+    for (const node of document.querySelectorAll('[data-i18n]')) node.innerHTML = t(node.dataset.i18n);
+  }
   const imgObj = new Image();
   // per-axis capture-px <-> css-px scale. The window's client height often differs
   // slightly from the screenshot height (DPI / work-area), so a single scale skews the
@@ -154,6 +165,10 @@
 
   window.calibrateApi.onInit((data) => {
     shot.src = data.dataUrl; imgObj.src = data.dataUrl;
+    uiLang = data.lang || 'en';
+    applyI18n();
+    // the capture/window/display diagnostics line only while OCR debug is on
+    if (debugEl) debugEl.hidden = !data.debug;
     capW = data.capW || 1;
     capH = data.capH || 1;
     displayInfo = data.display || null;
@@ -169,20 +184,14 @@
       const snapBtn = document.getElementById('snap');
       if (snapBtn) snapBtn.style.display = 'none';
       const msg = document.querySelector('.msg');
-      if (msg) msg.innerHTML = data.target === 'reprice-icon'
-        ? 'Zieh den Rahmen <b>um das Waehrungs-Icon</b> neben dem Preis - nur das Bild, '
-          + 'nicht den Namen daneben. Er muss nicht millimetergenau sein, aber andere Grafik '
-          + 'sollte draussen bleiben. Dann bestaetigen.'
-        : 'Zieh den Rahmen <b>um die Zahl im Preisfeld</b>. '
-          + 'Die Lupe zeigt die genaue Pixelzeile und Spalte; setze die Kanten knapp ausserhalb '
-          + 'der Ziffern. Dann bestaetigen.';
+      if (msg) msg.innerHTML = t(data.target === 'reprice-icon' ? 'calib.msg_reprice_icon' : 'calib.msg_reprice_num');
       // the illustration is a stash grid with item cells - nothing to do with a price box
       const ex = document.getElementById('ex');
       if (ex) ex.style.display = 'none';
       const note = document.querySelector('.bar-note');
       if (note) note.style.display = 'none';
       const ok = document.getElementById('ok');
-      if (ok) ok.textContent = 'Bestaetigen';
+      if (ok) ok.textContent = t('calib.confirm');
     }
     draw();
   });

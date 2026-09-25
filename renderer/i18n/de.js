@@ -1,6 +1,16 @@
 'use strict';
 window.I18N_CATALOGS = window.I18N_CATALOGS || {};
 window.I18N_CATALOGS.de = {
+  "calib.bar_note": "&#9888;&#65039; <b>Für zuverlässige Erkennung: Spiel auf 1920&times;1080 oder größer.</b> Kleinere Panels machen die Zahlen zu klein.",
+  "calib.cancel": "Abbrechen",
+  "calib.confirm": "Bestätigen",
+  "calib.confirm_test": "Bestätigen &amp; testen",
+  "calib.ex_text": "Lege den Rahmen <b style=\"color:#e8dcc4\">auf den farbigen Rand des inneren Item-Felds</b>. Nicht um die linke Fachliste, nicht um die Überschrift und nicht bis zum Suchfeld unten.",
+  "calib.ex_title": "Woran ausrichten",
+  "calib.msg_reprice_icon": "Zieh den Rahmen <b>um das Währungs-Icon</b> neben dem Preis - nur das Bild, nicht den Namen daneben. Er muss nicht millimetergenau sein, aber andere Grafik sollte draußen bleiben. Dann bestätigen.",
+  "calib.msg_reprice_num": "Zieh den Rahmen <b>um die Zahl im Preisfeld</b>. Die Lupe zeigt die genaue Pixelzeile und Spalte; setze die Kanten knapp außerhalb der Ziffern. Dann bestätigen.",
+  "calib.msg_stash": "Zieh den Rahmen um das <b>innere Item-Feld rechts</b>: links neben den ersten Items, oben direkt über der ersten Reihe, rechts am Panelrand, unten direkt unter den unteren Slots. <b>Nicht</b> die linke Fachliste, Überschrift oder Suchleiste einschließen. Auto-Snap kann helfen, ist aber optional.",
+  "calib.snap": "Am Rand einrasten",
   "currency.arb.acquire_base": "{base} beschaffen (falls nötig)",
   "currency.arb.acquire_cheapest_suffix": " - günstigster Weg: {leg}",
   "currency.arb.buy_direct": "{item} direkt mit {base} kaufen (handelt {pct}% unter Cross)",

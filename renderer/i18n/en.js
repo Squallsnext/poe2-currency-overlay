@@ -4,6 +4,16 @@
 // translations OF this file; a key missing from them falls back here (see i18n.js).
 window.I18N_CATALOGS = window.I18N_CATALOGS || {};
 window.I18N_CATALOGS.en = {
+  "calib.bar_note": "&#9888;&#65039; <b>For reliable reads, run the game at 1920&times;1080 or larger.</b> Smaller panels shrink the count digits and the scan starts missing them.",
+  "calib.cancel": "Cancel",
+  "calib.confirm": "Confirm",
+  "calib.confirm_test": "Confirm &amp; test",
+  "calib.ex_text": "Lay the box <b style=\"color:#e8dcc4\">on the coloured border of the inner item field</b>. Not around the tab list on the left, not the heading, and not down to the search field.",
+  "calib.ex_title": "What to align",
+  "calib.msg_reprice_icon": "Drag the box <b>around the currency icon</b> beside the price - the picture only, not the name next to it. It does not have to be tight, but keep other artwork out of it. Then Confirm.",
+  "calib.msg_reprice_num": "Drag the box <b>around the number in the price field</b>. The magnifier shows the exact pixel row and column, so put the edges just outside the digits. Then Confirm.",
+  "calib.msg_stash": "Drag the box around the <b>inner item field on the right</b>: just left of the first items, directly above the first row, at the panel's right edge, directly below the bottom slots. Do <b>not</b> include the tab list on the left, the heading or the search bar. Auto-snap can help but is optional.",
+  "calib.snap": "Auto-snap to border",
   "currency.arb.acquire_base": "Acquire {base} (if needed)",
   "currency.arb.acquire_cheapest_suffix": " - cheapest: {leg}",
   "currency.arb.buy_direct": "Buy {item} with {base} on the direct pair (trading {pct}% below cross)",

@@ -269,11 +269,12 @@ the extra Exalted cells, 4.7) appear in the tool automatically.
   real fullscreen on the display bounds (`setBounds(disp.bounds)` + `setFullScreen`).
 - **Separate X/Y scale** between capture pixels and window pixels, recomputed on resize,
   so the box and magnifier stay accurate from top to bottom.
-- Diagnostics: an on-screen line with capture/window/display sizes, and
-  `userData/calibration-debug.log`.
-- **Not for upstream as-is:** the window's texts (`calibrate.html`, `calibrate.js`) were
-  rewritten directly in German instead of going through i18n, and the diagnostics line is
-  always shown. Both need an i18n pass / a debug gate before merging.
+- Diagnostics: an on-screen line with capture/window/display sizes (only while OCR debug
+  is on), and `userData/calibration-debug.log`.
+- **Texts via i18n:** the window loads the app's own `en.js`/`de.js` catalogs and gets the
+  UI language from main (`calib.*` keys); other languages fall back to English like the
+  main window. The stash guidance now describes the target as the *inner item field*
+  (what works with the reader's aspect clamp), in both languages.
 
 **Needs testing:** verified only on one 5K display with the taskbar at the bottom. Not
 tested: 1080p/1440p, 150 %/200 % Windows scaling at other resolutions, taskbar left/right

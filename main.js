@@ -4034,6 +4034,7 @@ ipcMain.on('stash-calibrate-start', async (_e, opts) => {
         try {
           calibWin.webContents.send('calib-init', {
             dataUrl, capW, capH, seedBox: seed, target: calibTarget,
+            lang: resolvedUiLang(), debug: !!config.stashShowOcrDebug,
             display: {
               id: disp.id,
               scaleFactor: disp.scaleFactor,

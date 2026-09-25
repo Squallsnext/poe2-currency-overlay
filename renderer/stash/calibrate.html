@@ -85,7 +85,7 @@
 </head>
 <body>
   <img id="shot" alt="">
-  <div id="debug"></div>
+  <div id="debug" hidden></div>
   <div id="vguide"></div>
   <div id="hguide"></div>
   <div id="box">
@@ -95,21 +95,25 @@
   </div>
   <div id="loupe"><canvas width="168" height="168"></canvas></div>
   <div id="ex">
-    <h4>Woran ausrichten</h4>
+    <h4 data-i18n="calib.ex_title">What to align</h4>
     <div class="demo"><div class="frame"></div><div class="yourbox"></div>
       <div class="cell" style="left:30%;top:30%"></div><div class="cell" style="left:44%;top:30%"></div><div class="cell" style="left:58%;top:30%"></div>
       <div class="cell" style="left:30%;top:56%"></div><div class="cell" style="left:44%;top:56%"></div><div class="cell" style="left:58%;top:56%"></div>
     </div>
-    <p>Lege den Rahmen <b style="color:#e8dcc4">auf den farbigen Rand des inneren Item-Felds</b>. Nicht um die linke Fachliste, nicht um die Überschrift und nicht bis zum Suchfeld unten.</p>
+    <p data-i18n="calib.ex_text">Lay the box <b style="color:#e8dcc4">on the coloured border of the inner item field</b>. Not around the tab list on the left, not the heading, and not down to the search field.</p>
   </div>
   <div id="bar">
-    <div class="bar-note">&#9888;&#65039; <b>Für zuverlässige Erkennung: Spiel auf 1920&times;1080 oder größer.</b> Kleinere Panels machen die Zahlen zu klein.</div>
+    <div class="bar-note" data-i18n="calib.bar_note">&#9888;&#65039; <b>For reliable reads, run the game at 1920&times;1080 or larger.</b> Smaller panels shrink the count digits and the scan starts missing them.</div>
     <div class="bar-main">
-      <div class="msg">Zieh den Rahmen um das <b>innere Item-Feld rechts</b>: links neben den ersten Items, oben direkt über der ersten Reihe, rechts am Panelrand, unten direkt unter den unteren Slots. <b>Nicht</b> die linke Fachliste, Überschrift oder Suchleiste einschließen. Auto-Snap kann helfen, ist aber optional.</div>
+      <div class="msg" data-i18n="calib.msg_stash">Drag the box around the <b>inner item field on the right</b>: just left of the first items, directly above the first row, at the panel's right edge, directly below the bottom slots. Do <b>not</b> include the tab list on the left, the heading or the search bar. Auto-snap can help but is optional.</div>
       <div class="coords" id="coords"></div>
-      <div class="btns"><button id="cancel">Abbrechen</button><button id="snap">Am Rand einrasten</button><button id="ok">Bestätigen &amp; testen</button></div>
+      <div class="btns"><button id="cancel" data-i18n="calib.cancel">Cancel</button><button id="snap" data-i18n="calib.snap">Auto-snap to border</button><button id="ok" data-i18n="calib.confirm_test">Confirm &amp; test</button></div>
     </div>
   </div>
+<!-- the app's own catalogs: English + German carry the calib.* keys, every other
+     language falls back to English exactly like the main window does -->
+<script src="../i18n/en.js"></script>
+<script src="../i18n/de.js"></script>
 <script src="calibrate.js"></script>
 </body>
 </html>
