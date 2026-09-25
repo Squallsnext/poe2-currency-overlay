@@ -2112,8 +2112,9 @@ ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings } = {}) => {
     // values, saved or not - so it learns from exactly the black/white image on screen
     const saved = slotOverride(tab, apiId);
     const ov = settings ? Object.assign({}, saved, settings) : saved;
-    const ch = RP.buildChannel(Buffer.from(cap.bitmap), cap.W, cap.H, cap.box, refBox, RP.channelOpts(ov));
-    const pos = RP.slotPos(ch, slot, ov, refBox, cap.box);
+    const cut = RP.cropAroundSlot(Buffer.from(cap.bitmap), cap.W, cap.H, cap.box, refBox, slot, ov);
+    const ch = RP.buildChannel(cut.buf, cut.W, cut.H, cut.box, refBox, RP.channelOpts(ov));
+    const pos = RP.slotPos(ch, slot, ov, refBox, cut.box);
     const P0 = RP.slotParams(TAB_MAPS[tab], ch.scale, ov);
     const ms = RP.effectiveMatchScale(ch, P0);
     const P = RP.paramsAtScale(P0, ms);
@@ -2209,9 +2210,10 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
     const floorIn = pick('floor', null);
     // exactly the live reader's path (read-pipeline.js): same regime, same position,
     // same params, same bank including learned corrections
-    const bitmap = Buffer.from(cap.bitmap);
-    const ch = RP.buildChannel(bitmap, cap.W, cap.H, cap.box, refBox, { sat: desatSat, contrast, bright, gain, satPct });
-    const pos = RP.slotPos(ch, slot, ov, refBox, cap.box);
+    // only the window around this slot, not the whole screen (see cropAroundSlot)
+    const cut = RP.cropAroundSlot(Buffer.from(cap.bitmap), cap.W, cap.H, cap.box, refBox, slot, ov);
+    const ch = RP.buildChannel(cut.buf, cut.W, cut.H, cut.box, refBox, { sat: desatSat, contrast, bright, gain, satPct });
+    const pos = RP.slotPos(ch, slot, ov, refBox, cut.box);
     const P0 = Object.assign(RP.slotParams(map, ch.scale, ov), { minBlob, localThr, matchScale: matchScaleIn });
     // high-resolution matching where the regime allows it (see read-pipeline.js)
     const matchScale = RP.effectiveMatchScale(ch, P0);

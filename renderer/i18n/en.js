@@ -688,6 +688,7 @@ window.I18N_CATALOGS.en = {
   "networth.line.debug_local_off": "local cut: off (floor applies to everything)",
   "networth.line.debug_local_val": "local cut: stroke {v} brighter than surroundings",
   "networth.line.debug_need_rescan": "Scan this tab again for the debug view (screenshots are not kept across a restart).",
+  "networth.line.debug_open_title": "Open/close the debug view for this row (one at a time)",
   "networth.line.debug_preset_off": "All filters off",
   "networth.line.debug_preset_off_title": "Every filter neutral: middle view = original. Preview only, nothing is saved until Save.",
   "networth.line.debug_preset_standard": "Standard",

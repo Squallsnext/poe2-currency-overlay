@@ -60,6 +60,28 @@
   }
   function channelKey(o) { return [o.sat, o.contrast || 0, o.bright || 0, o.gain == null ? 100 : o.gain, o.satPct == null ? 100 : o.satPct].join('|'); }
 
+  // For ONE slot (debug preview, teach): cut the frame down to a window around that slot
+  // before building the channel. buildChannel filters the whole buffer, which on a native-
+  // regime capture (near-1 or 4K/5K) is the entire screen - ~15M pixels at 5K, per slider
+  // move. The window is generous (64 reference px each way, the read strip is <=~40) so
+  // every neighbourhood filter sees the same pixels it would in the full frame. The
+  // normalised regime resamples the whole PANEL and is left alone (already small).
+  // Returns { buf, W, H, box } with box shifted into the cut's coordinates.
+  function cropAroundSlot(buf, W, H, box, refBox, slot, ov) {
+    const scale = box.h / refBox.h;
+    const native = scale > EXTREME_SCALE || scale < 1 / EXTREME_SCALE || Math.abs(scale - 1) <= NEAR_ONE;
+    if (!native) return { buf, W, H, box };
+    const sx = ov && ov.cx != null ? ov.cx : slot.cx, sy = ov && ov.cy != null ? ov.cy : slot.cy;
+    const c = TD.scalePos(sx, sy, refBox, box);
+    const R = Math.ceil(64 * Math.max(1, scale));
+    const x0 = Math.max(0, c.cx - R), y0 = Math.max(0, c.cy - R);
+    const x1 = Math.min(W, c.cx + R), y1 = Math.min(H, c.cy + R);
+    const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0);
+    const out = Buffer.alloc(w * h * 4);
+    for (let y = 0; y < h; y++) buf.copy(out, y * w * 4, ((y0 + y) * W + x0) * 4, ((y0 + y) * W + x0 + w) * 4);
+    return { buf: out, W: w, H: h, box: { x: box.x - x0, y: box.y - y0, w: box.w, h: box.h } };
+  }
+
   // A slot's centre in channel coordinates. `ov` is the slot's saved override (may be
   // null, and may carry only floor/saturation/contrast with no position).
   function slotPos(ch, slot, ov, refBox, box) {
@@ -150,5 +172,5 @@
     return Object.assign({}, r, { floor: r.floor != null ? r.floor : P.floor });
   }
 
-  return { EXTREME_SCALE, MARGIN, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
+  return { EXTREME_SCALE, MARGIN, cropAroundSlot, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
 });

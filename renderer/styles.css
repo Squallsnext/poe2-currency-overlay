@@ -1923,3 +1923,6 @@ footer {
 .nw-wizard-x:hover { color: var(--am-hi); }
 .nw-wizard-body { font-size: 13px; line-height: 1.5; }
 .nw-wizard-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.nw-line-dbg { flex: 0 0 auto; background: transparent; border: 1px solid var(--bd-16); border-radius: 4px; cursor: pointer; font-size: 11px; padding: 1px 5px; margin-left: 4px; opacity: .7; }
+.nw-line-dbg:hover { opacity: 1; border-color: var(--am-hi); }
+.nw-line-dbg-on { opacity: 1; border-color: var(--am-hi); background: color-mix(in srgb, var(--am-hi) 18%, transparent); }

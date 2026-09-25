@@ -20,7 +20,7 @@
   const fmtDiv = (n) => n == null ? null : (n >= 100 ? Math.round(n) : n.toFixed(1)).toLocaleString('en-US') + ' ' + unit(t('networth.unit.div_label'), 'divine');
   const fmtCount = (n) => Number(n).toLocaleString('en-US');
 
-  const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, showOcrDebug: false, hiRes: false, showRel: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null, wizard: null, debugRows: new Set() };
+  const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, showOcrDebug: false, hiRes: false, showRel: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null, wizard: null, debugRows: new Set(), dbgLine: null };
   // apiId -> {rawUrl, binUrl} | 'loading', for the OCR-debug toggle. Cleared on every
   // fresh capture (see onStashCaptured below) and per-slot after a teach/forget, since
   // either changes what the NEXT fetch of that slot would show.
@@ -508,6 +508,15 @@
       rb.title = t('networth.line.reset_title');
       rb.onclick = (e) => { e.stopPropagation(); ln.userCount = undefined; ln.excluded = false; render(); };
       line.appendChild(rb);
+      // with this tab's debug on: one 🔍 per row, and only the ONE row picked gets images,
+      // sliders and live previews - they are computed one slot at a time instead of every
+      // slot of the tab at once
+      if (state.showOcrDebug && state.debugRows.has(row.id) && !ln.missing) {
+        const lb = el('button', 'nw-line-dbg' + (state.dbgLine === ln.apiId ? ' nw-line-dbg-on' : ''), '🔍');
+        lb.title = t('networth.line.debug_open_title');
+        lb.onclick = (e) => { e.stopPropagation(); state.dbgLine = state.dbgLine === ln.apiId ? null : ln.apiId; render(); };
+        line.appendChild(lb);
+      }
       list.appendChild(line);
       // OCR-debug toggle: the exact crop the reader worked from, so a problem slot can be
       // judged by eye - raw (native pixels, upscaled) and the binarized cell it actually
@@ -515,7 +524,7 @@
       // number (the count field above already teaches on a real correction) or confirm it
       // (the checkmark above already teaches on confirmation), and if the digit templates
       // themselves seem to be the problem, forget them and let them rebuild from scratch.
-      if (state.showOcrDebug && state.debugRows.has(row.id) && !ln.missing && window.api.stashSlotDebugImage) {
+      if (state.showOcrDebug && state.debugRows.has(row.id) && state.dbgLine === ln.apiId && !ln.missing && window.api.stashSlotDebugImage) {
         const dbg = el('div', 'nw-dbg');
         const cached = dbgImgCache[ln.apiId];
         if (cached === 'loading') {

@@ -683,6 +683,7 @@ window.I18N_CATALOGS.de = {
   "networth.line.debug_local_off": "lokaler Schnitt: aus (floor gilt für alles)",
   "networth.line.debug_local_val": "lokaler Schnitt: Strich {v} heller als Umgebung",
   "networth.line.debug_need_rescan": "Für die Debug-Ansicht dieses Fach bitte neu scannen (Screenshots werden nicht über einen Neustart gespeichert).",
+  "networth.line.debug_open_title": "Debug-Ansicht für diese Zeile öffnen/schließen (immer nur eine gleichzeitig)",
   "networth.line.debug_preset_off": "Alle Filter aus",
   "networth.line.debug_preset_off_title": "Alle Filter neutral: mittleres Bild = Original. Nur Vorschau, gespeichert wird erst mit Speichern.",
   "networth.line.debug_preset_standard": "Standard",

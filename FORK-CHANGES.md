@@ -137,6 +137,13 @@ preview and teach alike:
 - **Per-tab debug:** the global "Show OCR debug images" switch only adds a **Debug** button
   to each tab card; previews (each a full re-read) are built only for tabs switched on
   there. With four tabs debugging at once, the load was noticeable.
+- **One slot at a time:** inside a debugged tab each row has a 🔍 button; only the picked
+  row builds images, sliders and live previews.
+- **Previews and teach work on a window around the slot** (`cropAroundSlot`, 64 reference
+  px each way) instead of the whole screen in the native regimes. At 5K that is a
+  ~340×340 cut instead of 5120×2880 per slider move; reads are identical (checked on
+  synthetic 1×, 1.07× and 2.67× frames). A scan (F7) is unaffected - it reads every slot
+  in one pass anyway.
 - **Learn from this image**: teaches from exactly the black/white cell on screen with the
   current (even unsaved) sliders; reports "found N parts, expected M digits" instead of
   learning garbage.
