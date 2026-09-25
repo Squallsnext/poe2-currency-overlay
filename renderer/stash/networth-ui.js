@@ -20,7 +20,7 @@
   const fmtDiv = (n) => n == null ? null : (n >= 100 ? Math.round(n) : n.toFixed(1)).toLocaleString('en-US') + ' ' + unit(t('networth.unit.div_label'), 'divine');
   const fmtCount = (n) => Number(n).toLocaleString('en-US');
 
-  const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, showOcrDebug: false, hiRes: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null };
+  const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, showOcrDebug: false, hiRes: false, showRel: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null };
   // apiId -> {rawUrl, binUrl} | 'loading', for the OCR-debug toggle. Cleared on every
   // fresh capture (see onStashCaptured below) and per-slot after a teach/forget, since
   // either changes what the NEXT fetch of that slot would show.
@@ -49,7 +49,7 @@
   const TAB_LABEL = { currency: t('networth.tab.currency'), abyss: t('networth.tab.abyss'), essence: t('networth.tab.essence'), runes: t('networth.tab.runes'), 'runes-kalguuran': t('networth.tab.runes_kalguuran'), ritual: t('networth.tab.ritual'), soulcore: t('networth.tab.soulcore'), idol: t('networth.tab.idol'), 'ancient-augment': t('networth.tab.ancient_augment'), delirium: t('networth.tab.delirium'), breach: t('networth.tab.breach'), expedition: t('networth.tab.expedition') };
   const MIRROR_ICON = 'https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lEdXBsaWNhdGUiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/26bc31680e/CurrencyDuplicate.png';
 
-  if (window.api && window.api.getConfig) window.api.getConfig().then((c) => { state.dup = !!(c && c.stashDupTabs); state.sortLayout = !!(c && c.stashSortLayout); state.showMissing = !!(c && c.stashShowMissing); state.showConfidence = !!(c && c.stashShowConfidence); state.showOcrDebug = !!(c && c.stashShowOcrDebug); state.hiRes = !!(c && c.stashHiRes); state.calibrated = !!(c && c.stashCalibration); state.hotkey = (c && c.stashHotkey) || 'F7'; state.bannerHidden = !!(c && c.stashBannerHidden); render(); }).catch(() => {});
+  if (window.api && window.api.getConfig) window.api.getConfig().then((c) => { state.dup = !!(c && c.stashDupTabs); state.sortLayout = !!(c && c.stashSortLayout); state.showMissing = !!(c && c.stashShowMissing); state.showConfidence = !!(c && c.stashShowConfidence); state.showOcrDebug = !!(c && c.stashShowOcrDebug); state.hiRes = !!(c && c.stashHiRes); state.showRel = !!(c && c.stashShowReliability); state.calibrated = !!(c && c.stashCalibration); state.hotkey = (c && c.stashHotkey) || 'F7'; state.bannerHidden = !!(c && c.stashBannerHidden); render(); }).catch(() => {});
 
   const rowsOfType = (tab) => state.rows.filter((r) => r.tab === tab);
   function labelFor(row) {
@@ -153,6 +153,9 @@
     toggles.appendChild(mkToggle(state.showOcrDebug, t('networth.settings.toggle_ocr_debug_label'),
       t('networth.settings.toggle_ocr_debug_sub'),
       (v) => { state.showOcrDebug = v; try { window.api.setStashShowOcrDebug(v); } catch {} }));
+    toggles.appendChild(mkToggle(state.showRel, t('networth.settings.toggle_rel_label'),
+      t('networth.settings.toggle_rel_sub'),
+      (v) => { state.showRel = v; try { window.api.setStashShowReliability(v); } catch {} render(); }));
     // one switch for every slot's matching resolution - on a slower PC one click turns
     // the (heavier) 2x read off everywhere instead of slot by slot
     toggles.appendChild(mkToggle(state.hiRes, t('networth.settings.toggle_hires_label'),
@@ -302,7 +305,9 @@
       // rather than silently averaged into the total. `rel` is measured per slot against
       // every ground-truthed capture we hold; a user edit clears the flag, because once
       // they have typed the real number there is nothing left to doubt.
-      const relFlag = ln.userCount == null ? (ln.rel || null) : null;
+      // Off by default (settings toggle): the flags are a static list measured once on
+      // other people's captures, and per-slot tuning + learned templates make them stale.
+      const relFlag = state.showRel && ln.userCount == null ? (ln.rel || null) : null;
       const line = el('div', 'nw-line'
         + (ln.userCount != null ? ' nw-line-edited' : '')
         + (ln.excluded ? ' nw-line-off' : '')
@@ -864,8 +869,8 @@
   // flagged rows - a key to symbols that are not on screen is just clutter. Deliberately
   // small and quiet: it explains a subtle cue, it should not out-shout the numbers.
   function reliabilityLegend() {
-    const anyLow = state.rows.some((r) => (r.result.lines || []).some((ln) => ln.rel === 'low' && ln.userCount == null));
-    const anyMixed = state.rows.some((r) => (r.result.lines || []).some((ln) => ln.rel === 'mixed' && ln.userCount == null));
+    const anyLow = state.showRel && state.rows.some((r) => (r.result.lines || []).some((ln) => ln.rel === 'low' && ln.userCount == null));
+    const anyMixed = state.showRel && state.rows.some((r) => (r.result.lines || []).some((ln) => ln.rel === 'mixed' && ln.userCount == null));
     const anyEdited = state.rows.some((r) => (r.result.lines || []).some((ln) => ln.userCount != null));
     if (!anyLow && !anyMixed && !anyEdited) return null;
     const wrap = el('div', 'nw-legend');

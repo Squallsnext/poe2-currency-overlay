@@ -771,6 +771,8 @@ window.I18N_CATALOGS.en = {
   "networth.settings.toggle_hires_sub": "Reads stack counts twice as fine (only effective on 4K/5K). More accurate, but takes more computing time. Single slots can set their own resolution in the debug panel.",
   "networth.settings.toggle_missing_label": "Show missing / unread items",
   "networth.settings.toggle_missing_sub": "List empty or unread slots as editable ×0 lines, so you can fill in anything the scan missed.",
+  "networth.settings.toggle_rel_label": "Show \"often misread\" warnings",
+  "networth.settings.toggle_rel_sub": "Tints rows a fixed measurement list says were misread on some systems. Usually outdated once you have tuned slots and taught templates.",
   "networth.settings.toggle_sort_label": "Sort items by stash layout",
   "networth.settings.toggle_sort_sub": "List items in stash reading order instead of by value.",
   "networth.status.calculating": "Calculating…",

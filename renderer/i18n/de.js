@@ -766,6 +766,8 @@ window.I18N_CATALOGS.de = {
   "networth.settings.toggle_hires_sub": "Liest die Anzahlen doppelt so fein (nur bei 4K/5K wirksam). Genauer, braucht aber mehr Rechenzeit. Einzelne Felder können im Debug-Panel eine eigene Auflösung haben.",
   "networth.settings.toggle_missing_label": "Fehlende / ungelesene Items zeigen",
   "networth.settings.toggle_missing_sub": "Listet leere oder ungelesene Slots als bearbeitbare ×0-Zeilen, damit du ergänzen kannst, was der Scan verpasst hat.",
+  "networth.settings.toggle_rel_label": "Warnung „oft falsch gelesen“ anzeigen",
+  "networth.settings.toggle_rel_sub": "Färbt Zeilen ein, die laut einer festen Messliste auf manchen Systemen falsch gelesen wurden. Mit eigenen Einstellungen und gelernten Vorlagen meist überholt.",
   "networth.settings.toggle_sort_label": "Items nach Stash-Layout sortieren",
   "networth.settings.toggle_sort_sub": "Listet Items in Stash-Leserichtung statt nach Wert.",
   "networth.status.calculating": "Berechnet…",

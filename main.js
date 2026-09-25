@@ -267,6 +267,7 @@ const DEFAULT_CONFIG = {
   stashShowMissing: false, // Net Worth: show empty/unread slots as editable x0 lines
   stashShowConfidence: false, // Net Worth: show the per-line OCR confidence %
   stashShowOcrDebug: false, // Net Worth: show the exact crop the reader saw, per line
+  stashShowReliability: false, // Net Worth: tint rows the shipped reliability table marks as often misread
   stashHiRes: false, // Net Worth: read counts at 2x resolution where the capture allows (4K/5K); per-slot setting wins
   commandHotkeys: [], // Hotkeys settings: [{command:'/hideout', accelerator:'F8'}] - whitelist-only safe chat commands, one key = one manual command
   stashCalibration: null, // Net Worth: {x,y,w,h} panel box from one-time calibration; null = assume reference res
@@ -2718,6 +2719,7 @@ ipcMain.handle('set-stash-sort', (_e, on) => { config.stashSortLayout = !!on; sa
 ipcMain.handle('set-stash-show-missing', (_e, on) => { config.stashShowMissing = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-show-confidence', (_e, on) => { config.stashShowConfidence = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-show-ocr-debug', (_e, on) => { config.stashShowOcrDebug = !!on; saveConfig(); return true; });
+ipcMain.handle('set-stash-show-reliability', (_e, on) => { config.stashShowReliability = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-hi-res', (_e, on) => { config.stashHiRes = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-banner-hidden', (_e, on) => { config.stashBannerHidden = !!on; saveConfig(); return true; });
 // Grab one frame of a region and return it as a data URL, opening the capture stream if
