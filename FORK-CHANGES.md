@@ -146,6 +146,11 @@ preview and teach alike:
 
 ### 4.5 Slot alignment tool ("Ausrichten")
 
+> Where per-player settings live: alignment, per-slot reader settings and switches are in
+> the player's own `config.json` (`stashSlotOverrides`, …), learned digits in
+> `learned-digit-templates.json`, both under the app's userData folder. Nothing of one
+> player's setup is in the code.
+
 New in this fork. It started as a dev-only page written next to each scan's debug images
 (`stash-debug-live`, output "copy the deltas and send them to a developer"), which does not
 scale past one machine. It now opens as a real window from the app, and **Save writes
@@ -199,6 +204,10 @@ the extra Exalted cells, 4.7) appear in the tool automatically.
 
 ### 4.6 Other Net Worth changes
 
+- **Ritual tab:** slot R1-3 "Call of the Shadows" (`call-of-the-shadows`) added – it was one
+  of the unmapped empties. Position extrapolated from the row spacing and confirmed in game
+  (reads ×1 at 96 %).
+
 - **The Net Worth list survives a restart** (rows, counts, corrections, include/exclude,
   order; `localStorage` key `nwRows.v1`). Before, it lived only in memory. Prices are the
   ones from the scan; the captured screenshots are not kept, so the debug panel/Align for a
@@ -221,6 +230,10 @@ the extra Exalted cells, 4.7) appear in the tool automatically.
   (row 1 cell 1, row 2 cells 1–2), priced as Exalted via a new `priceAs` slot field and shown
   as "Exalted Orb #2" etc. This matches one player's habit of parking overflow Exalted there.
   The `priceAs` / `suffix` mechanism itself is generic.
+- **Currency tab coordinates** (`currency-tab-map.js` STATIC_SLOTS) were recalibrated in
+  code for one player's *enlarged in-game UI text*. For upstream, keep the original
+  coordinates: with the align tool (4.5) each player now stores their own offsets in their
+  config, so the shipped defaults should stay the standard-UI ones.
 - Root-level dev scripts and scratch data from tuning (`analyze-*.js`, `sweep-*.js`,
   `build-5k-digit-variant.js`, `scratch-*.json`, `debug-*.png`, `pnpm-*.yaml`) are not
   meant to be merged.
