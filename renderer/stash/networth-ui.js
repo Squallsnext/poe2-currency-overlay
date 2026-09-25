@@ -357,44 +357,59 @@
           imgs.appendChild(rawImg); imgs.appendChild(filtImg); imgs.appendChild(binImg);
           dbg.appendChild(imgs);
 
-          // Three sliders tuned together against ONE live preview, saved together with ONE
-          // button - the preview runs the live reader's exact path (read-pipeline.js), so
-          // "würde lesen" is what the next scan will read with these values. Every slider
-          // re-requests the preview with ALL current values (debounced IPC, not render() -
-          // a full re-render would drop slider focus mid-drag).
+          // Sliders tuned against ONE live preview that runs the live reader's exact path
+          // (read-pipeline.js), so "würde lesen" is what the next scan reads with these
+          // values. "Speichern" stores only the sliders actually MOVED (plus whatever was
+          // already saved) - an untouched floor stays on the adaptive sweep, so e.g. just
+          // the speck filter can be saved while everything else stays automatic. A saved
+          // slider is marked with a dot. Every slider re-requests the preview with ALL
+          // current values (debounced IPC, not render() - a full re-render would drop
+          // slider focus mid-drag).
           const controls = el('div', 'nw-dbg-controls');
           const previewLabel = el('span', 'nw-dbg-preview');
-          const mkRow = (min, max, value, fmt, step) => {
-            const row = el('div', 'nw-dbg-floor-row');
-            const s = el('input', 'nw-dbg-slider'); s.type = 'range'; s.min = min; s.max = max; s.step = step || 5; s.value = value;
-            const lab = el('span', 'nw-dbg-floor-val', fmt(value));
-            row.appendChild(s); row.appendChild(lab);
-            return { row, s, lab, fmt };
-          };
+          const saved = cached.saved || {};
           // floor label also shows the cut actually applied (the higher of floor and the
           // cell's automatic threshold), refreshed with each preview
           const floorFmt = (v) => (cached.effFloor != null && cached.effFloor !== +v
             ? t('networth.line.debug_floor_eff_val', { v, eff: cached.effFloor }) : 'floor ' + v);
-          const floorC = mkRow(60, 200, cached.floor, floorFmt);
-          const satC = mkRow(5, 120, cached.desatSat, (v) => t('networth.line.debug_sat_val', { v }));
-          const conC = mkRow(0, 200, cached.contrast, (v) => t('networth.line.debug_contrast_val', { v }));
-          // speck size: after the black/white cut, drop white blobs smaller than this -
-          // for icon highlights exactly as white/grey as a digit, which no pixel filter can
-          const blobC = mkRow(0, 30, cached.minBlob || 0, (v) => t('networth.line.debug_blob_val', { v }), 1);
-          const saved = cached.saved || {};
-          const hasSaved = saved.floor != null || saved.desatSat != null || saved.contrast != null || saved.minBlob != null;
+          const specs = [
+            // brightness/contrast of the colour source before every filter (test)
+            { key: 'bright', min: -100, max: 50, step: 5, fmt: (v) => t('networth.line.debug_bright_val', { v }) },
+            { key: 'gain', min: 40, max: 150, step: 5, fmt: (v) => t('networth.line.debug_gain_val', { v }) },
+            { key: 'desatSat', min: 5, max: 120, step: 5, fmt: (v) => t('networth.line.debug_sat_val', { v }) },
+            { key: 'contrast', min: 0, max: 200, step: 5, fmt: (v) => t('networth.line.debug_contrast_val', { v }) },
+            { key: 'floor', min: 60, max: 200, step: 5, fmt: floorFmt },
+            // speck size: after the black/white cut, drop white blobs smaller than this -
+            // for icon highlights exactly as white/grey as a digit, which no pixel filter can
+            { key: 'minBlob', min: 0, max: 30, step: 1, fmt: (v) => t('networth.line.debug_blob_val', { v }) },
+          ];
+          const touched = new Set();
+          const sliders = {};
+          for (const sp of specs) {
+            const row = el('div', 'nw-dbg-floor-row');
+            const s = el('input', 'nw-dbg-slider'); s.type = 'range';
+            s.min = sp.min; s.max = sp.max; s.step = sp.step; s.value = cached[sp.key];
+            const lab = el('span', 'nw-dbg-floor-val');
+            const mark = () => { lab.textContent = sp.fmt(s.value) + (saved[sp.key] != null && !touched.has(sp.key) ? ' •' : ''); };
+            mark();
+            row.appendChild(s); row.appendChild(lab);
+            sliders[sp.key] = { row, s, lab, mark };
+          }
+          const values = () => {
+            const v = {};
+            for (const sp of specs) v[sp.key] = +sliders[sp.key].s.value;
+            return v;
+          };
+          const hasSaved = specs.some((sp) => saved[sp.key] != null);
           const btnRow = el('div', 'nw-dbg-floor-row');
           const saveBtn = el('button', 'nw-dbg-pin', t('networth.line.debug_save_button'));
           const resetBtn = el('button', 'nw-dbg-forget', t('networth.line.debug_reset_button'));
           resetBtn.title = t('networth.line.debug_reset_title');
           const status = el('span', 'nw-dbg-floor-val');
-          // saved = these exact slider values are what the reader uses for this slot
           const updateStatus = () => {
-            const same = hasSaved && +floorC.s.value === saved.floor && +satC.s.value === saved.desatSat && +conC.s.value === saved.contrast
-              && +blobC.s.value === (saved.minBlob || 0);
-            saveBtn.disabled = same;
-            status.textContent = same ? t('networth.line.debug_status_saved')
-              : hasSaved ? t('networth.line.debug_status_changed') : t('networth.line.debug_status_auto');
+            saveBtn.disabled = !touched.size;
+            status.textContent = touched.size ? t('networth.line.debug_status_changed')
+              : hasSaved ? t('networth.line.debug_status_saved') : t('networth.line.debug_status_auto');
           };
           const showPreview = (p) => {
             previewLabel.textContent = t('networth.line.debug_preview', { text: p ? p.text : '?', pct: p ? Math.round(p.conf * 100) : 0 });
@@ -404,22 +419,29 @@
           const refreshPreview = () => {
             clearTimeout(debounceT);
             debounceT = setTimeout(async () => {
-              const res = await window.api.stashSlotDebugImage(ln.apiId, { floor: +floorC.s.value, desatSat: +satC.s.value, contrast: +conC.s.value, minBlob: +blobC.s.value }).catch(() => null);
+              // an untouched, unsaved floor previews the adaptive sweep, like the live read
+              const v = values();
+              if (!touched.has('floor') && saved.floor == null) v.floor = null;
+              const res = await window.api.stashSlotDebugImage(ln.apiId, v).catch(() => null);
               if (!res || !res.ok) return;
               rawImg.src = res.rawUrl; filtImg.src = res.filtUrl; binImg.src = res.binUrl;
               showPreview(res.preview);
-              Object.assign(cached, { floor: res.floor, effFloor: res.effFloor, desatSat: res.desatSat, contrast: res.contrast, minBlob: res.minBlob,
-                rawUrl: res.rawUrl, filtUrl: res.filtUrl, binUrl: res.binUrl, preview: res.preview });
-              floorC.lab.textContent = floorFmt(floorC.s.value);
+              Object.assign(cached, { effFloor: res.effFloor, rawUrl: res.rawUrl, filtUrl: res.filtUrl, binUrl: res.binUrl, preview: res.preview });
+              for (const sp of specs) cached[sp.key] = res[sp.key];
+              if (!touched.has('floor')) sliders.floor.s.value = res.floor;
+              sliders.floor.mark();
             }, 120);
           };
-          for (const c of [floorC, satC, conC, blobC]) {
-            c.s.addEventListener('input', () => { c.lab.textContent = c.fmt(c.s.value); updateStatus(); refreshPreview(); });
+          for (const sp of specs) {
+            const c = sliders[sp.key];
+            c.s.addEventListener('input', () => { touched.add(sp.key); c.mark(); updateStatus(); refreshPreview(); });
           }
           saveBtn.onclick = async (e) => {
             e.stopPropagation();
             saveBtn.disabled = true;
-            try { await window.api.stashSlotSaveReadSettings(ln.apiId, { floor: +floorC.s.value, desatSat: +satC.s.value, contrast: +conC.s.value, minBlob: +blobC.s.value }); } catch {}
+            const v = values(), out = {};
+            for (const k of touched) out[k] = v[k];
+            try { await window.api.stashSlotSaveReadSettings(ln.apiId, out); } catch {}
             delete dbgImgCache[ln.apiId];
             render();
           };
@@ -435,10 +457,7 @@
           btnRow.appendChild(status);
           updateStatus();
           controls.appendChild(previewLabel);
-          controls.appendChild(floorC.row);
-          controls.appendChild(satC.row);
-          controls.appendChild(conC.row);
-          controls.appendChild(blobC.row);
+          for (const sp of specs) controls.appendChild(sliders[sp.key].row);
           controls.appendChild(btnRow);
           if (ln.count != null && window.api.stashForgetDigits) {
             const forget = el('button', 'nw-dbg-forget', t('networth.line.forget_button'));

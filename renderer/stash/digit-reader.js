@@ -710,6 +710,10 @@
     // ultrawide slot (137 -> 143 correct), wider adds nothing.
     floor: 122, up: 12, dn: 12, stripWidth: 17,
     iouThresh: 0.76, dyLo: -2, dyHi: 3, minInkFrac: 0.45,
+    // speck filter (dropSmallBlobs): white blobs under this many px are icon highlights,
+    // not digits - the smallest digit exemplar in the bank is 15 px of ink, so 5 leaves a
+    // wide margin while clearing the typical 1-4 px glint
+    minBlob: 5,
   };
 
   // Max saturation (max-min) for a pixel to count as "flat white" text. Stack
@@ -771,6 +775,24 @@
         for (let k = y0; k <= y1; k++) { const v = rowMin[k * W + x]; if (v < m) m = v; }
         if (out[i] - m < contrast) out[i] = 0;
       }
+    }
+    return out;
+  }
+
+  // Brightness/contrast on the colour source BEFORE any filter - classic image-editor
+  // style: out = (v - 128) * gain/100 + 128 + bright, per channel, clamped. Returns a new
+  // buffer (alpha untouched); bright 0 + gain 100 returns buf itself.
+  function adjustRGBA(buf, W, H, bright, gain) {
+    bright = bright || 0; gain = gain == null ? 100 : gain;
+    if (!bright && gain === 100) return buf;
+    const lut = new Uint8Array(256), k = gain / 100;
+    for (let v = 0; v < 256; v++) {
+      const o = Math.round((v - 128) * k + 128 + bright);
+      lut[v] = o < 0 ? 0 : (o > 255 ? 255 : o);
+    }
+    const out = Buffer.alloc(W * H * 4);
+    for (let p = 0; p < W * H * 4; p += 4) {
+      out[p] = lut[buf[p]]; out[p + 1] = lut[buf[p + 1]]; out[p + 2] = lut[buf[p + 2]]; out[p + 3] = buf[p + 3];
     }
     return out;
   }
@@ -871,7 +893,7 @@
 
   return {
     otsu, crop, binarize, dropSmallBlobs, components, iou, slideMatch, greyOpening, resampleRGBA, resample,
-    extractTemplates, readCell, readCellEx, readCellAdaptive, valueChannelFromRGBA, valueChannelDesatMax,
+    extractTemplates, readCell, readCellEx, readCellAdaptive, valueChannelFromRGBA, valueChannelDesatMax, adjustRGBA,
     templatesFromJSON, bankFromJSON, DEFAULTS, DESAT_SAT, contrastGate, CONTRAST_RADIUS, debugShrunkCell, detectDigitSpan,
     upscaleTemplate, upscaleTemplateBank,
   };

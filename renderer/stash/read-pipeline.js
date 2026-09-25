@@ -26,7 +26,10 @@
   //   originX/Y reference-space origin of a normalised panel (0 = native frame)
   //   cellScale per-cell rescale readCellEx must apply (extreme regime only)
   //   px        buffer px per reference px (for size-dependent filters)
-  function buildChannel(buf, W, H, box, refBox, sat, contrast) {
+  //   orig      the unadjusted source (raw view), src has brightness/contrast applied
+  // `o` = { sat, contrast, bright, gain } - see channelOpts(); all optional.
+  function buildChannel(buf, W, H, box, refBox, o) {
+    o = o || {};
     const scale = box.h / refBox.h;
     let src = buf, W2 = W, H2 = H, originX = 0, originY = 0, cellScale = 1, px = scale;
     if (scale > EXTREME_SCALE || scale < 1 / EXTREME_SCALE) {
@@ -37,10 +40,24 @@
       src = DR.resampleRGBA(buf, W, H, box.x - MARGIN * kx, box.y - MARGIN * ky, (refBox.w + 2 * MARGIN) * kx, (refBox.h + 2 * MARGIN) * ky, W2, H2);
       originX = refBox.x - MARGIN; originY = refBox.y - MARGIN; px = 1;
     }
-    let V = DR.valueChannelDesatMax(src, W2, H2, sat == null ? DR.DESAT_SAT : sat);
-    if (contrast) V = DR.contrastGate(V, src, W2, H2, contrast, DR.CONTRAST_RADIUS * px);
-    return { V, src, W2, H2, originX, originY, cellScale, px, scale };
+    const orig = src;
+    src = DR.adjustRGBA(src, W2, H2, o.bright, o.gain);
+    let V = DR.valueChannelDesatMax(src, W2, H2, o.sat == null ? DR.DESAT_SAT : o.sat);
+    if (o.contrast) V = DR.contrastGate(V, src, W2, H2, o.contrast, DR.CONTRAST_RADIUS * px);
+    return { V, src, orig, W2, H2, originX, originY, cellScale, px, scale };
   }
+
+  // The channel options a slot's saved override asks for (defaults where it has none),
+  // and a cache key for them - slots that share settings share one channel.
+  function channelOpts(ov) {
+    return {
+      sat: ov && ov.desatSat != null ? ov.desatSat : DR.DESAT_SAT,
+      contrast: ov && ov.contrast ? ov.contrast : 0,
+      bright: ov && ov.bright ? ov.bright : 0,
+      gain: ov && ov.gain != null ? ov.gain : 100,
+    };
+  }
+  function channelKey(o) { return [o.sat, o.contrast || 0, o.bright || 0, o.gain == null ? 100 : o.gain].join('|'); }
 
   // A slot's centre in channel coordinates. `ov` is the slot's saved override (may be
   // null, and may carry only floor/saturation/contrast with no position).
@@ -96,5 +113,5 @@
     return Object.assign({}, r, { floor: r.floor != null ? r.floor : P.floor });
   }
 
-  return { EXTREME_SCALE, MARGIN, buildChannel, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
+  return { EXTREME_SCALE, MARGIN, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
 });

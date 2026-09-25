@@ -148,14 +148,14 @@ parentPort.on('message', (msg) => {
     // pixels correctly.
     // (the regime switch itself lives in read-pipeline.js, shared with the debug
     // preview and the teach step so all three see the same pixels)
-    const ch0 = RP.buildChannel(buf, W, H, box, refBox, DR.DESAT_SAT, 0);
-    // A per-slot saturation/contrast override (see the OCR debug panel) needs the SAME
-    // channel built again with different cutoffs - only paid for slots that have one.
-    // Keyed "sat|contrast"; contrast 0 is the default channel with no gate.
-    const chCache = new Map([[DR.DESAT_SAT + '|0', ch0]]);
-    function chFor(sat, contrast) {
-      const key = sat + '|' + (contrast || 0);
-      if (!chCache.has(key)) chCache.set(key, RP.buildChannel(buf, W, H, box, refBox, sat, contrast));
+    const ch0 = RP.buildChannel(buf, W, H, box, refBox, RP.channelOpts(null));
+    // A per-slot override of the channel (saturation/contrast/brightness, see the OCR
+    // debug panel) needs it built again - only paid for slots that have one, and shared
+    // between slots with identical settings.
+    const chCache = new Map([[RP.channelKey(RP.channelOpts(null)), ch0]]);
+    function chFor(ov) {
+      const o = RP.channelOpts(ov), key = RP.channelKey(o);
+      if (!chCache.has(key)) chCache.set(key, RP.buildChannel(buf, W, H, box, refBox, o));
       return chCache.get(key);
     }
     // per-apiId {cx,cy,stripWidth,up,dn} from the in-app "align" tool (see main.js's
@@ -166,8 +166,7 @@ parentPort.on('message', (msg) => {
     const reads = []; let readCount = 0;
     for (const s of map.STATIC_SLOTS) {
       const ov = tabOverrides && tabOverrides[s.apiId];
-      const ch = ov && (ov.desatSat != null || ov.contrast)
-        ? chFor(ov.desatSat != null ? ov.desatSat : DR.DESAT_SAT, ov.contrast || 0) : ch0;
+      const ch = chFor(ov);
       const pos = RP.slotPos(ch, s, ov, refBox, box);
       // adaptive: pick the binarisation threshold per cell rather than trusting one
       // global floor, which only ever suited the capture the templates came from - UNLESS
