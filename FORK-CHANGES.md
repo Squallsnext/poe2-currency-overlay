@@ -232,6 +232,10 @@ Only red/yellow boxes are shown by default ("also show good slots" reveals the r
   (An edge-profile match over the whole surroundings was tried too and was less exact.)
 - **Marking:** Ctrl+click boxes or drag a lasso on an empty area; moving one marked box
   moves the marked group only (Esc clears).
+- **All boxes shown by default** (was: only red/yellow, with a "show good ones too"
+  tick box). Players ticked it every single time: a box that reads a one-digit count
+  fine can sit off once the count has two digits. "Only red/yellow" is now an
+  opt-in switch, highlighted and remembered.
 - **Undo (Ctrl+Z)** for drags, nudges and both align actions (50 steps).
 - **Grid** toggle with adjustable spacing, plus a dashed guide line through the selected
   box's centre. Both settings are remembered.
@@ -285,6 +289,19 @@ the extra Exalted cells, 4.7) appear in the tool automatically.
   - An uncertain price is not replaced by a flat 1 Ex: even the direct sources disagree
     >3× on 113 of 635 items, including e.g. Kopec's Orb of Sacrifice (193 feed vs 54
     exchange), where 1 Ex would be far more wrong than either source.
+
+- **"Don't count" lists** (`renderer/stash/skip-groups.js`, own module; Settings → Net
+  Worth, config `stashSkipGroups`). Later in a league some items are no longer sold but
+  only upgraded (three lesser runes → one normal, three normal → one greater), so their
+  market price inflates the total with value that is never realised. The player makes
+  named lists, marks items (search, "mark all matches", icons, client-language names),
+  and one switch per list leaves them out of Net Worth – off at league start, on later.
+  Any number of lists. A template creates "lesser & normal runes": the lesser and normal
+  tier of every rune family that also has a greater/perfect tier (unique runes stay
+  out). Every list also sits as a chip on the Net Worth tab (one click toggles it), and
+  a left-out line is greyed with the list's name – nothing disappears silently.
+  Tested headless: template picks exactly the tiered families; total 590 → 400 Ex with
+  the switch on and back with the chip; the list is saved.
 
 - **"Wrong tab?"** on every tab card: tab detection correlates the panel's edge structure
   against one baked fingerprint per tab, and on a setup unlike the baked one two tabs can
@@ -369,6 +386,7 @@ These existed in the player's own build and were **deliberately left out** here:
 | `stashHiRes` | `false` | Global ×2 matching (4K/5K) |
 | `stashUserTabSigs` | `{}` | Extra tab-detection fingerprints from "Wrong tab?" |
 | `stashShowReliability` | `false` | "Often misread" row tints |
+| `stashSkipGroups` | `[]` | "Don't count" lists `[{ id, name, on, items }]` |
 | `priceOverrides` | `{}` | `apiId → { ex, at }`: the player's own price per unit |
 
 Learned templates (`userData/learned-digit-templates.json`) gained `byScale[ms]` for

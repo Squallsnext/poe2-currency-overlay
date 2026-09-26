@@ -64,6 +64,8 @@ contextBridge.exposeInMainWorld('api', {
   // own price for one item in Ex (null/0 = drop it and use the feed again)
   setPriceOverride: (apiId, ex) => ipcRenderer.invoke('set-price-override', { apiId, ex }),
   setStashHiRes: (on) => ipcRenderer.invoke('set-stash-hi-res', on),
+  // "Nicht mitzählen" lists (renderer/stash/skip-groups.js)
+  setStashSkipGroups: (groups) => ipcRenderer.invoke('set-stash-skip-groups', groups),
   setStashDupTabs: (on) => ipcRenderer.invoke('set-stash-dup', on),
   setStashBannerHidden: (on) => ipcRenderer.invoke('set-stash-banner-hidden', on),
   setStashSortLayout: (on) => ipcRenderer.invoke('set-stash-sort', on),

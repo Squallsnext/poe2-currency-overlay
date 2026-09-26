@@ -204,7 +204,11 @@
 
   // effective per-line values, honouring manual count edits (userCount) + toggles (excluded)
   const effCount = (ln) => (ln.userCount != null ? ln.userCount : ln.count) || 0;
-  const lineOn = (ln) => !ln.excluded;
+  // a line is left out by its own tick box, or by a switched-on "Nicht mitzählen" list
+  // (skip-groups.js) that holds the item
+  const skipGroup = (ln) => (window.NwSkipGroups ? window.NwSkipGroups.skippedBy(ln.priceId || ln.apiId) : null);
+  const lineOn = (ln) => !ln.excluded && !skipGroup(ln);
+  if (window.NwSkipGroups) window.NwSkipGroups.onChange(() => render());
   const lineVal = (ln) => (lineOn(ln) && ln.price != null) ? effCount(ln) * ln.price : 0;
   const rowTotalEx = (res) => (res.lines || []).reduce((s, ln) => s + lineVal(ln), 0);
   const rowEdited = (res) => (res.lines || []).some((ln) => ln.userCount != null);
@@ -268,6 +272,7 @@
         for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k]; // previews re-read with the new default
       }));
     root.appendChild(toggles);
+    if (window.NwSkipGroups) window.NwSkipGroups.renderSettingsSection(root, render);
     // Settings above, recovery tools below - the divider keeps users from reading
     // calibration/submission as steps they are meant to take. Same shape as the Reprice
     // card: the supported list first, the screenshot path for sizes NOT on it, manual
@@ -472,7 +477,7 @@
       const relFlag = state.showRel && ln.userCount == null ? (ln.rel || null) : null;
       const line = el('div', 'nw-line'
         + (ln.userCount != null ? ' nw-line-edited' : '')
-        + (ln.excluded ? ' nw-line-off' : '')
+        + (ln.excluded || skipGroup(ln) ? ' nw-line-off' : '')
         + (ln.missing ? ' nw-line-missing' : '')
         + (relFlag ? ' nw-line-rel-' + relFlag : ''));
       if (relFlag) {
@@ -482,10 +487,13 @@
       }
       const tg = el('input', 'nw-line-inc'); tg.type = 'checkbox'; tg.checked = !ln.excluded; tg.title = t('networth.row.include_title');
       tg.onclick = (e) => { e.stopPropagation(); ln.excluded = !tg.checked; render(); };
+      const sg = skipGroup(ln);
+      if (sg) { tg.checked = false; tg.disabled = true; tg.title = t('networth.skip.line_title', { name: sg.name }); }
       line.appendChild(tg);
       if (ln.icon) { const img = el('img', 'nw-ic'); img.src = ln.icon; img.onerror = () => img.remove(); line.appendChild(img); }
       else line.appendChild(el('div', 'nw-ic nw-ic-none'));
       line.appendChild(el('div', 'nw-name', esc(window.gameName(ln.name) + (ln.suffix || '')))); // feed is English; show the client's own name (+ "#2" for an extra slot of the same currency)
+      if (sg) { const tag = el('span', 'nw-skip-tag', '⊘ ' + esc(sg.name)); tag.title = t('networth.skip.line_title', { name: sg.name }); line.appendChild(tag); }
       if (state.showConfidence && ln.conf != null) {
         const pct = Math.round(ln.conf * 100);
         const cl = pct >= 88 ? 'ok' : (pct >= 80 ? 'mid' : 'low');
@@ -1210,6 +1218,9 @@
     if (state.wizard) wrap.appendChild(wizardCard());
     { const xb = experimentalBanner(); if (xb) wrap.appendChild(xb); }
     { const lg = reliabilityLegend(); if (lg) wrap.appendChild(lg); }
+    // the "Nicht mitzählen" lists with their switches, right on the tab - an item left out
+    // must never be a surprise
+    { const ch = window.NwSkipGroups && window.NwSkipGroups.chips(render); if (ch) wrap.appendChild(ch); }
 
     if (state.notice) wrap.appendChild(el('div', 'nw-notice nw-' + state.notice.kind, esc(state.notice.msg)));
 

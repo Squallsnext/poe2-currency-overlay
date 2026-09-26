@@ -270,6 +270,7 @@ const DEFAULT_CONFIG = {
   stashUserTabSigs: {}, // Net Worth: extra tab-detection fingerprints the user taught via "wrong tab?" (tab -> [signature])
   stashShowReliability: false, // Net Worth: tint rows the shipped reliability table marks as often misread
   stashHiRes: false, // Net Worth: read counts at 2x resolution where the capture allows (4K/5K); per-slot setting wins
+  stashSkipGroups: [], // Net Worth: the player's own lists of items left out of the total while switched on [{id,name,on,items:[apiId]}]
   priceOverrides: {}, // apiId -> {ex, at}: the user's own price for an item, wins over every feed (see applyPriceRules)
   commandHotkeys: [], // Hotkeys settings: [{command:'/hideout', accelerator:'F8'}] - whitelist-only safe chat commands, one key = one manual command
   stashCalibration: null, // Net Worth: {x,y,w,h} panel box from one-time calibration; null = assume reference res
@@ -2534,6 +2535,7 @@ button#cancel{background:#3a3a3a;color:#eee}
 #lasso{position:absolute;border:1px dashed #6fd3ff;background:rgba(111,211,255,.08);pointer-events:none;display:none;z-index:5}
 .box .t{position:absolute;left:0;top:-22px;white-space:nowrap;font:700 16px Consolas,monospace;color:inherit;text-shadow:0 0 4px #000,0 0 4px #000}
 #toggleok,#togglegrid,#togglemoveall{display:flex;align-items:center;gap:5px;font-size:13px;color:#cfc3aa}
+#toggleok{font-weight:700;color:#ffd166;border:1px solid #ffd166;border-radius:6px;padding:4px 8px}
 #togglegrid input[type=number]{width:52px;background:#0b0b0b;color:#ddd;border:1px solid #555;border-radius:6px;padding:4px 6px;font:12px Consolas,monospace}
 #grid{position:absolute;inset:0;pointer-events:none;display:none;z-index:2}
 #wrap.show-grid #grid{display:block}
@@ -2548,7 +2550,7 @@ button#cancel{background:#3a3a3a;color:#eee}
     <label>Breite <input id="gw" type="number" step="1"></label>
     <label>Höhe <input id="gh" type="number" step="1"></label>
   </div>
-  <label id="toggleok"><input id="showok" type="checkbox"> auch gute Felder zeigen</label>
+  <label id="toggleok" title="Standard: alle Kästchen sichtbar. Ein Feld, das heute passt (einstellige Zahl), kann bei zweistelligen Zahlen später danebenliegen - darum gleich alle ausrichten. Haken setzen = nur die roten/gelben zeigen. Wird gemerkt."><input id="onlybad" type="checkbox"> nur rote/gelbe zeigen</label>
   <button id="rowalign" title="Alle Kästchen rechts vom ausgewählten, die höchstens 10 px höher oder tiefer sitzen, auf dieselbe Höhe setzen (nur die Höhe, links/rechts bleibt). Taste R">Reihe angleichen →</button>
   <button id="colalign" title="Alle Kästchen unter dem ausgewählten, die höchstens 25 px links oder rechts davon sitzen, auf dieselbe Spalte setzen (nur links/rechts, die Höhe bleibt). Taste S">Spalte angleichen ↓</button>
   <button id="undo" title="Letztes Angleichen / Verschieben rückgängig machen. Strg+Z">Rückgängig</button>
@@ -2557,9 +2559,9 @@ button#cancel{background:#3a3a3a;color:#eee}
   <button id="unmark" title="Markierung aufheben (Esc)">Markierung aufheben</button>
   <label id="togglemoveall" title="An: Ziehen oder Pfeiltasten verschieben ALLE Kästchen um dieselbe Strecke - ein Kästchen ausrichten, der Rest folgt. Taste A"><input id="moveall" type="checkbox"> Alle mitbewegen</label>
   <label id="togglegrid"><input id="showgrid" type="checkbox"> Gitter <input id="gridstep" type="number" min="2" step="1" title="Gitterabstand in Pixeln"> px</label>
-  <span id="hint">Nur unsichere/falsche Felder werden standardmäßig gezeigt. Ziehen = verschieben, Pfeiltasten = 1px, Shift+Pfeil = 5px. Breite/Höhe = Größe für ALLE Kästchen auf einmal (auch die ausgeblendeten guten). Reihe angleichen (R): erstes Kästchen der Reihe auswählen, alle rechts davon übernehmen die Höhe. Spalte angleichen (S): oberstes Kästchen der Spalte auswählen, alle darunter übernehmen die Position links/rechts. Alle mitbewegen (A): ein Kästchen ausrichten, alle anderen verschieben sich genauso mit. Markieren: Strg+Klick auf Kästchen oder Rahmen auf freier Fläche aufziehen - dann bewegen sich nur die markierten zusammen (Esc hebt auf). Am Rahmen einrasten (F): ein Kästchen genau setzen und auswählen (weißer Rand) - es ist der Vorreiter; die markierten (sonst alle) übernehmen seine Lage im eigenen Zellrahmen. Kästchen, die schon passen, bleiben stehen; unsichere werden gestrichelt und nicht bewegt. Strg+Z = rückgängig. Gitter: gestrichelte Linie = Mitte des ausgewählten Kästchens.</span>
+  <span id="hint">Alle Kästchen sind sichtbar (grün = gut gelesen, gelb = unsicher, rot = falsch/leer) - richte am besten alle aus, auch grüne: zweistellige Zahlen brauchen mehr Platz. Ziehen = verschieben, Pfeiltasten = 1px, Shift+Pfeil = 5px. Breite/Höhe = Größe für ALLE Kästchen auf einmal (auch die ausgeblendeten guten). Reihe angleichen (R): erstes Kästchen der Reihe auswählen, alle rechts davon übernehmen die Höhe. Spalte angleichen (S): oberstes Kästchen der Spalte auswählen, alle darunter übernehmen die Position links/rechts. Alle mitbewegen (A): ein Kästchen ausrichten, alle anderen verschieben sich genauso mit. Markieren: Strg+Klick auf Kästchen oder Rahmen auf freier Fläche aufziehen - dann bewegen sich nur die markierten zusammen (Esc hebt auf). Am Rahmen einrasten (F): ein Kästchen genau setzen und auswählen (weißer Rand) - es ist der Vorreiter; die markierten (sonst alle) übernehmen seine Lage im eigenen Zellrahmen. Kästchen, die schon passen, bleiben stehen; unsichere werden gestrichelt und nicht bewegt. Strg+Z = rückgängig. Gitter: gestrichelte Linie = Mitte des ausgewählten Kästchens.</span>
 </div>
-<div id="wrap" class="hide-ok"><img id="panel" src="data:image/png;base64,${data.panelBase64}"><div id="grid"></div><div id="guide"></div><div id="lasso"></div></div>
+<div id="wrap"><img id="panel" src="data:image/png;base64,${data.panelBase64}"><div id="grid"></div><div id="guide"></div><div id="lasso"></div></div>
 <script>
 const REF_BOX = ${JSON.stringify(data.refBox)};
 const WIDTH = ${data.width};
@@ -2758,7 +2760,16 @@ document.getElementById('copy').onclick = async () => {
 };
 document.getElementById('cancel').onclick = () => window.adjustApi.close();
 document.getElementById('save').onclick = () => window.adjustApi.save({ tab: TAB, deltas: deltas() });
-document.getElementById('showok').addEventListener('change', (ev) => wrap.classList.toggle('hide-ok', !ev.target.checked));
+// All boxes are shown by default. Hiding the green ones was the old default, and players
+// ticked "show all" every single time: a box that reads a 1-digit count fine can sit off
+// once the count has two digits, so every box gets aligned. Hiding stays as an option,
+// remembered.
+{
+  const ob = document.getElementById('onlybad');
+  let on = false; try { on = localStorage.getItem('adjOnlyBad') === '1'; } catch {}
+  ob.checked = on; wrap.classList.toggle('hide-ok', on);
+  ob.addEventListener('change', () => { wrap.classList.toggle('hide-ok', ob.checked); try { localStorage.setItem('adjOnlyBad', ob.checked ? '1' : '0'); } catch {} });
+}
 document.getElementById('rowalign').onclick = () => alignRow();
 document.getElementById('colalign').onclick = () => alignCol();
 document.getElementById('undo').onclick = () => undo();
@@ -3198,6 +3209,15 @@ ipcMain.handle('set-price-override', (_e, { apiId, ex } = {}) => {
   if (ex > 0) config.priceOverrides[apiId] = { ex: +ex, at: Date.now() };
   else delete config.priceOverrides[apiId];
   saveConfig(); invalidatePriceCaches();
+  return true;
+});
+// "Nicht mitzählen" lists - stored as sent, sanitised to the known shape
+ipcMain.handle('set-stash-skip-groups', (_e, groups) => {
+  config.stashSkipGroups = (Array.isArray(groups) ? groups : []).slice(0, 50).map((g) => ({
+    id: String(g && g.id || ''), name: String(g && g.name || '').slice(0, 60), on: !!(g && g.on),
+    items: (Array.isArray(g && g.items) ? g.items : []).filter((x) => typeof x === 'string').slice(0, 2000),
+  }));
+  saveConfig();
   return true;
 });
 ipcMain.handle('set-stash-show-reliability', (_e, on) => { config.stashShowReliability = !!on; saveConfig(); return true; });

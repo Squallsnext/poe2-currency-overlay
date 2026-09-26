@@ -1940,3 +1940,27 @@ footer {
 .nw-val-edit { cursor: pointer; }
 .nw-val-edit:hover { text-decoration: underline dotted; }
 .nw-price-edit { width: 78px; text-align: right; }
+
+/* Net Worth "Nicht mitzählen" lists (stash/skip-groups.js) */
+.nw-skip { margin: 4px 0 18px; }
+.nw-skip-head { font-size: 12px; font-weight: 700; color: var(--tx-hi); margin-bottom: 4px; }
+.nw-skip-why { font-size: 11px; color: var(--tx-faint); line-height: 1.45; margin-bottom: 10px; max-width: 640px; }
+.nw-skip-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0; }
+.nw-skip-row .switch { flex: 1 1 260px; }
+.nw-skip-btns, .nw-skip-add, .nw-skip-edit-acts { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.nw-skip-add { margin-top: 8px; }
+.nw-skip-edit { border: 1px solid var(--in-bd); border-radius: 6px; padding: 8px; margin: 4px 0 10px; }
+.nw-skip-edit-top { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 6px; }
+.nw-skip-name, .nw-skip-search { background: var(--in-bg); color: var(--tx-hi); border: 1px solid var(--in-bd); border-radius: 5px; padding: 4px 7px; font-size: 12px; }
+.nw-skip-name { width: 180px; }
+.nw-skip-search { flex: 1 1 200px; }
+.nw-skip-only { font-size: 11px; color: var(--tx-body); }
+.nw-skip-list { max-height: 320px; overflow: auto; margin-top: 6px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 2px 10px; }
+.nw-skip-cat { grid-column: 1 / -1; font-size: 11px; font-weight: 700; color: var(--am-hi); margin-top: 6px; }
+.nw-skip-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--tx-body); cursor: pointer; }
+.nw-skip-ic { width: 18px; height: 18px; object-fit: contain; }
+.nw-skip-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 6px 0 8px; }
+.nw-skip-chips-lab { font-size: 11px; color: var(--tx-faint); }
+.nw-skip-chip { font-size: 11px; padding: 3px 9px; border-radius: 12px; border: 1px solid var(--in-bd); background: var(--in-bg); color: var(--tx-body); cursor: pointer; }
+.nw-skip-chip-on { border-color: var(--am); color: var(--am-hi); }
+.nw-skip-tag { font-size: 10.5px; color: var(--am-hi); margin-left: 6px; white-space: nowrap; }
