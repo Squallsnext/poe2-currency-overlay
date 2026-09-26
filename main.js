@@ -2237,7 +2237,7 @@ function saveLearnedTemplates(data) {
   try { fs.writeFileSync(learnedTemplatesFile(), JSON.stringify(data)); }
   catch (err) { logToggle('stash-learn', 'save failed: ' + (err && err.message || err)); }
 }
-const MAX_EXEMPLARS_PER_DIGIT = 30; // bounded so the file doesn't grow forever
+const MAX_EXEMPLARS_PER_DIGIT = 60; // bounded so the file doesn't grow forever (30 -> 60: exemplars now form up to 4 templates per digit, one per size, read-pipeline.js)
 // Shared by stash-teach-count, stash-slot-debug-image: which recent capture actually has
 // this apiId, and where its slot sits in that map.
 // A slot's saved override with the global defaults folded in: the "high resolution"

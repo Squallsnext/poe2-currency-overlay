@@ -120,19 +120,45 @@
   // size template is blown up by that factor to fit the bigger cell, and templates the
   // user taught AT that scale (learned.byScale[ms]) join as-is - those carry the real
   // detail a blown-up 9px template can't.
+  // The player's taught glyphs as up to LEARNED_GROUPS variants per digit instead of ONE:
+  // exemplars are grouped by size (a digit from another tab, filter setting or
+  // resolution comes out a different size), each group's median-ink exemplar is one
+  // template. With a single representative - the median over ALL exemplars - teaching a
+  // digit in one tab shifted it and the same digit elsewhere matched worse (reported:
+  // currency tuned to > 80 %, then ritual taught, and currency dropped again; abyss
+  // added, everything ~70 %). Sets without exemplars keep their single template.
+  const LEARNED_GROUPS = 4;
+  function learnedVariants(set, source) {
+    if (!set) return [];
+    const ex = set.exemplars || {};
+    if (!Object.keys(ex).some((d) => (ex[d] || []).length)) {
+      return set.templates && Object.keys(set.templates).length ? [{ source, templates: set.templates }] : [];
+    }
+    // the median over all exemplars (the one template this was before) stays in, the
+    // size groups come on top - so nothing that matched before can get lost
+    const out = set.templates && Object.keys(set.templates).length ? [{ source: source + '#all', templates: set.templates }] : [];
+    const base = out.length;
+    for (const d of Object.keys(ex)) {
+      const groups = new Map();
+      for (const g of ex[d] || []) { const k = g.w + 'x' + g.h; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(g); }
+      [...groups.values()].sort((a, b) => b.length - a.length).slice(0, LEARNED_GROUPS).forEach((list, i) => {
+        const inks = list.map((g, j) => ({ ink: g.data.reduce((a, b) => a + b, 0), j })).sort((a, b) => (a.ink - b.ink) || (a.j - b.j));
+        out[base + i] = out[base + i] || { source: source + '#' + i, templates: {} };
+        out[base + i].templates[d] = list[inks[Math.floor(inks.length / 2)].j];
+      });
+    }
+    return out.filter(Boolean);
+  }
   function buildBank(rawTemplates, learned, matchScale) {
     const ms = matchScale > 1 ? Math.round(matchScale) : 1;
     const variants = (rawTemplates.variants || []).slice();
-    if (learned && learned.templates && Object.keys(learned.templates).length) {
-      variants.push({ source: 'user-corrections', templates: learned.templates });
-    }
-    const scaled = ms > 1 && learned && learned.byScale && learned.byScale[ms] && learned.byScale[ms].templates;
+    variants.push(...learnedVariants(learned, 'user-corrections'));
     const scaledSrc = 'user-corrections@x' + ms;
-    if (scaled && Object.keys(scaled).length) variants.push({ source: scaledSrc, templates: scaled });
+    if (ms > 1 && learned && learned.byScale) variants.push(...learnedVariants(learned.byScale[ms], scaledSrc));
     const built = DR.bankFromJSON({ templates: rawTemplates.templates, variants });
     if (ms > 1) {
       for (const key of Object.keys(built.bank)) {
-        if (built.sourceOf(key) !== scaledSrc) built.bank[key] = DR.upscaleTemplate(built.bank[key], ms);
+        if (!String(built.sourceOf(key)).startsWith(scaledSrc)) built.bank[key] = DR.upscaleTemplate(built.bank[key], ms);
       }
     }
     return built;

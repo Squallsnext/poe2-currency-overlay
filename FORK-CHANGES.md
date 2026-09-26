@@ -737,6 +737,23 @@ line is often 1 px and not black, and half the cells were lost.)
 The count centres (`STATIC_SLOTS`) are unchanged, so shipped reads without placement stay
 as they were.
 
+**Taught digits no longer push each other out** (reported: currency tuned to > 80 %, then
+ritual taught - currency dropped again; abyss added - everything ~70 %, "not enough room
+to teach all the different ones").
+- The bank held ONE learned template per digit: the median of all exemplars (up to 30).
+  Teaching a 4 in the ritual tab (other background, other filters -> a differently shaped
+  glyph) shifted that median, and the currency 4 matched worse. Now the exemplars form up
+  to 4 extra templates per digit, one per glyph size (the median of each size group),
+  on top of the overall median (`learnedVariants` in read-pipeline.js). Exemplars per
+  digit: 60 (was 30).
+- The template key pool (`ALT_POOL`) had 100 keys; the shipped variants use 60, and
+  anything past 100 was dropped without a word - the player's 5K set already came to 101
+  at matching scale 2. Now 164.
+- Measured on the 5K currency picture with the player's learned file: 38/38 read, one
+  count fixed (269 was read 69), average confidence 88.3 -> 88.6 %, sure reads (>= 80 %)
+  32 -> 32; single slots move a few points either way (the adaptive threshold can pick
+  another floor when there are more templates).
+
 These existed in the player's own build and were **deliberately left out** here:
 
 - The currency tab coordinates recalibrated for an enlarged in-game UI text and three extra

@@ -903,8 +903,12 @@
   // silently dropped 7 of its 10 digits) - Greek never collides with real OCR'd digit
   // output, so it is safe filler for more variant capacity without touching `unmap`'s
   // per-character replace logic.
+  // one stand-in character per template beyond the base set. Was 100: the shipped
+  // variants use 60, so learned groups beyond that were silently dropped - now roomy
+  // (Cyrillic added: 164)
   const ALT_POOL = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    + 'αβγδεζηθικλμνξοπρστυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ';
+    + 'αβγδεζηθικλμνξοπρστυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ'
+    + 'абвгдежзийклмнопрстуфхцчшщъыьэюяАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
   function bankFromJSON(obj) {
     const bank = templatesFromJSON(obj);
     const back = new Map();
