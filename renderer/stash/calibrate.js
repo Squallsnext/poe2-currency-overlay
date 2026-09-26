@@ -7,13 +7,34 @@
   const vguide = document.getElementById('vguide');
   const hguide = document.getElementById('hguide');
   const coordsEl = document.getElementById('coords');
+  const debugEl = document.getElementById('debug');
   const imgObj = new Image();
   // per-axis capture-px <-> css-px scale. The window's client height often differs
   // slightly from the screenshot height (DPI / work-area), so a single scale skews the
   // loupe vertically (accurate at the top, drifting toward the bottom). Keep them separate.
   let sX = 1, sY = 1; // css px per capture px
+  let capW = 1, capH = 1;
+  let displayInfo = null;
   let box = { x: 120, y: 120, w: 400, h: 400 }; // CSS px
   let minBox = 40; // smallest box the user can drag to; reprice lowers it
+  const capToCssBox = (b) => ({ x: b.x * sX, y: b.y * sY, w: b.w * sX, h: b.h * sY });
+  const cssToCapBox = (b) => ({ x: toCapX(b.x), y: toCapY(b.y), w: toCapX(b.w), h: toCapY(b.h) });
+  function updateScale() {
+    sX = innerWidth / capW;
+    sY = innerHeight / capH;
+    updateDebug();
+  }
+  function updateDebug() {
+    if (!debugEl) return;
+    const d = displayInfo || {};
+    const b = d.bounds || {};
+    const w = d.workArea || {};
+    const wb = d.windowBounds || {};
+    debugEl.textContent =
+      `cap ${capW}x${capH}  css ${innerWidth}x${innerHeight}  scale ${sX.toFixed(5)},${sY.toFixed(5)}\n`
+      + `display ${d.id || '?'} @${d.scaleFactor || '?'}  bounds ${b.x || 0},${b.y || 0} ${b.width || 0}x${b.height || 0}  `
+      + `work ${w.x || 0},${w.y || 0} ${w.width || 0}x${w.height || 0}  win ${wb.x || 0},${wb.y || 0} ${wb.width || 0}x${wb.height || 0}`;
+  }
 
   function clampBox() {
     // 40px is a sensible floor for a stash panel and a ceiling for a price box - the
@@ -119,17 +140,26 @@
   });
   window.calibrateApi.onSnapped((f) => {
     if (!f || !(f.w > 0) || !(f.h > 0)) return;
-    box = { x: f.x * sX, y: f.y * sY, w: f.w * sX, h: f.h * sY };
+    box = capToCssBox(f);
     draw();
     boxEl.classList.remove('snapped'); void boxEl.offsetWidth; boxEl.classList.add('snapped');
   });
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.calibrateApi.cancel(); });
+  window.addEventListener('resize', () => {
+    const cur = cssToCapBox(box);
+    updateScale();
+    box = capToCssBox(cur);
+    draw();
+  });
 
   window.calibrateApi.onInit((data) => {
     shot.src = data.dataUrl; imgObj.src = data.dataUrl;
-    sX = innerWidth / data.capW; sY = innerHeight / data.capH;
+    capW = data.capW || 1;
+    capH = data.capH || 1;
+    displayInfo = data.display || null;
+    updateScale();
     const s = data.seedBox;
-    box = { x: s.x * sX, y: s.y * sY, w: s.w * sX, h: s.h * sY };
+    box = capToCssBox(s);
     // The same window calibrates the Net Worth stash panel and the Reprice price box.
     // Auto-snap looks for the stash panel's coloured border, which does not exist around
     // a price field, so it is hidden there rather than offered and useless.
@@ -140,19 +170,19 @@
       if (snapBtn) snapBtn.style.display = 'none';
       const msg = document.querySelector('.msg');
       if (msg) msg.innerHTML = data.target === 'reprice-icon'
-        ? 'Drag the box <b>around the currency icon</b> beside the price - the picture only, '
-          + 'not the name next to it. It does not have to be tight, but keep other artwork out '
-          + 'of it. Then Confirm.'
-        : 'Drag the box <b>around the number in the price field</b>. '
-          + 'The magnifier shows the exact pixel row and column, so put the edges just outside '
-          + 'the digits. Then Confirm.';
+        ? 'Zieh den Rahmen <b>um das Waehrungs-Icon</b> neben dem Preis - nur das Bild, '
+          + 'nicht den Namen daneben. Er muss nicht millimetergenau sein, aber andere Grafik '
+          + 'sollte draussen bleiben. Dann bestaetigen.'
+        : 'Zieh den Rahmen <b>um die Zahl im Preisfeld</b>. '
+          + 'Die Lupe zeigt die genaue Pixelzeile und Spalte; setze die Kanten knapp ausserhalb '
+          + 'der Ziffern. Dann bestaetigen.';
       // the illustration is a stash grid with item cells - nothing to do with a price box
       const ex = document.getElementById('ex');
       if (ex) ex.style.display = 'none';
       const note = document.querySelector('.bar-note');
       if (note) note.style.display = 'none';
       const ok = document.getElementById('ok');
-      if (ok) ok.textContent = 'Confirm';
+      if (ok) ok.textContent = 'Bestaetigen';
     }
     draw();
   });

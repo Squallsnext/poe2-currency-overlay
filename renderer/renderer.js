@@ -1918,11 +1918,61 @@ async function initSettings() {
       }
     });
   };
+  // click-to-record controller-button capture for the reprice gamepad binds. The
+  // capture itself happens in main (gamepad.js sees raw HID reports, not the renderer),
+  // so this just asks for the next press and waits.
+  const gpButtonLabel = (btn) => {
+    const bk = window.api.gamepadButtonKeys && window.api.gamepadButtonKeys[btn];
+    if (!bk) return '';
+    // built, not a literal - see i18n-verify.mjs's CALL regex, which only recognises a
+    // quoted string passed directly to t(); a literal here would show up truncated at
+    // the concatenation point as a phantom "unknown key".
+    const i18nKey = 'ui.settings.reprice.gamepad_button.' + bk;
+    return t(i18nKey);
+  };
+  const bindGamepadButtonInput = (input, getCur, trySet) => {
+    const render = () => { const cur = getCur(); input.value = cur == null ? '' : gpButtonLabel(cur); };
+    render();
+    input.addEventListener('focus', async () => {
+      input.classList.add('recording');
+      input.value = t('ui.settings.reprice.gamepad_recording');
+      const btn = await window.api.captureGamepadButton();
+      if (!input.classList.contains('recording')) return; // blurred/cancelled meanwhile
+      input.classList.remove('recording');
+      if (btn == null) { render(); return; }
+      const ok = await trySet(btn);
+      render();
+      showStatus(ok ? null : t('currency.settings.hotkey_conflict', { acc: gpButtonLabel(btn) }));
+    });
+    input.addEventListener('blur', () => {
+      if (input.classList.contains('recording')) { input.classList.remove('recording'); render(); }
+    });
+  };
+  // Every fixed hotkey action can also carry a controller-button twin, stored in
+  // config.gamepadBindings[action] - see GAMEPAD_ACTIONS in main.js for the action ids.
+  const bindGamepadAction = (action, inputId, clearId) => {
+    const input = $(inputId);
+    if (!input) return;
+    bindGamepadButtonInput(input,
+      () => (config.gamepadBindings && config.gamepadBindings[action] != null ? config.gamepadBindings[action] : null),
+      async (btn) => {
+        const ok = await window.api.setGamepadBinding(action, btn);
+        if (ok) { config.gamepadBindings = config.gamepadBindings || {}; config.gamepadBindings[action] = btn; }
+        return ok;
+      });
+    const clear = clearId && $(clearId);
+    if (clear) clear.addEventListener('click', async () => {
+      const ok = await window.api.setGamepadBinding(action, null);
+      if (ok) { if (config.gamepadBindings) delete config.gamepadBindings[action]; input.value = ''; }
+    });
+  };
   bindHotkeyInput($('hotkey-input'), () => config.hotkey, async (acc) => {
     const ok = await window.api.setHotkey(acc);
     if (ok) config.hotkey = acc;
     return ok;
   });
+  bindGamepadAction('overlay', 'gamepad-overlay-input', 'gamepad-overlay-clear');
+  bindGamepadAction('closeOverlay', 'gamepad-close-input', 'gamepad-close-clear');
   bindHotkeyInput($('item-hotkey-input'), () => config.itemHotkey || '', async (acc) => {
     const ok = await window.api.setItemHotkeys({ pin: acc, temp: config.itemHotkeyTemp });
     if (ok) {
@@ -1931,17 +1981,20 @@ async function initSettings() {
     }
     return ok;
   });
+  bindGamepadAction('itemPin', 'gamepad-item-pin-input', 'gamepad-item-pin-clear');
   bindHotkeyInput($('item-hotkey-temp-input'), () => config.itemHotkeyTemp || '', async (acc) => {
     const ok = await window.api.setItemHotkeys({ pin: config.itemHotkey, temp: acc });
     if (ok) config.itemHotkeyTemp = acc;
     return ok;
   });
+  bindGamepadAction('itemTemp', 'gamepad-item-temp-input', 'gamepad-item-temp-clear');
   const stashHkInput = $('stash-hotkey-input');
   if (stashHkInput) bindHotkeyInput(stashHkInput, () => config.stashHotkey || '', async (acc) => {
     const ok = await window.api.setStashHotkey(acc);
     if (ok) config.stashHotkey = acc;
     return ok;
   });
+  bindGamepadAction('stashCapture', 'gamepad-stash-input', 'gamepad-stash-clear');
 
   // ---------- reprice (Settings → Reprice) ----------
   // Reads the price the game already has in the box, applies one arithmetic rule and
@@ -1953,6 +2006,10 @@ async function initSettings() {
     if (ok) config.repriceHotkey = acc;
     return ok;
   });
+
+  bindGamepadAction('repriceToggle', 'reprice-gamepad-toggle-input', 'reprice-gamepad-toggle-clear');
+  bindGamepadAction('repriceRead', 'reprice-gamepad-read-input', 'reprice-gamepad-read-clear');
+  bindGamepadAction('repricePaste', 'reprice-gamepad-paste-input', 'reprice-gamepad-paste-clear');
 
   const rpEls = {
     branches: $('reprice-branches'), addBranch: $('reprice-add-branch'),
@@ -2883,6 +2940,19 @@ async function initSettings() {
       bindHotkeyInput(input, () => row.accelerator || '', async (acc) => {
         row.accelerator = acc;
         logAction(`cmd-hotkey bind: ${row.command} -> ${acc}`);
+        await saveCmdHotkeys();
+        return true;
+      });
+      const gpField = document.createElement('div');
+      gpField.className = 'kb-field';
+      const gpInput = document.createElement('input');
+      gpInput.className = 'kb-input'; gpInput.readOnly = true;
+      gpInput.placeholder = t('ui.settings.reprice.gamepad_placeholder');
+      gpField.appendChild(gpInput);
+      div.appendChild(gpField);
+      bindGamepadButtonInput(gpInput, () => (row.gamepad == null ? null : row.gamepad), async (btn) => {
+        row.gamepad = btn;
+        logAction(`cmd-hotkey gamepad bind: ${row.command} -> ${btn}`);
         await saveCmdHotkeys();
         return true;
       });

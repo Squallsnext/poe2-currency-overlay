@@ -1,5 +1,13 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Keep this in sync with gamepad.js. Sandboxed Electron preload scripts cannot
+// reliably require local app files, and failing here removes window.api entirely.
+const GAMEPAD_BUTTON_KEYS = [
+  'cross', 'circle', 'square', 'triangle', 'l1', 'r1', 'l2', 'r2',
+  'create', 'options', 'l3', 'r3',
+  'dpad_up', 'dpad_down', 'dpad_left', 'dpad_right', 'ps', 'touchpad',
+];
+
 contextBridge.exposeInMainWorld('api', {
   getConfig: () => ipcRenderer.invoke('get-config'),
   saveBuckets: (buckets) => ipcRenderer.invoke('save-buckets', buckets),
@@ -45,6 +53,14 @@ contextBridge.exposeInMainWorld('api', {
   trade2AuthCheck: (league, force) => ipcRenderer.invoke('trade2-auth-check', { league, force }),
   setActiveTab: (which) => ipcRenderer.send('active-tab', which),
   stashCaptureStart: () => ipcRenderer.send('stash-capture-start'),
+  stashTeachCount: (apiId, value) => ipcRenderer.invoke('stash-teach-count', { apiId, value }),
+  stashAdjustOpen: (tab) => ipcRenderer.invoke('stash-adjust-open', tab),
+  stashSlotDebugImage: (apiId, opts) => ipcRenderer.invoke('stash-slot-debug-image', apiId, opts),
+  stashSlotSetFloor: (apiId, floor) => ipcRenderer.invoke('stash-slot-set-floor', { apiId, floor }),
+  stashSlotSetStripRight: (apiId, stripRight) => ipcRenderer.invoke('stash-slot-set-strip-right', { apiId, stripRight }),
+  stashSlotSetDesat: (apiId, desatSat) => ipcRenderer.invoke('stash-slot-set-desat', { apiId, desatSat }),
+  stashForgetDigits: (digits) => ipcRenderer.invoke('stash-forget-digits', { digits }),
+  setStashShowOcrDebug: (on) => ipcRenderer.invoke('set-stash-show-ocr-debug', on),
   setStashDupTabs: (on) => ipcRenderer.invoke('set-stash-dup', on),
   setStashBannerHidden: (on) => ipcRenderer.invoke('set-stash-banner-hidden', on),
   setStashSortLayout: (on) => ipcRenderer.invoke('set-stash-sort', on),
@@ -52,6 +68,9 @@ contextBridge.exposeInMainWorld('api', {
   setStashShowConfidence: (on) => ipcRenderer.invoke('set-stash-show-confidence', on),
   setStashHotkey: (accelerator) => ipcRenderer.invoke('set-stash-hotkey', accelerator),
   setRepriceHotkey: (accelerator) => ipcRenderer.invoke('set-reprice-hotkey', accelerator),
+  captureGamepadButton: () => ipcRenderer.invoke('capture-gamepad-button'),
+  setGamepadBinding: (action, button) => ipcRenderer.invoke('set-gamepad-binding', { action, button }),
+  gamepadButtonKeys: GAMEPAD_BUTTON_KEYS,
   setRepriceConfig: (cfg) => ipcRenderer.invoke('set-reprice-config', cfg),
   // the reprice box uses the SAME calibration window as Net Worth - one flow, one
   // confirm button. It reports back by event, not by resolving a promise.

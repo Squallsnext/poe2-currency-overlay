@@ -214,6 +214,13 @@ const DEFAULT_CONFIG = {
   repriceThreshold: 20,
   repriceOp: 'subtract', repriceValue: 10, repriceMode: 'percent',
   repriceOp2: 'subtract', repriceValue2: 1, repriceMode2: 'flat',
+  // Every hotkey action can ALSO be bound to a controller button - see GAMEPAD_ACTIONS.
+  // Button indices match dualsense-gamepad-button-map.md (0=Cross/X, 2=Square). An action
+  // missing from this object is unbound - a controller is optional everywhere.
+  gamepadBindings: {
+    repriceRead: 2,  // Square: start a reprice read, same as right-click
+    repricePaste: 0, // X: Ctrl+A/Ctrl+V, only right after a successful read
+  },
   // A ready-made ruleset shipped as a saved option named "Default" - load it, ignore it,
   // or delete it. Seeded through the DEFAULT_CONFIG merge, so it only appears while the
   // repriceRulesets key has never been written; deleting it persists [] and it stays gone.
@@ -259,8 +266,10 @@ const DEFAULT_CONFIG = {
   stashSortLayout: false, // Net Worth: list a tab's items in stash reading order instead of by value
   stashShowMissing: false, // Net Worth: show empty/unread slots as editable x0 lines
   stashShowConfidence: false, // Net Worth: show the per-line OCR confidence %
+  stashShowOcrDebug: false, // Net Worth: show the exact crop the reader saw, per line
   commandHotkeys: [], // Hotkeys settings: [{command:'/hideout', accelerator:'F8'}] - whitelist-only safe chat commands, one key = one manual command
   stashCalibration: null, // Net Worth: {x,y,w,h} panel box from one-time calibration; null = assume reference res
+  stashSlotOverrides: {}, // per-tab, per-apiId {cx,cy,stripWidth,up,dn} from the in-app "align" tool; overrides the shipped map for slots a user's setup misreads
   itemQ20: true,       // search armour/weapons as if 20% quality
   itemFillRunes: true, // search as if empty rune sockets held Greater Iron Runes
   itemSliders: true,   // show per-mod range sliders in Price Check
@@ -1003,6 +1012,48 @@ function startHookListener() {
   }
 }
 
+// Controller input, for every hotkey action, not only Reprice - see gamepad.js for why
+// this cannot just be the renderer's Gamepad API. Wiring lives here so the button-down
+// source stays a dumb event stream; each action decides what a press means, exactly
+// like the equivalent globalShortcut-bound keyboard hotkey already does.
+const gamepad = require('./gamepad.js').create({ log: (tag, msg) => logToggle(tag, msg) });
+// One entry per bindable action; config.gamepadBindings maps action id -> button index.
+// Keep the id set in sync with GAMEPAD_ACTION_IDS below (the IPC-side allowlist).
+const GAMEPAD_ACTIONS = {
+  overlay: () => toggleOverlay(),
+  // Dedicated close, distinct from `overlay` (which OPENS a blank overlay if it happens
+  // to be shut) - the same "hide only" shape as the existing hardcoded Escape binding.
+  // "Price check" mode has no auto-hide of its own (that's Quick check's mouse-leave
+  // behaviour), so a controller player needs an explicit way back without touching a
+  // mouse - hideOverlay(true) hands focus straight back to the game, same as Quick
+  // check's self-close does.
+  closeOverlay: () => { if (overlayShown) hideOverlay(true); },
+  // Unlike the keyboard hotkey (which always re-checks and "stays open"), the
+  // controller button toggles: a second press closes what the first one opened,
+  // since a controller player has no separate close button they'd reliably reach for.
+  itemPin: () => { if (overlayShown) hideOverlay(true); else onItemHotkey('pin', null); },
+  itemTemp: () => { if (overlayShown) hideOverlay(true); else onItemHotkey('temp', null); },
+  stashCapture: () => captureAndBroadcast(),
+  repriceToggle: () => reprice.toggle(),
+  repriceRead: () => reprice.startAttempt(),
+  repricePaste: () => reprice.pasteIfReady(),
+};
+let gamepadStarted = false;
+function startGamepadListener() {
+  if (gamepadStarted) return;
+  gamepadStarted = true;
+  gamepad.onButtonDown((btn) => {
+    const binds = config.gamepadBindings || {};
+    for (const action in GAMEPAD_ACTIONS) {
+      if (binds[action] === btn) GAMEPAD_ACTIONS[action]();
+    }
+    for (const row of config.commandHotkeys || []) {
+      if (row && row.gamepad === btn && isAllowedCommand(row.command)) sendChatCommand(row.command);
+    }
+  });
+  gamepad.start();
+}
+
 // Bring the game window to the foreground. Native path first (focus-native.js):
 // an in-process SetForegroundWindow on the game's cached HWND - the primitive
 // EE2's focusTarget() uses. Windows only grants foreground changes to a process
@@ -1672,6 +1723,23 @@ async function grabScreen(cw, ch, withDataUrl) {
 // Run the heavy stash OCR in a worker thread so the main event loop (hotkeys, IPC,
 // window toggle) stays responsive. `onDetected(tab)` fires as soon as the worker
 // knows which tab it is, before the full read finishes.
+// shared by writeStashDebug, stash-teach-count and stash-adjust-open, which all need to
+// map a detected tab name to its slot layout
+const TAB_MAPS = {
+  currency: require('./renderer/stash/currency-tab-map'),
+  abyss: require('./renderer/stash/abyss-tab-map'),
+  essence: require('./renderer/stash/essence-tab-map'),
+  runes: require('./renderer/stash/runes-tab-map'),
+  'runes-kalguuran': require('./renderer/stash/runes-kalguuran-tab-map'),
+  ritual: require('./renderer/stash/ritual-tab-map'),
+  soulcore: require('./renderer/stash/soulcore-tab-map'),
+  idol: require('./renderer/stash/idol-tab-map'),
+  'ancient-augment': require('./renderer/stash/ancient-augment-tab-map'),
+  delirium: require('./renderer/stash/delirium-tab-map'),
+  breach: require('./renderer/stash/breach-tab-map'),
+  expedition: require('./renderer/stash/expedition-tab-map'),
+};
+
 function runReaderWorker(bitmap, W, H, onDetected) {
   return new Promise((resolve) => {
     let w;
@@ -1686,8 +1754,278 @@ function runReaderWorker(bitmap, W, H, onDetected) {
     });
     w.on('error', (e) => finish({ ok: false, error: String(e && e.message || e) }));
     const ab = bitmap.buffer.slice(bitmap.byteOffset, bitmap.byteOffset + bitmap.byteLength);
-    w.postMessage({ bitmap: ab, W, H, calBox: config.stashCalibration || null }, [ab]); // transfer the ~8MB frame, no copy
+    // learned digit templates (see stash-teach-count) ride along so every read benefits
+    // from past corrections - the worker merges them into its bank for just this read
+    let learnedTemplates = null;
+    try { learnedTemplates = loadLearnedTemplates(); } catch { /* fresh install, none yet */ }
+    // per-slot cx/cy/size overrides from the in-app "align" tool (see stash-adjust-save) -
+    // keyed by tab, then apiId. The worker doesn't know the tab until it detects one, so
+    // the whole map rides along and it looks up its own tab's entry.
+    const slotOverrides = config.stashSlotOverrides || null;
+    w.postMessage({ bitmap: ab, W, H, calBox: config.stashCalibration || null, learnedTemplates, slotOverrides }, [ab]); // transfer the ~8MB frame, no copy
   });
+}
+
+function writeStashDebug(shot, res) {
+  if (app.isPackaged || !shot) return;
+  try {
+    const dir = path.join(app.getPath('userData'), 'stash-debug');
+    fs.mkdirSync(dir, { recursive: true });
+    const debugDirs = [dir];
+    try {
+      const mirrorDir = path.resolve(__dirname, '..', '..', 'outputs', 'stash-debug-live');
+      fs.mkdirSync(mirrorDir, { recursive: true });
+      debugDirs.push(mirrorDir);
+    } catch {}
+    const writeDebugFile = (name, data) => {
+      for (const outDir of debugDirs) {
+        try { fs.writeFileSync(path.join(outDir, name), data); } catch {}
+      }
+    };
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const box = res && res.box ? res.box : (config.stashCalibration || null);
+    const meta = {
+      at: new Date().toISOString(),
+      screen: { w: shot.W, h: shot.H },
+      calibrated: !!config.stashCalibration,
+      configBox: config.stashCalibration || null,
+      result: res || null,
+    };
+    writeDebugFile(`${stamp}.json`, JSON.stringify(meta, null, 2));
+    if (box && box.w > 0 && box.h > 0) {
+      const x = Math.max(0, Math.min(shot.W - 1, Math.round(box.x)));
+      const y = Math.max(0, Math.min(shot.H - 1, Math.round(box.y)));
+      const width = Math.max(1, Math.min(shot.W - x, Math.round(box.w)));
+      const height = Math.max(1, Math.min(shot.H - y, Math.round(box.h)));
+      const img = nativeImage.createFromBitmap(Buffer.from(shot.bitmap), { width: shot.W, height: shot.H });
+      const panelName = `${stamp}-panel.png`;
+      writeDebugFile(panelName, img.crop({ x, y, width, height }).toPNG());
+      try {
+        const tab = res && (res.tab || (res.detect && res.detect.tab));
+        const map = tab && TAB_MAPS[tab];
+        if (map && Array.isArray(map.STATIC_SLOTS)) {
+          const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (ch) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;',
+          }[ch]));
+          const reads = new Map(((res && res.reads) || []).map((r) => [r.apiId, r]));
+          const kx = width / REF_BOX.w;
+          const ky = height / REF_BOX.h;
+          // Match whatever the real reader uses for THIS tab - map.readParams (see
+          // runes-kalguuran-tab-map.js for another tab that overrides it) - rather than a
+          // hardcoded guess, so the debug boxes always show the box actually being read.
+          const DR = require('./renderer/stash/digit-reader.js');
+          const readP = map.readParams ? Object.assign({}, DR.DEFAULTS, map.readParams) : DR.DEFAULTS;
+          const strip = readP.stripWidth, up = readP.up, dn = readP.dn;
+          const slotRects = [];
+          // DEBUG: which template each accepted glyph came from and at what score - "why
+          // did it read THIS" instead of just "it read this". ~ marks a gap-filled glyph
+          // (no direct score - see digit-reader.js's gapFill).
+          const fmtGlyphs = (glyphs) => (glyphs || []).map((g) => (
+            g.gapFilled ? `${g.ch}@${g.source}~` : `${g.ch}@${g.source}:${Math.round((g.score || 0) * 100)}`
+          )).join(' ');
+          const parts = [
+            `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+            `<image href="${esc(panelName)}" x="0" y="0" width="${width}" height="${height}"/>`,
+            '<style>text{font:18px Consolas,monospace;font-weight:700;paint-order:stroke;stroke:#000;stroke-width:4px;stroke-linejoin:round}.ok{fill:#56e38a;stroke:#56e38a}.warn{fill:#ffd166;stroke:#ffd166}.bad{fill:#ff5f6d;stroke:#ff5f6d}.r{fill:none;stroke-width:2px}.c{stroke:#fff;stroke-width:1.5px}.dbg{font-size:13px;fill:#8fd0ff;stroke:#000;stroke-width:3px}.meta{font:14px Consolas,monospace;fill:#ffd166;stroke:#000;stroke-width:3px}</style>',
+            `<text class="meta" x="6" y="16">digitBank=${esc(res && res.digitBank || '?')} scale=${res && res.scale != null ? res.scale : '?'}</text>`,
+          ];
+          for (const s of map.STATIC_SLOTS) {
+            const r = reads.get(s.apiId) || {};
+            const cx = (s.cx - REF_BOX.x) * kx;
+            const cy = (s.cy - REF_BOX.y) * ky;
+            const rx = cx - strip * kx;
+            const ry = cy - up * ky;
+            const rw = strip * 2 * kx;
+            const rh = (up + dn) * ky;
+            const conf = typeof r.conf === 'number' ? r.conf : 0;
+            const cls = r.count == null ? 'bad' : (conf >= 0.80 ? 'ok' : (conf >= 0.65 ? 'warn' : 'bad'));
+            const label = `${s.apiId}: ${r.count == null ? '?' : r.count}${r.conf == null ? '' : ' ' + Math.round(r.conf * 100) + '%'}`;
+            const glyphLabel = fmtGlyphs(r.glyphs);
+            slotRects.push({ apiId: s.apiId, label, glyphLabel, cls, rx, ry, rw, rh, cxRef: s.cx, cyRef: s.cy });
+            parts.push(`<rect class="r ${cls}" x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" width="${rw.toFixed(1)}" height="${rh.toFixed(1)}"/>`);
+            parts.push(`<line class="c" x1="${(cx - 5).toFixed(1)}" y1="${cy.toFixed(1)}" x2="${(cx + 5).toFixed(1)}" y2="${cy.toFixed(1)}"/><line class="c" x1="${cx.toFixed(1)}" y1="${(cy - 5).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(cy + 5).toFixed(1)}"/>`);
+            parts.push(`<text class="${cls}" x="${Math.max(2, rx).toFixed(1)}" y="${Math.max(18, ry - 3).toFixed(1)}">${esc(label)}</text>`);
+            if (glyphLabel) parts.push(`<text class="dbg" x="${Math.max(2, rx).toFixed(1)}" y="${(ry + rh + 14).toFixed(1)}">${esc(glyphLabel)}</text>`);
+          }
+          parts.push('</svg>');
+          writeDebugFile(`${stamp}-slots.svg`, parts.join('\n'));
+          const scale = 3;
+          const colW = Math.ceil(strip * 2 * kx * scale) + 360;
+          const rowH = Math.ceil((up + dn) * ky * scale) + 34;
+          const cols = 2;
+          const sheetW = colW * cols;
+          const sheetH = Math.ceil(slotRects.length / cols) * rowH + 12;
+          const sheet = [
+            `<svg xmlns="http://www.w3.org/2000/svg" width="${sheetW}" height="${sheetH}" viewBox="0 0 ${sheetW} ${sheetH}">`,
+            '<style>svg{background:#111}text{font:18px Consolas,monospace;font-weight:700;fill:#eee}.ok{stroke:#56e38a;fill:#56e38a}.warn{stroke:#ffd166;fill:#ffd166}.bad{stroke:#ff5f6d;fill:#ff5f6d}.box{fill:none;stroke-width:2px}.dbg{font-size:13px;fill:#8fd0ff}</style>',
+            `<text class="dbg" x="8" y="${sheetH - 6}">digitBank=${esc(res && res.digitBank || '?')} scale=${res && res.scale != null ? res.scale : '?'}</text>`,
+          ];
+          slotRects.forEach((r, i) => {
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+            const x0 = col * colW + 8;
+            const y0 = row * rowH + 8;
+            const cropW = r.rw * scale;
+            const cropH = r.rh * scale;
+            const clip = `clip${i}`;
+            sheet.push(`<clipPath id="${clip}"><rect x="${x0}" y="${y0}" width="${cropW.toFixed(1)}" height="${cropH.toFixed(1)}"/></clipPath>`);
+            sheet.push(`<image href="${esc(panelName)}" x="${(x0 - r.rx * scale).toFixed(1)}" y="${(y0 - r.ry * scale).toFixed(1)}" width="${(width * scale).toFixed(1)}" height="${(height * scale).toFixed(1)}" clip-path="url(#${clip})"/>`);
+            sheet.push(`<rect class="box ${r.cls}" x="${x0}" y="${y0}" width="${cropW.toFixed(1)}" height="${cropH.toFixed(1)}"/>`);
+            sheet.push(`<text class="${r.cls}" x="${(x0 + cropW + 10).toFixed(1)}" y="${(y0 + 24).toFixed(1)}">${esc(r.label)}</text>`);
+            if (r.glyphLabel) sheet.push(`<text class="dbg" x="${(x0 + cropW + 10).toFixed(1)}" y="${(y0 + 44).toFixed(1)}">${esc(r.glyphLabel)}</text>`);
+          });
+          sheet.push('</svg>');
+          writeDebugFile(`${stamp}-strips.svg`, sheet.join('\n'));
+          const adjustData = slotRects.map((r) => ({
+            apiId: r.apiId,
+            label: r.label,
+            cls: r.cls,
+            x: +r.rx.toFixed(2),
+            y: +r.ry.toFixed(2),
+            w: +r.rw.toFixed(2),
+            h: +r.rh.toFixed(2),
+            cxRef: r.cxRef,
+            cyRef: r.cyRef,
+          }));
+          const adjustHtml = `<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<title>POE2 Prices Stash OCR Adjust ${esc(stamp)}</title>
+<style>
+html,body{margin:0;background:#111;color:#eee;font-family:system-ui,Segoe UI,Arial,sans-serif}
+#bar{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;padding:10px;background:#181818;border-bottom:1px solid #444;flex-wrap:wrap}
+button{background:#d99a42;color:#17120b;border:0;border-radius:6px;padding:8px 12px;font-weight:700;cursor:pointer}
+#hint{font-size:13px;color:#cfc3aa}
+#sizebox{display:flex;gap:6px;align-items:center;font-size:13px;color:#cfc3aa}
+#sizebox input{width:64px;background:#0b0b0b;color:#ddd;border:1px solid #555;border-radius:6px;padding:5px 6px;font:12px Consolas,monospace}
+#wrap{position:relative;width:${width}px;height:${height}px;margin:12px}
+#panel{position:absolute;inset:0;width:${width}px;height:${height}px}
+.box{position:absolute;box-sizing:border-box;border:2px solid #ff5f6d;background:rgba(255,95,109,.06);cursor:move}
+.box.warn{border-color:#ffd166;background:rgba(255,209,102,.06)}
+.box.ok{border-color:#56e38a;background:rgba(86,227,138,.06)}
+.box.sel{outline:2px solid #fff;z-index:3}
+.box .t{position:absolute;left:0;top:-22px;white-space:nowrap;font:700 16px Consolas,monospace;color:inherit;text-shadow:0 0 4px #000,0 0 4px #000}
+textarea{width:720px;max-width:45vw;height:74px;background:#0b0b0b;color:#ddd;border:1px solid #555;border-radius:6px;padding:8px;font:12px Consolas,monospace}
+</style>
+<div id="bar">
+  <button id="copy">Deltas kopieren</button>
+  <button id="reset">Reset</button>
+  <div id="sizebox">
+    <label>Breite <input id="gw" type="number" step="1"></label>
+    <label>Höhe <input id="gh" type="number" step="1"></label>
+  </div>
+  <span id="hint">Ziehen = verschieben (alle Kästchen sind gleich groß). Breite/Höhe oben = Größe für ALLE Kästchen auf einmal, Mittelpunkt bleibt erhalten. Pfeiltasten = 1px verschieben, Shift+Pfeil = 5px verschieben. Danach Deltas kopieren und an Codex schicken.</span>
+  <textarea id="out" readonly></textarea>
+</div>
+<div id="wrap"><img id="panel" src="${esc(panelName)}"></div>
+<script>
+const REF_BOX = ${JSON.stringify(REF_BOX)};
+const WIDTH = ${width};
+const HEIGHT = ${height};
+const KX = WIDTH / REF_BOX.w;
+const KY = HEIGHT / REF_BOX.h;
+const DATA = ${JSON.stringify(adjustData).replace(/</g, '\\u003c')};
+const wrap = document.getElementById('wrap');
+const out = document.getElementById('out');
+const gwInput = document.getElementById('gw'), ghInput = document.getElementById('gh');
+let selected = null;
+let drag = null;
+function clsColor(c){ return c === 'ok' ? '#56e38a' : c === 'warn' ? '#ffd166' : '#ff5f6d'; }
+function place(el, r){
+  el.style.left = r.x + 'px'; el.style.top = r.y + 'px';
+  el.style.width = r.w + 'px'; el.style.height = r.h + 'px';
+}
+function emit(){
+  const deltas = {};
+  for (const r of DATA) {
+    const cx = REF_BOX.x + (r.x + r.w / 2) / KX;
+    const cy = REF_BOX.y + (r.y + r.h / 2) / KY;
+    const stripWidth = (r.w / KX) / 2;
+    const up = (r.h / KY) / 2;
+    const dn = up;
+    deltas[r.apiId] = {
+      dx: +(cx - r.cxRef).toFixed(2),
+      dy: +(cy - r.cyRef).toFixed(2),
+      cx: +cx.toFixed(2),
+      cy: +cy.toFixed(2),
+      stripWidth: +stripWidth.toFixed(2),
+      up: +up.toFixed(2),
+      dn: +dn.toFixed(2)
+    };
+  }
+  out.value = JSON.stringify(deltas, null, 2);
+}
+function select(el){
+  document.querySelectorAll('.box.sel').forEach(x => x.classList.remove('sel'));
+  selected = el; if (el) el.classList.add('sel');
+}
+// One shared size for every box - the real reader applies a single strip/up/dn to every
+// currency slot (see the 'strip = 17, up = 12, dn = 12' constants above), only the
+// CENTER differs per item. Resizing here always moves every box together and keeps each
+// one centered where it already was, so a per-item size this tool could produce but the
+// reader can never use isn't possible to create by accident.
+function setGlobalSize(w, h){
+  w = Math.max(12, w); h = Math.max(12, h);
+  for (const r of DATA) {
+    const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+    r.w = w; r.h = h;
+    r.x = cx - w / 2; r.y = cy - h / 2;
+  }
+  document.querySelectorAll('.box').forEach((el) => place(el, DATA[+el.dataset.i]));
+  gwInput.value = Math.round(w); ghInput.value = Math.round(h);
+  emit();
+}
+gwInput.addEventListener('input', () => setGlobalSize(+gwInput.value || DATA[0].w, DATA[0].h));
+ghInput.addEventListener('input', () => setGlobalSize(DATA[0].w, +ghInput.value || DATA[0].h));
+DATA.forEach((r, i) => {
+  const el = document.createElement('div');
+  el.className = 'box ' + r.cls;
+  el.dataset.i = i;
+  el.style.color = clsColor(r.cls);
+  el.innerHTML = '<div class="t">' + r.label.replace(/[&<>]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch])) + '</div>';
+  place(el, r);
+  el.addEventListener('pointerdown', (ev) => {
+    select(el); el.setPointerCapture(ev.pointerId);
+    drag = { i, sx: ev.clientX, sy: ev.clientY, x: r.x, y: r.y };
+    ev.preventDefault();
+  });
+  el.addEventListener('pointermove', (ev) => {
+    if (!drag || drag.i !== i) return;
+    r.x = drag.x + (ev.clientX - drag.sx);
+    r.y = drag.y + (ev.clientY - drag.sy);
+    place(el, r); emit();
+  });
+  el.addEventListener('pointerup', () => { drag = null; emit(); });
+  wrap.appendChild(el);
+});
+document.addEventListener('keydown', (ev) => {
+  if (!selected) return;
+  const i = +selected.dataset.i, r = DATA[i];
+  const n = ev.shiftKey ? 5 : 1;
+  let dx = 0, dy = 0;
+  if (ev.key === 'ArrowLeft') dx = -n;
+  else if (ev.key === 'ArrowRight') dx = n;
+  else if (ev.key === 'ArrowUp') dy = -n;
+  else if (ev.key === 'ArrowDown') dy = n;
+  else return;
+  r.x += dx; r.y += dy;
+  place(selected, r); emit(); ev.preventDefault();
+});
+document.getElementById('copy').onclick = async () => {
+  emit();
+  try { await navigator.clipboard.writeText(out.value); } catch {}
+};
+document.getElementById('reset').onclick = () => location.reload();
+select(document.querySelector('.box'));
+gwInput.value = Math.round(DATA[0].w); ghInput.value = Math.round(DATA[0].h);
+emit();
+</script>
+</html>`;
+          writeDebugFile(`${stamp}-adjust.html`, adjustHtml);
+        }
+      } catch {}
+    }
+  } catch {}
 }
 
 // Grabbing hides the overlay for ~70ms, so grabs must not overlap - but a grab is fast
@@ -1704,7 +2042,7 @@ async function grabStashFrame() {
     if (process.platform !== 'win32' && win && !win.isDestroyed()) {
       try { win.webContents.setBackgroundThrottling(false); } catch { }
     }
-    const disp = screen.getPrimaryDisplay();
+    const disp = repriceDisplay();
     const cw = Math.round(disp.size.width * disp.scaleFactor);
     const ch = Math.round(disp.size.height * disp.scaleFactor);
     if (wasVisible) { win.setOpacity(0); if (process.platform !== 'win32') win.hide(); await new Promise((r) => setTimeout(r, 70)); }
@@ -1718,14 +2056,517 @@ async function grabStashFrame() {
   }
 }
 
+// Learn from a user's correction (Net Worth's click-to-edit-count): re-extract the
+// digit glyphs from the LAST capture of this tab at this slot's position, pair them
+// with the value the user says is actually there, and fold them into a per-install
+// template store. See reader-worker.js's comment on why a single capture's exemplars
+// don't generalise across sessions - many real corrections, over time, should. Never
+// touches the app's own shipped digit-templates.json; lives in userData instead.
+const lastCaptureByTab = new Map();
+function learnedTemplatesFile() { return path.join(app.getPath('userData'), 'learned-digit-templates.json'); }
+function loadLearnedTemplates() {
+  try { return JSON.parse(fs.readFileSync(learnedTemplatesFile(), 'utf8')); }
+  catch { return { exemplars: {}, templates: {} }; }
+}
+function saveLearnedTemplates(data) {
+  try { fs.writeFileSync(learnedTemplatesFile(), JSON.stringify(data)); }
+  catch (err) { logToggle('stash-learn', 'save failed: ' + (err && err.message || err)); }
+}
+const MAX_EXEMPLARS_PER_DIGIT = 30; // bounded so the file doesn't grow forever
+// Shared by stash-teach-count, stash-slot-debug-image: which recent capture actually has
+// this apiId, and where its slot sits in that map.
+function findTabSlot(apiId) {
+  for (const [name, cap] of lastCaptureByTab) {
+    const map = TAB_MAPS[name];
+    const s = map && map.STATIC_SLOTS && map.STATIC_SLOTS.find((x) => x.apiId === apiId);
+    if (s) return { tab: name, slot: s, cap };
+  }
+  return null;
+}
+ipcMain.handle('stash-teach-count', (_e, { apiId, value } = {}) => {
+  try {
+    value = String(value == null ? '' : value).replace(/[^0-9]/g, '');
+    if (!value) return { ok: false, reason: 'empty' };
+    const found = findTabSlot(apiId);
+    if (!found) return { ok: false, reason: 'no-recent-capture' };
+    const { tab, slot, cap } = found;
+    const DR = require('./renderer/stash/digit-reader.js');
+    const TD = require('./renderer/stash/tab-detect.js');
+    const TT = require('./renderer/stash/tab-templates.json');
+    const refBox = TT.box;
+    const scale = cap.box.h / refBox.h;
+    const V = DR.valueChannelDesatMax(Buffer.from(cap.bitmap), cap.W, cap.H);
+    const pos = TD.scalePos(slot.cx, slot.cy, refBox, cap.box);
+    const { binarized } = DR.debugShrunkCell(V, cap.W, cap.H, pos.cx, pos.cy, DR.DEFAULTS, scale);
+    const comps = DR.components(binarized).sort((a, b) => a.x - b.x);
+    if (comps.length !== value.length) {
+      logToggle('stash-learn', `skip "${value}" for ${apiId}: found ${comps.length} glyph(s), expected ${value.length}`);
+      return { ok: false, reason: 'segment-mismatch', found: comps.length, want: value.length };
+    }
+
+    const learned = loadLearnedTemplates();
+    learned.exemplars = learned.exemplars || {};
+    // Re-crop each glyph centred on the strip's own vertical middle, NOT on the
+    // component's natural ink bounding box. readCellEx's slideMatch always searches a
+    // window built around Hd/2 (+/- a few px of dy jitter) - it has no idea a template
+    // came from further off-centre than that. A template cut from wherever the ink
+    // actually sat therefore only self-matches at whatever dy happens to reach it, which
+    // for anything more than 2-3px off centre scores far below 1.0 even against the exact
+    // frame it was cut from (measured: 0.46, not ~1.0). Anchoring the crop to Hd/2 instead
+    // makes the saved template line up with dy=0 in the very same search that will use it.
+    const Hd = binarized.h;
+    comps.forEach((c, i) => {
+      const ch = value[i];
+      const bw = c.mask.w, bh = c.mask.h;
+      const yStart = (Hd >> 1) - (bh >> 1);
+      const mask = new Uint8Array(bw * bh);
+      for (let ty = 0; ty < bh; ty++) {
+        const sy = yStart + ty;
+        if (sy < 0 || sy >= binarized.h) continue;
+        for (let tx = 0; tx < bw; tx++) {
+          const sx = c.x + tx;
+          if (sx < 0 || sx >= binarized.w) continue;
+          mask[ty * bw + tx] = binarized.data[sy * binarized.w + sx];
+        }
+      }
+      const arr = learned.exemplars[ch] || (learned.exemplars[ch] = []);
+      arr.push({ w: bw, h: bh, data: Array.from(mask) });
+      if (arr.length > MAX_EXEMPLARS_PER_DIGIT) arr.shift(); // oldest out, so it keeps drifting with reality
+    });
+    // recompute each touched digit's representative the same way extractTemplates does:
+    // the median-ink exemplar, so one odd/noisy correction can't dominate the template
+    learned.templates = learned.templates || {};
+    for (const ch of new Set(value.split(''))) {
+      const glyphs = learned.exemplars[ch];
+      const inks = glyphs.map((g, i) => ({ ink: g.data.reduce((a, b) => a + b, 0), i }));
+      inks.sort((a, b) => (a.ink - b.ink) || (a.i - b.i));
+      learned.templates[ch] = glyphs[inks[Math.floor(glyphs.length / 2)].i];
+    }
+    saveLearnedTemplates(learned);
+    logToggle('stash-learn', `taught "${value}" for ${apiId} (${tab}) - ${comps.length} glyph(s), ${Object.keys(learned.templates).length} digit(s) known`);
+    return { ok: true, digits: comps.length };
+  } catch (err) {
+    logToggle('stash-learn', 'ERROR ' + (err && err.message || err));
+    return { ok: false, reason: 'error', error: String(err && err.message || err) };
+  }
+});
+
+// The "show me the material" tool the OCR debug toggle uses - the exact same crop the
+// reader itself worked from (native, upscaled for visibility) and the binarized version
+// it actually template-matched against, so a problem slot can be judged by eye instead of
+// guessed at from the number alone.
+ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
+  try {
+    const found = findTabSlot(apiId);
+    if (!found) return { ok: false, reason: 'no-recent-capture' };
+    const { tab, slot, cap } = found;
+    const map = TAB_MAPS[tab];
+    const DR = require('./renderer/stash/digit-reader.js');
+    const TD = require('./renderer/stash/tab-detect.js');
+    const TT = require('./renderer/stash/tab-templates.json');
+    const refBox = TT.box;
+    const scale = cap.box.h / refBox.h;
+    const ov = (config.stashSlotOverrides && config.stashSlotOverrides[tab] && config.stashSlotOverrides[tab][apiId]) || null;
+    const sx = ov && ov.cx != null ? ov.cx : slot.cx, sy = ov && ov.cy != null ? ov.cy : slot.cy;
+    const pos = TD.scalePos(sx, sy, refBox, cap.box);
+    const base = map && map.readParams ? Object.assign({}, DR.DEFAULTS, map.readParams) : DR.DEFAULTS;
+    const P = Object.assign({}, base, {
+      stripWidth: ov && ov.stripWidth != null ? ov.stripWidth : base.stripWidth,
+      up: ov && ov.up != null ? ov.up : base.up,
+      dn: ov && ov.dn != null ? ov.dn : base.dn,
+      stripLeft: ov && ov.stripLeft != null ? ov.stripLeft : undefined,
+      stripRight: ov && ov.stripRight != null ? ov.stripRight : undefined,
+    });
+    // the floor/right-edge being PREVIEWED: an explicit slider value while dragging, else
+    // this slot's saved pin if it has one, else the default (floor: the adaptive sweep's
+    // starting point, only a representative single-floor view since a live read with no
+    // pin actually sweeps several and keeps whichever wins; stripRight: symmetric, i.e.
+    // today's box, same as everyone else's).
+    const floor = (opts && opts.floor != null) ? Math.round(opts.floor) : (ov && ov.floor != null ? ov.floor : P.floor);
+    const stripRight = (opts && opts.stripRight != null) ? opts.stripRight : (P.stripRight != null ? P.stripRight : P.stripWidth);
+    const Pf = Object.assign({}, P, { floor, stripRight });
+    const UPSCALE = 6;
+    // native crop, generously padded, for a "does this even look like the number" gut
+    // check - AT THE PREVIEWED stripRight, so a trimmed box's raw view matches what the
+    // binarized view below is actually built from, not the untrimmed default.
+    const stripLeft = P.stripLeft != null ? P.stripLeft : P.stripWidth;
+    const nativeL = Math.round(stripLeft * scale), nativeR = Math.round(stripRight * scale);
+    const nativeUp = Math.round(P.up * scale), nativeDn = Math.round(P.dn * scale);
+    const img = nativeImage.createFromBitmap(Buffer.from(cap.bitmap), { width: cap.W, height: cap.H });
+    const cropRect = {
+      x: Math.max(0, Math.round(pos.cx - nativeL)), y: Math.max(0, Math.round(pos.cy - nativeUp)),
+      width: Math.min(cap.W, nativeL + nativeR), height: Math.min(cap.H, nativeUp + nativeDn),
+    };
+    const rawUrl = img.crop(cropRect)
+      .resize({ width: cropRect.width * UPSCALE, height: cropRect.height * UPSCALE, quality: 'good' })
+      .toDataURL();
+    // the binarized cell, i.e. what slideMatch actually compares templates against, AT
+    // THE PREVIEWED FLOOR/EDGE/SATURATION - not necessarily what a live read would settle on
+    const desatSat = (opts && opts.desatSat != null) ? Math.round(opts.desatSat)
+      : (ov && ov.desatSat != null ? ov.desatSat : DR.DESAT_SAT);
+    const V = DR.valueChannelDesatMax(Buffer.from(cap.bitmap), cap.W, cap.H, desatSat);
+    const { binarized } = DR.debugShrunkCell(V, cap.W, cap.H, pos.cx, pos.cy, Pf, scale);
+    const binBuf = Buffer.alloc(binarized.w * binarized.h * 4);
+    for (let i = 0; i < binarized.w * binarized.h; i++) {
+      const v = binarized.data[i] ? 255 : 0;
+      binBuf[i * 4] = v; binBuf[i * 4 + 1] = v; binBuf[i * 4 + 2] = v; binBuf[i * 4 + 3] = 255;
+    }
+    const binUrl = nativeImage.createFromBitmap(binBuf, { width: binarized.w, height: binarized.h })
+      .resize({ width: binarized.w * UPSCALE, height: binarized.h * UPSCALE, quality: 'good' })
+      .toDataURL();
+    // what THIS floor alone reads, so the slider gives immediate right/wrong feedback
+    // instead of just a cleaner-looking image that may or may not read any better
+    let RAW = require('./renderer/stash/digit-templates.json');
+    const bankInfo = DR.bankFromJSON(RAW);
+    const cellScale = scale > 1.5 || scale < 1 / 1.5 ? scale : 1;
+    const preview = DR.readCellEx(V, cap.W, cap.H, pos.cx, pos.cy, bankInfo.bank, Pf, cellScale);
+    const previewText = preview.text === '?' ? '?' : [...preview.text].map(bankInfo.unmap).join('');
+    return {
+      ok: true, rawUrl, binUrl, floor, pinned: !!(ov && ov.floor != null),
+      stripRight, stripRightPinned: !!(ov && ov.stripRight != null), stripWidth: P.stripWidth,
+      desatSat, desatSatPinned: !!(ov && ov.desatSat != null),
+      preview: { text: previewText, conf: preview.conf },
+    };
+  } catch (err) {
+    return { ok: false, reason: 'error', error: String(err && err.message || err) };
+  }
+});
+
+// "Vorlage vergessen": a bad correction can poison a digit's learned templates the same
+// way a bad capture poisoned the shipped ones once (see the multi-rendering bank's whole
+// design) - this is the one-way-out. Scoped to the digits actually involved in the
+// problem being looked at, not a blanket wipe, so fixing one bad "6" doesn't also throw
+// away a dozen good "1" exemplars learned from other slots.
+ipcMain.handle('stash-forget-digits', (_e, { digits } = {}) => {
+  try {
+    const chars = String(digits == null ? '' : digits).replace(/[^0-9]/g, '').split('');
+    if (!chars.length) return { ok: false, reason: 'empty' };
+    const learned = loadLearnedTemplates();
+    learned.exemplars = learned.exemplars || {}; learned.templates = learned.templates || {};
+    let removed = 0;
+    for (const ch of new Set(chars)) {
+      if (learned.exemplars[ch]) { removed += learned.exemplars[ch].length; delete learned.exemplars[ch]; }
+      delete learned.templates[ch];
+    }
+    saveLearnedTemplates(learned);
+    logToggle('stash-learn', `forgot ${[...new Set(chars)].join(',')} - ${removed} exemplar(s) removed`);
+    return { ok: true, removed };
+  } catch (err) {
+    return { ok: false, reason: 'error', error: String(err && err.message || err) };
+  }
+});
+
+// ---------- in-app slot alignment ("Ausrichten") ----------
+// The same drag-to-fix tool the dev-only stash-debug-live writer has produced for a
+// while (see writeStashDebug's adjustHtml below) - copy-deltas-to-clipboard-and-hand-
+// them-to-a-dev doesn't scale past one machine. This opens the same tool as a real
+// window, and "save" writes straight into config instead of the clipboard, so anyone
+// whose setup misreads a slot can fix it themselves.
+let adjustWin = null;
+function closeAdjustWin() { try { if (adjustWin && !adjustWin.isDestroyed()) adjustWin.close(); } catch {} adjustWin = null; }
+
+function buildAdjustSlotData(tab, cap) {
+  const map = TAB_MAPS[tab];
+  if (!map || !Array.isArray(map.STATIC_SLOTS)) return null;
+  const TT = require('./renderer/stash/tab-templates.json');
+  const refBox = TT.box;
+  const x = Math.max(0, Math.min(cap.W - 1, Math.round(cap.box.x)));
+  const y = Math.max(0, Math.min(cap.H - 1, Math.round(cap.box.y)));
+  const width = Math.max(1, Math.min(cap.W - x, Math.round(cap.box.w)));
+  const height = Math.max(1, Math.min(cap.H - y, Math.round(cap.box.h)));
+  const kx = width / refBox.w, ky = height / refBox.h;
+  const DR = require('./renderer/stash/digit-reader.js');
+  const readP = map.readParams ? Object.assign({}, DR.DEFAULTS, map.readParams) : DR.DEFAULTS;
+  const existing = (config.stashSlotOverrides && config.stashSlotOverrides[tab]) || {};
+  const reads = new Map(((cap.res && cap.res.reads) || []).map((r) => [r.apiId, r]));
+  const rows = [];
+  for (const s of map.STATIC_SLOTS) {
+    const r = reads.get(s.apiId) || {};
+    const conf = typeof r.conf === 'number' ? r.conf : 0;
+    const cls = r.count == null ? 'bad' : (conf >= 0.80 ? 'ok' : (conf >= 0.65 ? 'warn' : 'bad'));
+    // Good slots ride along too (tagged 'ok'), hidden by default in the tool - a global
+    // resize (the width/height fields) moves EVERY box together, so shrinking it to stop
+    // a bad slot's box reaching into its icon also needs to know where the good ones
+    // already sit, or the same drag could push a currently-fine slot's box off the count.
+    const ov = existing[s.apiId];
+    const sCx = ov ? ov.cx : s.cx, sCy = ov ? ov.cy : s.cy;
+    const strip = ov && ov.stripWidth != null ? ov.stripWidth : readP.stripWidth;
+    const up = ov && ov.up != null ? ov.up : readP.up;
+    const dn = ov && ov.dn != null ? ov.dn : readP.dn;
+    const cx = (sCx - refBox.x) * kx, cy = (sCy - refBox.y) * ky;
+    const label = `${s.apiId}: ${r.count == null ? '?' : r.count}${r.conf == null ? '' : ' ' + Math.round(r.conf * 100) + '%'}`;
+    rows.push({
+      apiId: s.apiId, label, cls,
+      x: +(cx - strip * kx).toFixed(2), y: +(cy - up * ky).toFixed(2),
+      w: +(strip * 2 * kx).toFixed(2), h: +((up + dn) * ky).toFixed(2),
+      cxRef: s.cx, cyRef: s.cy,
+    });
+  }
+  if (!rows.length) return { ok: true, rows: [], width, height, refBox, x, y };
+  const img = nativeImage.createFromBitmap(Buffer.from(cap.bitmap), { width: cap.W, height: cap.H });
+  const panelPng = img.crop({ x, y, width, height }).toPNG();
+  return { ok: true, rows, width, height, refBox, panelBase64: panelPng.toString('base64') };
+}
+
+function buildAdjustWindowHtml(tab, data) {
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;',
+  }[ch]));
+  return `<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<title>Zahlenfelder ausrichten</title>
+<style>
+html,body{margin:0;background:#111;color:#eee;font-family:system-ui,Segoe UI,Arial,sans-serif}
+#bar{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;padding:10px;background:#181818;border-bottom:1px solid #444;flex-wrap:wrap}
+button{background:#d99a42;color:#17120b;border:0;border-radius:6px;padding:8px 12px;font-weight:700;cursor:pointer}
+button#save{background:#56e38a}
+button#cancel{background:#3a3a3a;color:#eee}
+#hint{font-size:13px;color:#cfc3aa;flex:1 1 260px}
+#sizebox{display:flex;gap:6px;align-items:center;font-size:13px;color:#cfc3aa}
+#sizebox input{width:64px;background:#0b0b0b;color:#ddd;border:1px solid #555;border-radius:6px;padding:5px 6px;font:12px Consolas,monospace}
+#wrap{position:relative;width:${data.width}px;height:${data.height}px;margin:12px}
+#panel{position:absolute;inset:0;width:${data.width}px;height:${data.height}px}
+.box{position:absolute;box-sizing:border-box;border:2px solid #ff5f6d;background:rgba(255,95,109,.10);cursor:move}
+.box.warn{border-color:#ffd166;background:rgba(255,209,102,.10)}
+.box.ok{border-color:#56e38a;background:rgba(86,227,138,.10)}
+#wrap.hide-ok .box.ok{display:none}
+.box.sel{outline:2px solid #fff;z-index:3}
+.box .t{position:absolute;left:0;top:-22px;white-space:nowrap;font:700 16px Consolas,monospace;color:inherit;text-shadow:0 0 4px #000,0 0 4px #000}
+#toggleok{display:flex;align-items:center;gap:5px;font-size:13px;color:#cfc3aa}
+</style>
+<div id="bar">
+  <button id="save">Speichern &amp; übernehmen</button>
+  <button id="cancel">Abbrechen</button>
+  <button id="copy">Deltas kopieren</button>
+  <div id="sizebox">
+    <label>Breite <input id="gw" type="number" step="1"></label>
+    <label>Höhe <input id="gh" type="number" step="1"></label>
+  </div>
+  <label id="toggleok"><input id="showok" type="checkbox"> auch gute Felder zeigen</label>
+  <span id="hint">Nur unsichere/falsche Felder werden standardmäßig gezeigt. Ziehen = verschieben, Pfeiltasten = 1px, Shift+Pfeil = 5px. Breite/Höhe = Größe für ALLE Kästchen auf einmal (auch die ausgeblendeten guten).</span>
+</div>
+<div id="wrap" class="hide-ok"><img id="panel" src="data:image/png;base64,${data.panelBase64}"></div>
+<script>
+const REF_BOX = ${JSON.stringify(data.refBox)};
+const WIDTH = ${data.width};
+const HEIGHT = ${data.height};
+const KX = WIDTH / REF_BOX.w;
+const KY = HEIGHT / REF_BOX.h;
+const TAB = ${JSON.stringify(tab)};
+const DATA = ${JSON.stringify(data.rows).replace(/</g, '\\u003c')};
+const wrap = document.getElementById('wrap');
+const gwInput = document.getElementById('gw'), ghInput = document.getElementById('gh');
+let selected = null;
+let drag = null;
+function place(el, r){
+  el.style.left = r.x + 'px'; el.style.top = r.y + 'px';
+  el.style.width = r.w + 'px'; el.style.height = r.h + 'px';
+}
+function deltas(){
+  const out = {};
+  for (const r of DATA) {
+    const cx = REF_BOX.x + (r.x + r.w / 2) / KX;
+    const cy = REF_BOX.y + (r.y + r.h / 2) / KY;
+    const stripWidth = (r.w / KX) / 2;
+    const up = (r.h / KY) / 2;
+    out[r.apiId] = { cx: +cx.toFixed(2), cy: +cy.toFixed(2), stripWidth: +stripWidth.toFixed(2), up: +up.toFixed(2), dn: +up.toFixed(2) };
+  }
+  return out;
+}
+function select(el){
+  document.querySelectorAll('.box.sel').forEach(x => x.classList.remove('sel'));
+  selected = el; if (el) el.classList.add('sel');
+}
+// One shared size for every box, same reasoning as the dev tool this is built on: the
+// real reader applies a single strip/up/dn per tab, only the CENTER differs per slot.
+function setGlobalSize(w, h){
+  w = Math.max(12, w); h = Math.max(12, h);
+  for (const r of DATA) {
+    const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+    r.w = w; r.h = h;
+    r.x = cx - w / 2; r.y = cy - h / 2;
+  }
+  document.querySelectorAll('.box').forEach((el) => place(el, DATA[+el.dataset.i]));
+  gwInput.value = Math.round(w); ghInput.value = Math.round(h);
+}
+gwInput.addEventListener('input', () => setGlobalSize(+gwInput.value || DATA[0].w, DATA[0].h));
+ghInput.addEventListener('input', () => setGlobalSize(DATA[0].w, +ghInput.value || DATA[0].h));
+DATA.forEach((r, i) => {
+  const el = document.createElement('div');
+  el.className = 'box ' + r.cls;
+  el.dataset.i = i;
+  el.innerHTML = '<div class="t">' + r.label.replace(/[&<>]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch])) + '</div>';
+  place(el, r);
+  el.addEventListener('pointerdown', (ev) => {
+    select(el); el.setPointerCapture(ev.pointerId);
+    drag = { i, sx: ev.clientX, sy: ev.clientY, x: r.x, y: r.y };
+    ev.preventDefault();
+  });
+  el.addEventListener('pointermove', (ev) => {
+    if (!drag || drag.i !== i) return;
+    r.x = drag.x + (ev.clientX - drag.sx);
+    r.y = drag.y + (ev.clientY - drag.sy);
+    place(el, r);
+  });
+  el.addEventListener('pointerup', () => { drag = null; });
+  wrap.appendChild(el);
+});
+document.addEventListener('keydown', (ev) => {
+  if (!selected) return;
+  const i = +selected.dataset.i, r = DATA[i];
+  const n = ev.shiftKey ? 5 : 1;
+  let dx = 0, dy = 0;
+  if (ev.key === 'ArrowLeft') dx = -n;
+  else if (ev.key === 'ArrowRight') dx = n;
+  else if (ev.key === 'ArrowUp') dy = -n;
+  else if (ev.key === 'ArrowDown') dy = n;
+  else return;
+  r.x += dx; r.y += dy;
+  place(selected, r); ev.preventDefault();
+});
+document.getElementById('copy').onclick = async () => {
+  try { await navigator.clipboard.writeText(JSON.stringify(deltas(), null, 2)); } catch {}
+};
+document.getElementById('cancel').onclick = () => window.adjustApi.close();
+document.getElementById('save').onclick = () => window.adjustApi.save({ tab: TAB, deltas: deltas() });
+document.getElementById('showok').addEventListener('change', (ev) => wrap.classList.toggle('hide-ok', !ev.target.checked));
+if (DATA.length) select(document.querySelector('.box:not(.ok)') || document.querySelector('.box'));
+gwInput.value = DATA.length ? Math.round(DATA[0].w) : 0;
+ghInput.value = DATA.length ? Math.round(DATA[0].h) : 0;
+</script>
+</html>`;
+}
+
+ipcMain.handle('stash-adjust-open', (_e, tab) => {
+  try {
+    const cap = lastCaptureByTab.get(tab);
+    if (!cap) return { ok: false, reason: 'no-recent-capture' };
+    const data = buildAdjustSlotData(tab, cap);
+    if (!data || !data.rows.length) return { ok: false, reason: 'nothing-to-adjust' };
+    closeAdjustWin();
+    adjustWin = new BrowserWindow({
+      width: Math.min(1500, data.width + 60), height: Math.min(1000, data.height + 140),
+      title: 'Zahlenfelder ausrichten', autoHideMenuBar: true,
+      webPreferences: { preload: path.join(__dirname, 'renderer', 'stash', 'adjust-preload.js'), contextIsolation: true, nodeIntegration: false },
+    });
+    adjustWin.on('closed', () => { adjustWin = null; });
+    const tmpFile = path.join(app.getPath('userData'), 'stash-adjust.html');
+    fs.writeFileSync(tmpFile, buildAdjustWindowHtml(tab, data));
+    adjustWin.loadFile(tmpFile);
+    return { ok: true, count: data.rows.length };
+  } catch (err) {
+    return { ok: false, reason: 'error', error: String(err && err.message || err) };
+  }
+});
+ipcMain.on('stash-adjust-close', () => closeAdjustWin());
+// Per-apiId merge, not a per-tab replace: stash-adjust-save sends a full {cx,cy,
+// stripWidth,up,dn} for every slot it touches, but stash-slot-set-floor sends only
+// {floor} - a flat Object.assign at the tab level would let a floor-only save silently
+// wipe out a previously-saved position fix for the same slot (and vice versa).
+function mergeSlotOverrides(tab, deltas) {
+  config.stashSlotOverrides = config.stashSlotOverrides || {};
+  config.stashSlotOverrides[tab] = config.stashSlotOverrides[tab] || {};
+  for (const apiId of Object.keys(deltas)) {
+    config.stashSlotOverrides[tab][apiId] = Object.assign({}, config.stashSlotOverrides[tab][apiId], deltas[apiId]);
+  }
+  saveConfig();
+}
+ipcMain.handle('stash-adjust-save', (_e, { tab, deltas } = {}) => {
+  try {
+    if (!tab || !deltas) return { ok: false };
+    mergeSlotOverrides(tab, deltas);
+    closeAdjustWin();
+    logToggle('stash-learn', `alignment saved for ${tab}: ${Object.keys(deltas).length} slot(s)`);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message || err) };
+  }
+});
+// The OCR-debug panel's floor slider: pin ONE binarisation threshold for this exact slot
+// instead of trusting the adaptive sweep, for the cases (bright background art) where the
+// sweep's own confidence measure is what is being fooled - see reader-worker.js.
+ipcMain.handle('stash-slot-set-floor', (_e, { apiId, floor } = {}) => {
+  try {
+    const found = findTabSlot(apiId);
+    if (!found) return { ok: false, reason: 'no-recent-capture' };
+    if (floor == null) {
+      // clear: drop back to the adaptive sweep
+      const cur = config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId];
+      if (cur) delete cur.floor;
+    } else {
+      mergeSlotOverrides(found.tab, { [apiId]: { floor: Math.round(floor) } });
+    }
+    saveConfig();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message || err) };
+  }
+});
+// The right-edge trim: a number is left-anchored and an item's icon sits to its right, so
+// pulling in ONLY the right edge removes that art from the search - unlike a floor, this
+// keeps working the moment the underlying pixels change (a different item's icon), because
+// it is a position, not a brightness guess.
+ipcMain.handle('stash-slot-set-strip-right', (_e, { apiId, stripRight } = {}) => {
+  try {
+    const found = findTabSlot(apiId);
+    if (!found) return { ok: false, reason: 'no-recent-capture' };
+    if (stripRight == null) {
+      const cur = config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId];
+      if (cur) delete cur.stripRight;
+    } else {
+      mergeSlotOverrides(found.tab, { [apiId]: { stripRight: Math.round(stripRight) } });
+    }
+    saveConfig();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message || err) };
+  }
+});
+// Confirmed live to matter on a slot with a grey/white icon (contrary to the usual case,
+// see the debug panel's own note) - a lower cutoff excludes some of the icon's near-white
+// pixels that the default gate still let through, at the cost of maybe clipping the
+// faintest anti-aliased digit edge too, hence per-slot rather than a global change.
+ipcMain.handle('stash-slot-set-desat', (_e, { apiId, desatSat } = {}) => {
+  try {
+    const found = findTabSlot(apiId);
+    if (!found) return { ok: false, reason: 'no-recent-capture' };
+    if (desatSat == null) {
+      const cur = config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId];
+      if (cur) delete cur.desatSat;
+    } else {
+      mergeSlotOverrides(found.tab, { [apiId]: { desatSat: Math.round(desatSat) } });
+    }
+    saveConfig();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message || err) };
+  }
+});
+
 async function readStashFrame(shot, onDetected) {
   try {
     if (!shot) return { ok: false, error: 'no screen source' };
     const { bitmap, W, H } = shot;
 
+    const t0 = Date.now();
     const res = await runReaderWorker(bitmap, W, H, onDetected);
+    const t1 = Date.now();
+    writeStashDebug(shot, res);
+    logToggle('stash-perf', `ocr ${t1 - t0}ms  debug-write ${Date.now() - t1}ms`
+      + (res && res.tab ? ` tab=${res.tab} slots=${res.slotCount} read=${res.readCount} digitBank=${res.digitBank} scale=${res.scale}` : ''));
     if (!res || !res.ok) return res || { ok: false, error: 'reader failed' };
-    if (res.mismatch) return { ok: true, mismatch: true, autoFound: !!res.autoFound, readCount: res.readCount, slotCount: res.slotCount };
+    if (res.mismatch) {
+      return {
+        ok: true, mismatch: true, autoFound: !!res.autoFound, readCount: res.readCount, slotCount: res.slotCount,
+        boxSource: res.boxSource || null, panelCoverage: res.panelCoverage || null, detect: res.detect || null,
+      };
+    }
+
+    // keep the raw frame for this tab around briefly, so a later correction (see
+    // stash-teach-count below) or an "align" session (see stash-adjust-open) can
+    // re-extract the exact glyphs / rebuild the exact boxes the reader saw
+    lastCaptureByTab.set(res.tab, { bitmap, W, H, box: res.box, res });
 
     let prices = {};
     try { prices = await getStashPriceMap(); } catch (err) { /* prices optional; counts still shown */ }
@@ -1782,7 +2623,9 @@ async function pumpGrabs() {
   try {
     while (pendingGrabs.length) {
       const seq = pendingGrabs.shift();
+      const t0 = Date.now();
       const shot = await grabStashFrame();
+      logToggle('stash-perf', `capture ${Date.now() - t0}ms`);
       pendingReads.push({ shot, seq });
       sendToUI('stash-queued', { depth: queueDepth() });
       pumpReads();
@@ -1819,6 +2662,7 @@ ipcMain.handle('set-stash-dup', (_e, on) => { config.stashDupTabs = !!on; saveCo
 ipcMain.handle('set-stash-sort', (_e, on) => { config.stashSortLayout = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-show-missing', (_e, on) => { config.stashShowMissing = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-show-confidence', (_e, on) => { config.stashShowConfidence = !!on; saveConfig(); return true; });
+ipcMain.handle('set-stash-show-ocr-debug', (_e, on) => { config.stashShowOcrDebug = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-banner-hidden', (_e, on) => { config.stashBannerHidden = !!on; saveConfig(); return true; });
 // Grab one frame of a region and return it as a data URL, opening the capture stream if
 // it is not already up. Used by the calibration preview and the test read.
@@ -2502,6 +3346,28 @@ ipcMain.handle('set-reprice-hotkey', (_e, accelerator) => {
   return true;
 });
 
+// Settings "click, then press a controller button" capture - resolves with the button
+// index (see gamepad.js BUTTON_KEYS) or null if nothing was pressed in time.
+ipcMain.handle('capture-gamepad-button', () => {
+  return new Promise((resolve) => { gamepad.captureNext(resolve, 8000); });
+});
+
+// Keep in sync with GAMEPAD_ACTIONS above - this is the write-side allowlist so an
+// arbitrary string from the renderer can't land as a live config key.
+const GAMEPAD_ACTION_IDS = new Set([
+  'overlay', 'closeOverlay', 'itemPin', 'itemTemp', 'stashCapture',
+  'repriceToggle', 'repriceRead', 'repricePaste',
+]);
+ipcMain.handle('set-gamepad-binding', (_e, { action, button } = {}) => {
+  if (!GAMEPAD_ACTION_IDS.has(action)) return false;
+  const clean = Number.isInteger(button) && button >= 0 && button <= 17 ? button : null;
+  config.gamepadBindings = config.gamepadBindings || {};
+  if (clean == null) delete config.gamepadBindings[action]; else config.gamepadBindings[action] = clean;
+  saveConfig();
+  logToggle('gamepad', `binding ${action} = ${clean}`);
+  return true;
+});
+
 // Everything arriving here is rebuilt field by field rather than stored as sent. It comes
 // from the renderer, but it also lands in a config file a user can hand-edit, and the
 // reader applies it to their money.
@@ -2598,6 +3464,17 @@ function calBoxToFrame(c) {
     y: Math.round(c.y - (REF_BOX.y - FRAME_BOX.y) * sy),
     w: Math.round(FRAME_BOX.w * sx), h: Math.round(FRAME_BOX.h * sy),
   };
+}
+function normalizeStashFrame(f) {
+  if (!f || !(f.w > 0) || !(f.h > 0)) return f;
+  const want = FRAME_BOX.w / FRAME_BOX.h;
+  const got = f.w / f.h;
+  if (Math.abs(got - want) < 0.06) return f;
+  // The stash-panel calibration target is the coloured outer panel frame, which is
+  // effectively square in the reference. If the user drags down into the wood/search
+  // area, keeping that tall rectangle skews every slot's Y coordinate. Preserve the
+  // measured width/top edge and clamp height back to the reader's expected aspect.
+  return Object.assign({}, f, { h: Math.round(f.w / want) });
 }
 
 // ---------- community stash-panel submissions ----------
@@ -2915,16 +3792,29 @@ ipcMain.on('stash-calibrate-start', async (_e, opts) => {
     if (calibWin && !calibWin.isDestroyed()) { calibWin.focus(); return; }
     await primeCapture(); // before the veil - see primeCapture
     const disp = repriceDisplay();
-    const capW = Math.round(disp.size.width * disp.scaleFactor);
-    const capH = Math.round(disp.size.height * disp.scaleFactor);
+    const reqW = Math.round(disp.size.width * disp.scaleFactor);
+    const reqH = Math.round(disp.size.height * disp.scaleFactor);
     // grab the desktop without the overlay in it
     const wasVisible = win && win.isVisible() && win.getOpacity() > 0;
     if (wasVisible) { win.setOpacity(0); if (process.platform !== 'win32') win.hide(); await new Promise((r) => setTimeout(r, 70)); }
-    const shot = await grabScreen(capW, capH, true);
+    const shot = await grabScreen(reqW, reqH, true);
     if (wasVisible) { win.setOpacity(1); if (process.platform !== 'win32') win.showInactive(); }
     if (!shot || !shot.dataUrl) return;
     calibCap = { buf: shot.bitmap, W: shot.W, H: shot.H };
+    // Use the ACTUAL bitmap size returned by desktopCapturer, not the requested
+    // thumbnail size. On 5K/scaled displays Chromium can return a few pixels less than
+    // requested; using the request to map CSS<->capture pixels shifts/crops the saved
+    // calibration box.
+    const capW = shot.W;
+    const capH = shot.H;
     const dataUrl = shot.dataUrl;
+    try {
+      const line = `${new Date().toISOString()} target=${calibTarget} `
+        + `display=${disp.id} bounds=${disp.bounds.x},${disp.bounds.y},${disp.bounds.width}x${disp.bounds.height} `
+        + `work=${disp.workArea.x},${disp.workArea.y},${disp.workArea.width}x${disp.workArea.height} `
+        + `scale=${disp.scaleFactor} requested=${reqW}x${reqH} capture=${capW}x${capH}\n`;
+      fs.appendFileSync(path.join(app.getPath('userData'), 'calibration-debug.log'), line);
+    } catch {}
     // seed the box at the previous frame, else FRAME_BOX scaled to this capture
     let seed;
     if (CALIB_TARGETS[calibTarget]) {
@@ -2938,15 +3828,33 @@ ipcMain.on('stash-calibrate-start', async (_e, opts) => {
     calibWin = new BrowserWindow({
       x: disp.bounds.x, y: disp.bounds.y, width: disp.size.width, height: disp.size.height,
       frame: false, transparent: false, resizable: false, movable: false, skipTaskbar: true,
-      fullscreenable: true, backgroundColor: '#000000',
+      // The screenshot is full-display pixels, including the strip Windows reserves for
+      // the taskbar. If the calibration window is constrained to the work area, the image
+      // is vertically squeezed/shifted and the saved box lands roughly a taskbar-height
+      // away from the pixels the user aligned. Force real fullscreen for calibration.
+      fullscreen: true, fullscreenable: true, backgroundColor: '#000000',
       webPreferences: { preload: path.join(__dirname, 'renderer', 'stash', 'calibrate-preload.js'), contextIsolation: true, nodeIntegration: false },
     });
     calibWin.setAlwaysOnTop(true, 'screen-saver');
+    try { calibWin.setBounds(disp.bounds); calibWin.setFullScreen(true); } catch {}
     calibWin.on('closed', () => { calibWin = null; });
     calibWin.loadFile(path.join(__dirname, 'renderer', 'stash', 'calibrate.html'),
       { search: `theme=${config && config.theme === 'industry' ? 'industry' : 'default'}` });
     calibWin.webContents.once('did-finish-load', () => {
-      try { calibWin.webContents.send('calib-init', { dataUrl, capW, capH, seedBox: seed, target: calibTarget }); } catch {}
+      setTimeout(() => {
+        try {
+          calibWin.webContents.send('calib-init', {
+            dataUrl, capW, capH, seedBox: seed, target: calibTarget,
+            display: {
+              id: disp.id,
+              scaleFactor: disp.scaleFactor,
+              bounds: disp.bounds,
+              workArea: disp.workArea,
+              windowBounds: calibWin.getBounds(),
+            },
+          });
+        } catch {}
+      }, 80);
     });
   } catch (err) { console.error('calibrate-start failed:', err.message); }
 });
@@ -2964,9 +3872,8 @@ ipcMain.on('stash-calibrate-confirm', async (_e, frame) => {
     if (CALIB_TARGETS[calibTarget]) {
       // stored as SCREEN FRACTIONS so it survives a resolution change
       const t = CALIB_TARGETS[calibTarget];
-      const disp = screen.getPrimaryDisplay();
-      const capW = Math.round(disp.size.width * disp.scaleFactor);
-      const capH = Math.round(disp.size.height * disp.scaleFactor);
+      const capW = (calibCap && calibCap.W) || frame.x + frame.w;
+      const capH = (calibCap && calibCap.H) || frame.y + frame.h;
       const region = { x: frame.x / capW, y: frame.y / capH, w: frame.w / capW, h: frame.h / capH };
       config[t.key] = region;
       saveConfig();
@@ -2979,7 +3886,8 @@ ipcMain.on('stash-calibrate-confirm', async (_e, frame) => {
       if (win && !win.isDestroyed()) win.webContents.send('reprice-calibrated', { target: calibTarget, region, preview: url, icon });
       return;
     }
-    config.stashCalibration = frameToCalBox(frame);
+    const normalizedFrame = normalizeStashFrame(frame);
+    config.stashCalibration = frameToCalBox(normalizedFrame);
     saveConfig();
     closeCalibWin();
     // how big the calibrated panel is vs the reference - below ~1 the digits shrink
@@ -3092,7 +4000,11 @@ ipcMain.handle('set-command-hotkeys', (_e, rows) => {
   // are dropped, empty accelerators kept (row bound later)
   const clean = (Array.isArray(rows) ? rows : [])
     .filter((r) => r && isAllowedCommand(r.command))
-    .map((r) => ({ command: r.command.trim(), accelerator: typeof r.accelerator === 'string' ? r.accelerator : '' }));
+    .map((r) => ({
+      command: r.command.trim(),
+      accelerator: typeof r.accelerator === 'string' ? r.accelerator : '',
+      gamepad: Number.isInteger(r.gamepad) && r.gamepad >= 0 && r.gamepad <= 17 ? r.gamepad : null,
+    }));
   for (const r of config.commandHotkeys || []) {
     if (r && r.accelerator) { try { globalShortcut.unregister(r.accelerator); } catch {} }
   }
@@ -3569,6 +4481,9 @@ if (!gotLock) {
     // same treatment for the native focus module (koffi + game-window lookup):
     // bind and prime the HWND cache off the critical path
     setTimeout(() => { try { focusNative.warm(); } catch {} }, 0);
+    // and for the controller: node-hid is a native addon too, and the DualSense may not
+    // even be plugged in yet - startGamepadListener tolerates both off the critical path
+    setTimeout(startGamepadListener, 0);
     checkFeed(); // pick data source on load
     setInterval(checkFeed, FEED_CHECK_MS); // re-check every 15 minutes
     setInterval(liveTick, LIVE_HEARTBEAT_MS); // live core-pair rates; each beat honors the Tab/Bg rate
@@ -3594,6 +4509,7 @@ if (!gotLock) {
     globalShortcut.unregisterAll();
     // release the global keyboard hook, or the process can outlive the window
     if (hookListening && hookMod) { try { hookMod.uIOhook.stop(); } catch {} }
+    try { gamepad.stop(); } catch {}
   });
 
   // keep running when the (only) window is hidden/closed

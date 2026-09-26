@@ -72,6 +72,9 @@
     border-radius: 3px; }
   #ex .cell { position: absolute; width: 11px; height: 11px; background: rgba(120,140,200,.35); border: 1px solid rgba(160,180,240,.4); border-radius: 2px; }
   #ex p { color: #9a8c70; font-size: 10.5px; margin-top: 8px; line-height: 1.4; }
+  #debug { position: fixed; left: 8px; top: 8px; z-index: 40; padding: 4px 7px; border-radius: 5px;
+    background: rgba(0,0,0,.62); color: #e8dcc4; font: 11px/1.35 ui-monospace, SFMono-Regular, Consolas, monospace;
+    white-space: pre; pointer-events: none; }
 </style>
 <script>
   // separate document: themes.css keys off data-theme, and main passes the
@@ -82,6 +85,7 @@
 </head>
 <body>
   <img id="shot" alt="">
+  <div id="debug"></div>
   <div id="vguide"></div>
   <div id="hguide"></div>
   <div id="box">
@@ -91,19 +95,19 @@
   </div>
   <div id="loupe"><canvas width="168" height="168"></canvas></div>
   <div id="ex">
-    <h4>What to align</h4>
+    <h4>Woran ausrichten</h4>
     <div class="demo"><div class="frame"></div><div class="yourbox"></div>
       <div class="cell" style="left:30%;top:30%"></div><div class="cell" style="left:44%;top:30%"></div><div class="cell" style="left:58%;top:30%"></div>
       <div class="cell" style="left:30%;top:56%"></div><div class="cell" style="left:44%;top:56%"></div><div class="cell" style="left:58%;top:56%"></div>
     </div>
-    <p>Lay your box <b style="color:#e8dcc4">directly on top of the stash panel's coloured outer bounding box</b> (the glowing border). When your lines cover the coloured lines, it's aligned.</p>
+    <p>Lege den Rahmen <b style="color:#e8dcc4">auf den farbigen Rand des inneren Item-Felds</b>. Nicht um die linke Fachliste, nicht um die Überschrift und nicht bis zum Suchfeld unten.</p>
   </div>
   <div id="bar">
-    <div class="bar-note">&#9888;&#65039; <b>For reliable reads, run the game at 1920&times;1080 or larger.</b> Smaller panels shrink the count digits and the scan starts missing them.</div>
+    <div class="bar-note">&#9888;&#65039; <b>Für zuverlässige Erkennung: Spiel auf 1920&times;1080 oder größer.</b> Kleinere Panels machen die Zahlen zu klein.</div>
     <div class="bar-main">
-      <div class="msg">Drag the box <b>roughly over your stash panel</b>, then hit <b>Auto-snap</b> - each edge locks onto the coloured bounding line. Fine-tune by hand if needed (the magnifier highlights the exact pixel row/column). Then Confirm.</div>
+      <div class="msg">Zieh den Rahmen um das <b>innere Item-Feld rechts</b>: links neben den ersten Items, oben direkt über der ersten Reihe, rechts am Panelrand, unten direkt unter den unteren Slots. <b>Nicht</b> die linke Fachliste, Überschrift oder Suchleiste einschließen. Auto-Snap kann helfen, ist aber optional.</div>
       <div class="coords" id="coords"></div>
-      <div class="btns"><button id="cancel">Cancel</button><button id="snap">Auto-snap to border</button><button id="ok">Confirm &amp; test</button></div>
+      <div class="btns"><button id="cancel">Abbrechen</button><button id="snap">Am Rand einrasten</button><button id="ok">Bestätigen &amp; testen</button></div>
     </div>
   </div>
 <script src="calibrate.js"></script>

@@ -54,14 +54,21 @@
               <div class="set-field">
                 <label data-i18n="ui.settings.general.overlay_hotkey_label" data-i18n-title="ui.settings.general.overlay_hotkey_tooltip" title="Global key that shows/hides this overlay. Click, then press a key or combo.">Overlay hotkey</label>
                 <div class="kb-field"><input id="hotkey-input" class="kb-input" readonly data-i18n-ph="ui.settings.hotkey_placeholder" placeholder="click, then press keys" /><span class="kb-hint" data-i18n="ui.settings.hotkey_rebind_hint">click to rebind</span></div>
+                <div class="kb-field"><span class="kb-hint" data-i18n="ui.settings.gamepad.label">Controller</span><input id="gamepad-overlay-input" class="kb-input" readonly data-i18n-ph="ui.settings.reprice.gamepad_placeholder" placeholder="click, then press a controller button" /><button id="gamepad-overlay-clear" class="cmdhk-del" data-i18n="ui.settings.reprice.gamepad_clear" data-i18n-title="ui.settings.reprice.gamepad_clear_tooltip" title="Unbind">×</button></div>
+              </div>
+              <div class="set-field">
+                <label data-i18n="ui.settings.gamepad.close_label" data-i18n-title="ui.settings.gamepad.close_tooltip" title="Optional: a controller button that only closes the overlay if it's open - never opens a blank one, unlike the toggle above. Same as pressing Escape.">Controller: close overlay</label>
+                <div class="kb-field"><input id="gamepad-close-input" class="kb-input" readonly data-i18n-ph="ui.settings.reprice.gamepad_placeholder" placeholder="click, then press a controller button" /><button id="gamepad-close-clear" class="cmdhk-del" data-i18n="ui.settings.reprice.gamepad_clear" data-i18n-title="ui.settings.reprice.gamepad_clear_tooltip" title="Unbind">×</button></div>
               </div>
               <div class="set-field">
                 <label data-i18n-title="ui.settings.pricecheck_hotkey_tooltip" title="Hover an item in game and press this: the overlay opens with the item searched and STAYS until you hide it."><span data-i18n="ui.settings.pricecheck_hotkey_label">Price check</span> <span class="kb-mode" data-i18n="ui.settings.pricecheck_hotkey_mode">stays open</span></label>
                 <div class="kb-field"><input id="item-hotkey-input" class="kb-input" readonly data-i18n-ph="ui.settings.hotkey_placeholder" placeholder="click, then press keys" /><span class="kb-hint" data-i18n="ui.settings.hotkey_rebind_hint">click to rebind</span></div>
+                <div class="kb-field"><span class="kb-hint" data-i18n="ui.settings.gamepad.label">Controller</span><input id="gamepad-item-pin-input" class="kb-input" readonly data-i18n-ph="ui.settings.reprice.gamepad_placeholder" placeholder="click, then press a controller button" /><button id="gamepad-item-pin-clear" class="cmdhk-del" data-i18n="ui.settings.reprice.gamepad_clear" data-i18n-title="ui.settings.reprice.gamepad_clear_tooltip" title="Unbind">×</button></div>
               </div>
               <div class="set-field">
                 <label data-i18n-title="ui.settings.quickcheck_hotkey_tooltip" title="Same check, but temporary: once your mouse visits the overlay and leaves it, the overlay hides itself."><span data-i18n="ui.settings.quickcheck_hotkey_label">Quick check</span> <span class="kb-mode" data-i18n="ui.settings.quickcheck_hotkey_mode">auto-hides</span></label>
                 <div class="kb-field"><input id="item-hotkey-temp-input" class="kb-input" readonly data-i18n-ph="ui.settings.hotkey_placeholder" placeholder="click, then press keys" /><span class="kb-hint" data-i18n="ui.settings.hotkey_rebind_hint">click to rebind</span></div>
+                <div class="kb-field"><span class="kb-hint" data-i18n="ui.settings.gamepad.label">Controller</span><input id="gamepad-item-temp-input" class="kb-input" readonly data-i18n-ph="ui.settings.reprice.gamepad_placeholder" placeholder="click, then press a controller button" /><button id="gamepad-item-temp-clear" class="cmdhk-del" data-i18n="ui.settings.reprice.gamepad_clear" data-i18n-title="ui.settings.reprice.gamepad_clear_tooltip" title="Unbind">×</button></div>
               </div>
               <div class="set-field">
                 <div class="set-slab"><label data-i18n="ui.settings.ui_scale_label" data-i18n-title="ui.settings.ui_scale_tooltip" title="Zoom the whole overlay up or down (50-200%).">UI scale</label><span id="scale-value" class="scale-value">100%</span></div>
@@ -188,6 +195,7 @@
             <div class="set-field">
               <label data-i18n="ui.settings.networth.capture_hotkey_label" data-i18n-title="ui.settings.networth.capture_hotkey_tooltip" title="Global key: open a currency tab in game and press this to scan and value it into the tally.">Capture hotkey</label>
               <div class="kb-field"><input id="stash-hotkey-input" class="kb-input" readonly data-i18n-ph="ui.settings.hotkey_placeholder" placeholder="click, then press keys" /><span class="kb-hint" data-i18n="ui.settings.hotkey_rebind_hint">click to rebind</span></div>
+              <div class="kb-field"><span class="kb-hint" data-i18n="ui.settings.gamepad.label">Controller</span><input id="gamepad-stash-input" class="kb-input" readonly data-i18n-ph="ui.settings.reprice.gamepad_placeholder" placeholder="click, then press a controller button" /><button id="gamepad-stash-clear" class="cmdhk-del" data-i18n="ui.settings.reprice.gamepad_clear" data-i18n-title="ui.settings.reprice.gamepad_clear_tooltip" title="Unbind">×</button></div>
             </div>
             <div id="nw-set-root"></div>
           </section>
@@ -197,6 +205,15 @@
             <div class="set-field">
               <label data-i18n="ui.settings.reprice.hotkey_label" data-i18n-title="ui.settings.reprice.hotkey_tooltip" title="Global key that turns reprice mode on and off. While it is on, right-clicking an item to reprice puts the adjusted price on your clipboard, ready to paste.">Reprice mode hotkey</label>
               <div class="kb-field"><input id="reprice-hotkey-input" class="kb-input" readonly data-i18n-ph="ui.settings.hotkey_placeholder" placeholder="click, then press keys" /><span class="kb-hint" data-i18n="ui.settings.hotkey_rebind_hint">click to rebind</span></div>
+              <div class="kb-field"><span class="kb-hint" data-i18n="ui.settings.gamepad.label">Controller</span><input id="reprice-gamepad-toggle-input" class="kb-input" readonly data-i18n-ph="ui.settings.reprice.gamepad_placeholder" placeholder="click, then press a controller button" /><button id="reprice-gamepad-toggle-clear" class="cmdhk-del" data-i18n="ui.settings.reprice.gamepad_clear" data-i18n-title="ui.settings.reprice.gamepad_clear_tooltip" title="Unbind">×</button></div>
+            </div>
+            <div class="set-field">
+              <label data-i18n="ui.settings.reprice.gamepad_read_label" data-i18n-title="ui.settings.reprice.gamepad_read_tooltip" title="Optional: a DualSense button that starts a reprice read, the same as right-clicking. Needs a controller plugged in.">Controller: start read</label>
+              <div class="kb-field"><input id="reprice-gamepad-read-input" class="kb-input" readonly data-i18n-ph="ui.settings.reprice.gamepad_placeholder" placeholder="click, then press a controller button" /><button id="reprice-gamepad-read-clear" class="cmdhk-del" data-i18n="ui.settings.reprice.gamepad_clear" data-i18n-title="ui.settings.reprice.gamepad_clear_tooltip" title="Unbind">×</button></div>
+            </div>
+            <div class="set-field">
+              <label data-i18n="ui.settings.reprice.gamepad_paste_label" data-i18n-title="ui.settings.reprice.gamepad_paste_tooltip" title="Optional: a DualSense button that sends Ctrl+A, Ctrl+V - only right after a successful reprice read.">Controller: paste result</label>
+              <div class="kb-field"><input id="reprice-gamepad-paste-input" class="kb-input" readonly data-i18n-ph="ui.settings.reprice.gamepad_placeholder" placeholder="click, then press a controller button" /><button id="reprice-gamepad-paste-clear" class="cmdhk-del" data-i18n="ui.settings.reprice.gamepad_clear" data-i18n-title="ui.settings.reprice.gamepad_clear_tooltip" title="Unbind">×</button></div>
             </div>
             <div class="set-field">
               <div class="set-inline">

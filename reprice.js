@@ -29,12 +29,28 @@ const RepriceRules = require('./renderer/reprice-rules.js');
 // So: poll. Stop the instant digits are read, which is what makes this cheap - a fast
 // setup exits on the first look and never pays for the rest.
 const POLL_EVERY_MS = 40;   // a frame at a time, not a paint at a time
+// How long a successful read stays pasteable, e.g. by the controller's paste button.
+// Long enough to glance at the badge and confirm the number, short enough that a stale
+// result from a different item never gets pasted by an unrelated later press.
+const PASTE_WINDOW_MS = 5000;
 // Long enough for the dialog to actually be drawn. Each look now scans for the field's
 // border rather than glancing at a small saved box, so it costs more and fewer of them
 // fit in the same window - reads started giving up before the dialog appeared, and only
 // landed if the user spammed the right button. This does NOT slow a successful read: the
 // loop stops the instant it finds a number.
+//
+// Used as-is only when there is NO calibrated fallback to move to - see
+// AUTO_GIVE_UP_WITH_FALLBACK_MS below for the case where there is one.
 const GIVE_UP_AFTER_MS = 3000;
+// When a calibrated box IS set, auto-detect gets much less rope before the fallback takes
+// over. Measured live on a setup where the finder never once located the dialog (a high-
+// DPI display, same class of problem as the stash reader's): every attempt burned the
+// full GIVE_UP_AFTER_MS finding nothing, then the fallback read the calibrated box
+// correctly in a few more ms - a ~4s round trip for a read that a human keeps up with by
+// doing the maths in their head. The fallback carries the same "not before the dialog is
+// drawn" risk the comment above warns about either way; it is just paid at 600ms of
+// auto-detect instead of 3000ms of it, not skipped.
+const AUTO_GIVE_UP_WITH_FALLBACK_MS = 600;
 
 function create(deps) {
   // deps: { getWin, getConfig, saveConfig, log, getHook }
@@ -45,9 +61,24 @@ function create(deps) {
   let busy = false;
   let hookBound = false;
   let onChange = null;
+  // Set only right after a clipboard write, so a controller's paste button (or anything
+  // else that fires later) pastes an actual computed price, never stale clipboard
+  // content from the "rule left it unchanged" branch, which does not touch the clipboard.
+  let lastResult = null;
+  let pasteDeadline = 0;
 
   const cfg = () => getConfig() || {};
   const say = (msg) => { try { log && log('reprice', msg); } catch { /* logging must never break a reprice */ } };
+  // Unconditional (dev builds only), unlike `say` which is gated behind a debug env var
+  // most installs never set - a "why does this take 4 seconds" report needs the numbers
+  // from the run that was actually slow, not a rerun with logging turned on afterwards.
+  const perf = (msg) => {
+    try {
+      const { app } = require('electron');
+      if (app.isPackaged) return;
+      fs.appendFileSync(path.join(app.getPath('userData'), 'reprice-perf.log'), `${new Date().toISOString()} ${msg}\n`);
+    } catch { /* perf logging must never break a reprice */ }
+  };
 
   // ---- the offscreen frame source ------------------------------------------
   // Runs in the main window's renderer: it already has a document, and a hidden helper
@@ -287,7 +318,10 @@ function create(deps) {
     const t0 = Date.now();
     let looks = 0;
     let usedAuto = false;
-    while (Date.now() - t0 < GIVE_UP_AFTER_MS) {
+    let firstShotAt = null; // ms since t0 when autoGrab FIRST located the field - null means it never did
+    let grabMs = 0, readMs = 0; // summed time actually spent in autoGrab/readPrice, vs. spent polling/waiting
+    const autoGiveUpMs = (region && region.w > 0) ? AUTO_GIVE_UP_WITH_FALLBACK_MS : GIVE_UP_AFTER_MS;
+    while (Date.now() - t0 < autoGiveUpMs) {
       await new Promise((r) => setTimeout(r, POLL_EVERY_MS));
       const wait = Date.now() - t0;
       looks++;
@@ -296,8 +330,10 @@ function create(deps) {
       // so the number is somewhere different for every item - a saved box is right for
       // the item it was drawn on and wrong for the next one.
       let shot = null, iconShot = null;
+      const tGrab = Date.now();
       const auto = await autoGrab();
-      if (auto) { shot = auto.num; iconShot = auto.icon; usedAuto = true; }
+      grabMs += Date.now() - tGrab;
+      if (auto) { shot = auto.num; iconShot = auto.icon; usedAuto = true; if (firstShotAt == null) firstShotAt = wait; }
       // NO calibrated read here.
       //
       // Falling back per-poll is what made the first click never work. The dialog is not
@@ -313,9 +349,11 @@ function create(deps) {
 
       // The measured block height travels with the read so main can tell whether the
       // glyphs on screen are a size it has templates for.
+      const tRead = Date.now();
       const base = deps.readPrice
         ? await deps.readPrice(shot, { at: wait, auto: usedAuto, blockH: auto && auto.block ? auto.block.h : 0 })
         : null;
+      readMs += Date.now() - tRead;
       if (base == null) continue;
 
       const ctx = {};
@@ -328,9 +366,12 @@ function create(deps) {
       }
       const out = RepriceRules.apply(base, RepriceRules.fromConfig(cfg()), ctx);
       console.error(`[reprice] read ${base} currency=${ctx.currency || 'none'} -> ${out}`);
+      const perfLine = () => `auto path: total=${Date.now() - t0}ms looks=${looks} firstShotAt=${firstShotAt == null ? 'never' : firstShotAt + 'ms'} `
+        + `grabMs=${grabMs} readMs=${readMs} value=${base}`;
       if (out == null) {
         say(`read ${base} but the rule produced nothing`);
         console.error('[reprice] rule produced nothing');
+        perf(perfLine() + ' -> rule produced nothing');
         // Still report it: a badge frozen on an older result looks like the click did
         // nothing at all, which is indistinguishable from the feature being broken.
         try { if (deps.onRead) deps.onRead(null); } catch { }
@@ -339,11 +380,14 @@ function create(deps) {
       if (out === base) {
         say(`read ${base}, rule leaves it unchanged - clipboard untouched`);
         console.error('[reprice] rule left it unchanged');
+        perf(perfLine() + ' -> unchanged');
         try { if (deps.onRead) deps.onRead({ base, result: out, unchanged: true }); } catch { }
         return;
       }
       clipboard.writeText(String(out));
+      lastResult = { base, result: out }; pasteDeadline = Date.now() + PASTE_WINDOW_MS;
       say(`read ${base}${ctx.currency ? ' ' + ctx.currency : ''} -> ${out} (after ${wait}ms)`);
+      perf(perfLine() + ` -> ${out}`);
       const info = { base, result: out, currency: ctx.currency || null };
       if (onChange) onChange(info);
       try { if (deps.onRead) deps.onRead(info); } catch { }
@@ -364,7 +408,10 @@ function create(deps) {
         const out = RepriceRules.apply(base, RepriceRules.fromConfig(cfg()), ctx);
         if (out != null && out !== base) {
           clipboard.writeText(String(out));
+          lastResult = { base, result: out }; pasteDeadline = Date.now() + PASTE_WINDOW_MS;
           say(`read ${base} -> ${out} (calibrated fallback)`);
+          perf(`calibrated-fallback path: total=${Date.now() - t0}ms looks=${looks} `
+            + `firstShotAt=${firstShotAt == null ? 'never' : firstShotAt + 'ms'} grabMs=${grabMs} readMs=${readMs} value=${base} -> ${out}`);
           const info = { base, result: out, currency: ctx.currency || null };
           if (onChange) onChange(info);
           try { if (deps.onRead) deps.onRead(info); } catch { }
@@ -406,13 +453,41 @@ function create(deps) {
     // fair chance of seeing the dialog at all.
     console.error(`[reprice] no number: ${looks} looks over ${spent}ms `
       + `(${Math.round(spent / Math.max(1, looks))}ms per look)`);
+    perf(`miss: total=${spent}ms looks=${looks} firstShotAt=${firstShotAt == null ? 'never' : firstShotAt + 'ms'} `
+      + `grabMs=${grabMs} readMs=${readMs}` + (region && region.w > 0 ? ' (calibrated fallback also found nothing)' : ' (no calibrated fallback set)'));
     try { if (deps.onRead) deps.onRead(null); } catch { }
   }
 
-  function onRightClick() {
-    if (!on || busy) return;
+  // Public: also the controller's "start reprice read" button (Square by default), not
+  // just the right-click hook below.
+  function startAttempt() {
+    if (!on || busy) return false;
     busy = true;
     attempt().catch((err) => say('failed: ' + (err && err.message || err))).finally(() => { busy = false; });
+    return true;
+  }
+  const onRightClick = startAttempt;
+
+  // The controller's "paste" button (X by default). Fires Ctrl+A/Ctrl+V only when mode
+  // is on and a clipboard-writing read happened within the last PASTE_WINDOW_MS - silent
+  // no-op otherwise, so it never touches anything during normal gameplay.
+  function pasteIfReady() {
+    if (!on || !lastResult || Date.now() > pasteDeadline) return false;
+    const hook = deps.getHook && deps.getHook();
+    if (!hook || !hook.uIOhook) { say('paste failed: no input hook'); return false; }
+    const { uIOhook, UiohookKey } = hook;
+    try {
+      uIOhook.keyToggle(UiohookKey.Ctrl, 'down');
+      uIOhook.keyTap(UiohookKey.A);
+      uIOhook.keyTap(UiohookKey.V);
+      uIOhook.keyToggle(UiohookKey.Ctrl, 'up');
+    } catch (err) {
+      say('paste failed: ' + (err && err.message || err));
+      return false;
+    }
+    say(`pasted ${lastResult.result}`);
+    lastResult = null; // one paste per successful read
+    return true;
   }
 
   // ---- mode ----------------------------------------------------------------
@@ -459,6 +534,8 @@ function create(deps) {
     openStream,
     closeStream,
     setOnChange: (fn) => { onChange = fn; },
+    startAttempt,
+    pasteIfReady,
   };
 }
 

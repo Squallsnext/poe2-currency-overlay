@@ -7,7 +7,8 @@
 // sinistral-crystallisation's "41" (rune art fused to the "1") is fixed by the digit-reader's
 // 1px kerning-overlap tolerance (see digit-reader overlaps()). chance @(258,520) is tuned to read
 // "?" on the empty cell past its bucket marker.
-// TODO: 3 unowned/unknown empties not mapped (R1 slot3, R2 slot1, R4 slot1).
+// TODO: 2 unowned/unknown empties still not mapped (R2 slot1, R4 slot1). R1 slot3 is now
+// call-of-the-shadows (2026-09-25, position extrapolated not drop-verified).
 (function (root, factory) {
   const api = factory();
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
@@ -17,6 +18,10 @@
   const STATIC_SLOTS = [
     { cx: 208, cy: 209, apiId: 'an-audience-with-the-king' },
     { cx: 269, cy: 209, apiId: 'head-of-the-king' },
+    // R1 slot3 - was one of the 3 unmapped TODO empties below; position extrapolated from
+    // the row's own ~61px spacing (208 -> 269), not yet drop-verified. Use the in-app
+    // "Ausrichten" tool to nudge it if it doesn't land exactly on the count.
+    { cx: 330, cy: 209, apiId: 'call-of-the-shadows' },
     { cx: 337, cy: 304, apiId: 'omen-of-gambling' },
     { cx: 394, cy: 304, apiId: 'omen-of-bartering' },
     { cx: 110, cy: 385, apiId: 'omen-of-sinistral-exaltation' },

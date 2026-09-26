@@ -20,11 +20,15 @@
   const fmtDiv = (n) => n == null ? null : (n >= 100 ? Math.round(n) : n.toFixed(1)).toLocaleString('en-US') + ' ' + unit(t('networth.unit.div_label'), 'divine');
   const fmtCount = (n) => Number(n).toLocaleString('en-US');
 
-  const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null };
+  const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, showOcrDebug: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null };
+  // apiId -> {rawUrl, binUrl} | 'loading', for the OCR-debug toggle. Cleared on every
+  // fresh capture (see onStashCaptured below) and per-slot after a teach/forget, since
+  // either changes what the NEXT fetch of that slot would show.
+  const dbgImgCache = {};
   const TAB_LABEL = { currency: t('networth.tab.currency'), abyss: t('networth.tab.abyss'), essence: t('networth.tab.essence'), runes: t('networth.tab.runes'), 'runes-kalguuran': t('networth.tab.runes_kalguuran'), ritual: t('networth.tab.ritual'), soulcore: t('networth.tab.soulcore'), idol: t('networth.tab.idol'), 'ancient-augment': t('networth.tab.ancient_augment'), delirium: t('networth.tab.delirium'), breach: t('networth.tab.breach'), expedition: t('networth.tab.expedition') };
   const MIRROR_ICON = 'https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lEdXBsaWNhdGUiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/26bc31680e/CurrencyDuplicate.png';
 
-  if (window.api && window.api.getConfig) window.api.getConfig().then((c) => { state.dup = !!(c && c.stashDupTabs); state.sortLayout = !!(c && c.stashSortLayout); state.showMissing = !!(c && c.stashShowMissing); state.showConfidence = !!(c && c.stashShowConfidence); state.calibrated = !!(c && c.stashCalibration); state.hotkey = (c && c.stashHotkey) || 'F7'; state.bannerHidden = !!(c && c.stashBannerHidden); render(); }).catch(() => {});
+  if (window.api && window.api.getConfig) window.api.getConfig().then((c) => { state.dup = !!(c && c.stashDupTabs); state.sortLayout = !!(c && c.stashSortLayout); state.showMissing = !!(c && c.stashShowMissing); state.showConfidence = !!(c && c.stashShowConfidence); state.showOcrDebug = !!(c && c.stashShowOcrDebug); state.calibrated = !!(c && c.stashCalibration); state.hotkey = (c && c.stashHotkey) || 'F7'; state.bannerHidden = !!(c && c.stashBannerHidden); render(); }).catch(() => {});
 
   const rowsOfType = (tab) => state.rows.filter((r) => r.tab === tab);
   function labelFor(row) {
@@ -125,6 +129,9 @@
     toggles.appendChild(mkToggle(state.showConfidence, t('networth.settings.toggle_confidence_label'),
       t('networth.settings.toggle_confidence_sub'),
       (v) => { state.showConfidence = v; try { window.api.setStashShowConfidence(v); } catch {} }));
+    toggles.appendChild(mkToggle(state.showOcrDebug, t('networth.settings.toggle_ocr_debug_label'),
+      t('networth.settings.toggle_ocr_debug_sub'),
+      (v) => { state.showOcrDebug = v; try { window.api.setStashShowOcrDebug(v); } catch {} }));
     root.appendChild(toggles);
     // Settings above, recovery tools below - the divider keeps users from reading
     // calibration/submission as steps they are meant to take. Same shape as the Reprice
@@ -225,6 +232,20 @@
     title.appendChild(document.createTextNode(labelFor(row)));
     head.appendChild(title);
 
+    // Only offered when something on this tab actually needs it - a slot the reader
+    // itself flags as low-confidence or unread. Opens the same drag-to-fix tool the
+    // dev-only debug output has had for a while, as a real window; saving writes
+    // straight into config so the fix applies from the very next scan.
+    if ((r.lines || []).some((ln) => ln.missing || (ln.conf != null && ln.conf < 0.80)) && window.api.stashAdjustOpen) {
+      const adj = el('button', 'nw-card-adjust', t('networth.row.adjust_label'));
+      adj.title = t('networth.row.adjust_title');
+      adj.onclick = async (e) => {
+        e.stopPropagation();
+        const res = await window.api.stashAdjustOpen(row.tab).catch(() => ({ ok: false }));
+        if (!res || !res.ok) console.warn('stash-adjust-open:', res && res.reason);
+      };
+      head.appendChild(adj);
+    }
     const rowEx = rowTotalEx(r);
     const tot = el('div', 'nw-card-total' + (rowEdited(r) ? ' nw-edited' : ''));
     tot.appendChild(el('span', 'nw-ex', fmtEx(rowEx)));
@@ -274,6 +295,36 @@
         const cf = el('div', 'nw-conf nw-conf-' + cl, pct + '%');
         cf.title = t('networth.line.confidence_title');
         line.appendChild(cf);
+        // Low confidence but already-correct reads (a thin margin at OCR time, not a
+        // wrong value) never reach the teach pipeline otherwise - it only fires on an
+        // actual correction. This is an explicit, deliberate "yes" from the user, so it's
+        // safe to feed the same way: unlike the count field's blur handler, it can't fire
+        // from an idle click that never checked the number.
+        if (cl === 'low' && effCount(ln) > 0 && window.api.stashTeachCount) {
+          const okBtn = el('button', 'nw-conf-confirm', '✓');
+          okBtn.title = t('networth.line.confirm_title');
+          okBtn.onclick = async (e) => {
+            e.stopPropagation();
+            okBtn.disabled = true;
+            let res;
+            try { res = await window.api.stashTeachCount(ln.apiId, String(effCount(ln))); }
+            catch { res = { ok: false }; }
+            if (res && res.ok) {
+              okBtn.classList.add('nw-conf-confirm-done');
+              okBtn.textContent = '✓';
+              okBtn.title = t('networth.line.confirm_done_title');
+            } else {
+              // Segmentation couldn't isolate one glyph per digit for this exact frame
+              // (touching digits, icon bleed, ...) - the teach pipeline refuses rather
+              // than guessing, so say so instead of showing a false "learned" tick.
+              okBtn.classList.add('nw-conf-confirm-failed');
+              okBtn.textContent = '!';
+              okBtn.title = t('networth.line.confirm_failed_title');
+              okBtn.disabled = false;
+            }
+          };
+          line.appendChild(okBtn);
+        }
       }
       const cnt = el('div', 'nw-cnt'); cnt.innerHTML = `<span class="nw-x">×</span>${esc(fmtCount(effCount(ln)))}`;
       cnt.title = t('networth.line.edit_count_title');
@@ -285,6 +336,136 @@
       rb.onclick = (e) => { e.stopPropagation(); ln.userCount = undefined; ln.excluded = false; render(); };
       line.appendChild(rb);
       list.appendChild(line);
+      // OCR-debug toggle: the exact crop the reader worked from, so a problem slot can be
+      // judged by eye - raw (native pixels, upscaled) and the binarized cell it actually
+      // template-matched against - plus a way to fix it from right there: type the real
+      // number (the count field above already teaches on a real correction) or confirm it
+      // (the checkmark above already teaches on confirmation), and if the digit templates
+      // themselves seem to be the problem, forget them and let them rebuild from scratch.
+      if (state.showOcrDebug && !ln.missing && window.api.stashSlotDebugImage) {
+        const dbg = el('div', 'nw-dbg');
+        const cached = dbgImgCache[ln.apiId];
+        if (cached === 'loading') {
+          dbg.textContent = '…';
+        } else if (cached && cached.ok) {
+          const imgs = el('div', 'nw-dbg-imgs');
+          const rawImg = el('img', 'nw-dbg-img'); rawImg.src = cached.rawUrl; rawImg.title = 'raw';
+          const binImg = el('img', 'nw-dbg-img'); binImg.src = cached.binUrl; binImg.title = 'binarized';
+          imgs.appendChild(rawImg); imgs.appendChild(binImg);
+          dbg.appendChild(imgs);
+
+          const controls = el('div', 'nw-dbg-controls');
+          // Floor + right-edge sliders - bright background art (an item's icon) can fool
+          // the adaptive sweep's own confidence measure (see reader-worker.js) by
+          // brightness alone, and it sits to the right of a left-anchored number, so the
+          // two controls attack the same problem from different angles: floor separates by
+          // brightness where that still works, stripRight removes the art from the search
+          // outright where it does not. Both sliders re-request the SAME preview call with
+          // BOTH current values every time (debounced IPC, not the app's own render() - a
+          // full re-render would drop slider focus mid-drag), so adjusting one never
+          // silently discards an unsaved drag on the other.
+          const previewLabel = el('span', 'nw-dbg-preview',
+            t('networth.line.debug_preview', { text: cached.preview ? cached.preview.text : '?', pct: cached.preview ? Math.round(cached.preview.conf * 100) : 0 }));
+          const floorRow = el('div', 'nw-dbg-floor-row');
+          const floorLabel = el('span', 'nw-dbg-floor-val', 'floor ' + cached.floor);
+          const slider = el('input', 'nw-dbg-slider'); slider.type = 'range'; slider.min = 60; slider.max = 200; slider.step = 5; slider.value = cached.floor;
+          const stripRow = el('div', 'nw-dbg-floor-row');
+          const stripLabel = el('span', 'nw-dbg-floor-val', t('networth.line.debug_strip_right_val', { px: cached.stripRight }));
+          const stripSlider = el('input', 'nw-dbg-slider'); stripSlider.type = 'range';
+          stripSlider.min = 4; stripSlider.max = Math.max(4, cached.stripWidth); stripSlider.step = 1; stripSlider.value = cached.stripRight;
+          // Saturation - PREVIEW ONLY, no pin/save yet. An icon that is itself grey/white
+          // (marble, bone, ash...) gives this gate nothing to key off, so before wiring a
+          // third per-slot override into the live reader (which shares one value channel
+          // across the whole scan - a bigger change than floor/stripRight were), this lets
+          // the theory be checked against the actual slot instead of taken on faith.
+          const satRow = el('div', 'nw-dbg-floor-row');
+          const satLabel = el('span', 'nw-dbg-floor-val', t('networth.line.debug_sat_val', { v: cached.desatSat }));
+          const satSlider = el('input', 'nw-dbg-slider'); satSlider.type = 'range';
+          satSlider.min = 5; satSlider.max = 120; satSlider.step = 5; satSlider.value = cached.desatSat;
+          let debounceT = null;
+          const refreshPreview = () => {
+            clearTimeout(debounceT);
+            debounceT = setTimeout(async () => {
+              const res = await window.api.stashSlotDebugImage(ln.apiId, { floor: +slider.value, stripRight: +stripSlider.value, desatSat: +satSlider.value }).catch(() => null);
+              if (!res || !res.ok) return;
+              rawImg.src = res.rawUrl; binImg.src = res.binUrl;
+              previewLabel.textContent = t('networth.line.debug_preview', { text: res.preview.text, pct: Math.round(res.preview.conf * 100) });
+              cached.floor = res.floor; cached.stripRight = res.stripRight; cached.desatSat = res.desatSat;
+              cached.rawUrl = res.rawUrl; cached.binUrl = res.binUrl; cached.preview = res.preview;
+            }, 120);
+          };
+          // Once pinned, further drags just keep saving - re-clicking "set" after every
+          // nudge was the friction being reported, and the whole point of a pin is "trust
+          // my number", so a pinned slider staying in sync with itself is not a surprise.
+          slider.addEventListener('input', () => {
+            floorLabel.textContent = 'floor ' + slider.value; refreshPreview();
+            if (cached.pinned) window.api.stashSlotSetFloor(ln.apiId, +slider.value).catch(() => {});
+          });
+          stripSlider.addEventListener('input', () => {
+            stripLabel.textContent = t('networth.line.debug_strip_right_val', { px: stripSlider.value }); refreshPreview();
+            if (cached.stripRightPinned) window.api.stashSlotSetStripRight(ln.apiId, +stripSlider.value).catch(() => {});
+          });
+          satSlider.addEventListener('input', () => {
+            satLabel.textContent = t('networth.line.debug_sat_val', { v: satSlider.value }); refreshPreview();
+            if (cached.desatSatPinned) window.api.stashSlotSetDesat(ln.apiId, +satSlider.value).catch(() => {});
+          });
+          floorRow.appendChild(slider); floorRow.appendChild(floorLabel);
+          const pinBtn = el('button', 'nw-dbg-pin', cached.pinned ? t('networth.line.debug_unpin_button') : t('networth.line.debug_pin_floor_button'));
+          pinBtn.onclick = async (e) => {
+            e.stopPropagation();
+            pinBtn.disabled = true;
+            try { await window.api.stashSlotSetFloor(ln.apiId, cached.pinned ? null : +slider.value); } catch {}
+            delete dbgImgCache[ln.apiId];
+            render();
+          };
+          floorRow.appendChild(pinBtn);
+          stripRow.appendChild(stripSlider); stripRow.appendChild(stripLabel);
+          const stripPinBtn = el('button', 'nw-dbg-pin', cached.stripRightPinned ? t('networth.line.debug_unpin_button') : t('networth.line.debug_pin_strip_button'));
+          stripPinBtn.onclick = async (e) => {
+            e.stopPropagation();
+            stripPinBtn.disabled = true;
+            try { await window.api.stashSlotSetStripRight(ln.apiId, cached.stripRightPinned ? null : +stripSlider.value); } catch {}
+            delete dbgImgCache[ln.apiId];
+            render();
+          };
+          stripRow.appendChild(stripPinBtn);
+          satRow.appendChild(satSlider); satRow.appendChild(satLabel);
+          const satPinBtn = el('button', 'nw-dbg-pin', cached.desatSatPinned ? t('networth.line.debug_unpin_button') : t('networth.line.debug_pin_sat_button'));
+          satPinBtn.onclick = async (e) => {
+            e.stopPropagation();
+            satPinBtn.disabled = true;
+            try { await window.api.stashSlotSetDesat(ln.apiId, cached.desatSatPinned ? null : +satSlider.value); } catch {}
+            delete dbgImgCache[ln.apiId];
+            render();
+          };
+          satRow.appendChild(satPinBtn);
+          controls.appendChild(previewLabel);
+          controls.appendChild(floorRow);
+          controls.appendChild(stripRow);
+          controls.appendChild(satRow);
+          if (ln.count != null && window.api.stashForgetDigits) {
+            const forget = el('button', 'nw-dbg-forget', t('networth.line.forget_button'));
+            forget.title = t('networth.line.forget_title');
+            forget.onclick = async (e) => {
+              e.stopPropagation();
+              forget.disabled = true;
+              try { await window.api.stashForgetDigits(String(ln.count)); } catch {}
+              delete dbgImgCache[ln.apiId];
+              render();
+            };
+            controls.appendChild(forget);
+          }
+          dbg.appendChild(controls);
+        } else {
+          dbg.textContent = '…';
+          dbgImgCache[ln.apiId] = 'loading';
+          window.api.stashSlotDebugImage(ln.apiId).then((res) => {
+            dbgImgCache[ln.apiId] = res || { ok: false };
+            render();
+          }).catch(() => { dbgImgCache[ln.apiId] = { ok: false }; render(); });
+        }
+        list.appendChild(dbg);
+      }
     }
     card.appendChild(list);
     return card;
@@ -300,7 +481,14 @@
       if (done) return; done = true;
       const raw = String(inp.value).replace(/[^0-9]/g, '');
       const v = raw === '' ? 0 : parseInt(raw, 10);
-      ln.userCount = (v === (ln.count || 0)) ? undefined : v;
+      const corrected = v !== (ln.count || 0);
+      ln.userCount = corrected ? v : undefined;
+      // teach the reader from this correction - fire-and-forget, never blocks the UI.
+      // Only when there's an actual digit string to learn from (not "correcting" to 0,
+      // which usually just means "this slot is empty", not "here is what 0 looks like").
+      if (corrected && v > 0 && window.api.stashTeachCount) {
+        window.api.stashTeachCount(ln.apiId, String(v)).catch(() => {});
+      }
       render();
     };
     inp.onblur = commit;
@@ -643,6 +831,10 @@
       // another capture may still be in flight - only clear the spinner when the queue
       // has actually drained, which main reports
       if (!state.queued) { state.busy = false; state.phase = 'idle'; state.pendingTab = null; }
+      // a fresh frame means the OCR-debug images (if the toggle is on) are stale - drop
+      // the cache so the next render re-fetches instead of showing the previous capture's
+      // crop under this scan's numbers
+      for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
       applyResult(res);
     });
     if (window.api.onStashQueued) window.api.onStashQueued((info) => {

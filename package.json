@@ -26,6 +26,7 @@
     "files": [
       "main.js",
       "reprice.js",
+      "gamepad.js",
       "focus-native.js",
       "linux-focus.js",
       "preload.js",
@@ -86,6 +87,7 @@
     "electron-updater": "^6.8.9",
     "koffi": "^3.1.2",
     "neverthrow": "^8.2.0",
+    "node-hid": "^3.1.2",
     "uiohook-napi": "^1.5.5"
   }
 }

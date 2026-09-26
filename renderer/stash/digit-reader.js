@@ -56,12 +56,48 @@
     const { data, w, h } = sub;
     if (nw === w && nh === h) return sub;
     const out = new Uint8Array(nw * nh);
-    const sx = w / nw, sy = h / nh;
+    const stepX = w / nw, stepY = h / nh;
+    // Minification must area-average, exactly like resampleRGBA below - a game digit's
+    // strokes are 1-2px, and bilinear only samples a 2x2 neighbourhood regardless of how
+    // far it is shrinking, so at a real minify (readCellEx's per-cell native crop at
+    // extreme display scale) it is effectively point-sampling: which source pixels land
+    // in that 2x2 window depends on the crop's exact sub-pixel phase, so the SAME glyph
+    // shrunk from two frames that differ by a fraction of a source pixel can binarize to
+    // different strokes entirely - "348" read as "38" one time and "1" the next, with the
+    // crop itself unchanged. This was unreachable dead code until per-cell scaling had a
+    // real caller (readCellEx's scale!=1 branch); nothing here was ever a minify before.
+    if (stepX > 1 || stepY > 1) {
+      const clampX = (v) => (v < 0 ? 0 : v > w - 1 ? w - 1 : v);
+      const clampY = (v) => (v < 0 ? 0 : v > h - 1 ? h - 1 : v);
+      for (let y = 0; y < nh; y++) {
+        const fy0 = y * stepY, fy1 = fy0 + stepY;
+        const iy0 = Math.floor(fy0), iy1 = Math.ceil(fy1) - 1;
+        for (let x = 0; x < nw; x++) {
+          const fx0 = x * stepX, fx1 = fx0 + stepX;
+          const ix0 = Math.floor(fx0), ix1 = Math.ceil(fx1) - 1;
+          let sum = 0, wsum = 0;
+          for (let yy = iy0; yy <= iy1; yy++) {
+            const wy = Math.min(yy + 1, fy1) - Math.max(yy, fy0);
+            if (wy <= 0) continue;
+            const cy = clampY(yy);
+            for (let xx = ix0; xx <= ix1; xx++) {
+              const wx = Math.min(xx + 1, fx1) - Math.max(xx, fx0);
+              if (wx <= 0) continue;
+              const ww = wx * wy;
+              sum += data[cy * w + clampX(xx)] * ww;
+              wsum += ww;
+            }
+          }
+          out[y * nw + x] = wsum > 0 ? Math.round(sum / wsum) : 0;
+        }
+      }
+      return { data: out, w: nw, h: nh };
+    }
     for (let y = 0; y < nh; y++) {
-      let fy = (y + 0.5) * sy - 0.5; let y0 = Math.floor(fy); const wy = fy - y0;
+      let fy = (y + 0.5) * stepY - 0.5; let y0 = Math.floor(fy); const wy = fy - y0;
       let y1 = y0 + 1; y0 = Math.max(0, Math.min(h - 1, y0)); y1 = Math.max(0, Math.min(h - 1, y1));
       for (let x = 0; x < nw; x++) {
-        let fx = (x + 0.5) * sx - 0.5; let x0 = Math.floor(fx); const wx = fx - x0;
+        let fx = (x + 0.5) * stepX - 0.5; let x0 = Math.floor(fx); const wx = fx - x0;
         let x1 = x0 + 1; x0 = Math.max(0, Math.min(w - 1, x0)); x1 = Math.max(0, Math.min(w - 1, x1));
         const a = data[y0 * w + x0], b = data[y0 * w + x1], c = data[y1 * w + x0], d = data[y1 * w + x1];
         const top = a + (b - a) * wx, bot = c + (d - c) * wx;
@@ -282,6 +318,11 @@
   }
 
   const OVERLAP = 0.20; // hardcoded in the Python accept/gap logic
+  // A real number's digits are always tightly kerned - this is the widest gap (reference
+  // px) worth still calling "the same number". Shared by readCellEx's post-filter (a
+  // trailing cluster past this gap is unrelated art) and detectDigitSpan below (the pre-
+  // pass that finds how far the real number actually extends before any art starts).
+  const MAX_DIGIT_GAP = 15;
 
   function overlaps(x, tw, accepted) {
     for (const a of accepted) {
@@ -295,22 +336,72 @@
     return false;
   }
 
+  // How many digits are actually here, and how far right do they extend? Connected
+  // components already segments digit-plausible-sized ink blobs (see components()) -
+  // walking them left to right and stopping at the first gap wider than a real number
+  // ever kerns finds the number's own extent BEFORE any template matching happens, so
+  // whatever sits past it (typically an item icon bleeding into the wide capture strip)
+  // can be masked out of the search outright instead of hoping a threshold or a post-hoc
+  // filter catches it once it has already been mismatched as a digit.
+  function detectDigitSpan(bin) {
+    const comps = components(bin).sort((a, b) => a.x - b.x);
+    if (!comps.length) return null;
+    let endX = comps[0].x + comps[0].mask.w;
+    let count = 1;
+    for (let i = 1; i < comps.length; i++) {
+      const gap = comps[i].x - endX;
+      if (gap > MAX_DIGIT_GAP) break;
+      endX = comps[i].x + comps[i].mask.w;
+      count++;
+    }
+    return { count, startX: comps[0].x, endX };
+  }
+
   // Read one cell -> string, or "?" if unreadable.
   function readCellEx(V, W, H, cx, cy, templates, P, scale) {
     scale = scale && scale > 0 ? scale : 1;
+    // Independent left/right extent (default: both = stripWidth, i.e. today's symmetric
+    // box - unset, nothing changes for anyone). Digits are left-anchored and background
+    // art (an item's icon) sits to their right, so a short number leaves a wide, empty-
+    // looking gap on the right that is really "icon, not yet ruled out" - a floor tuned
+    // to keep the digit intact often lets a bright icon highlight through there too,
+    // because the two aren't separable by brightness alone at that point (see the OCR
+    // debug panel's discussion). Narrowing stripRight removes that art from the search
+    // entirely rather than hoping a threshold or a post-hoc filter catches it.
+    const stripL = P.stripLeft != null ? P.stripLeft : P.stripWidth;
+    const stripR = P.stripRight != null ? P.stripRight : P.stripWidth;
     let sub;
     if (scale !== 1) {
       // calibrated non-reference resolution: crop the scaled window, then resample
       // back to reference size so the fixed 0-9 templates + reference P still apply.
-      const sw = Math.round(P.stripWidth * scale), up = Math.round(P.up * scale), dn = Math.round(P.dn * scale);
-      const raw = crop(V, W, H, cx - sw, cy - up, cx + sw, cy + dn);
-      if (!raw.w || !raw.h) return { text: '?', conf: 0 };
-      sub = resample(raw, Math.max(1, Math.round(raw.w / scale)), Math.max(1, Math.round(raw.h / scale)));
+      // P.matchScale (default 1, EXPERIMENTAL): shrink less aggressively - to
+      // matchScale x reference size instead of 1x - for a sharper glyph at the cost of
+      // a bigger sliding-match window. templates must be pre-scaled by the same factor
+      // (see upscaleTemplate) or the sizes won't line up.
+      const targetScale = scale / (P.matchScale || 1);
+      const swL = Math.round(stripL * scale), swR = Math.round(stripR * scale), up = Math.round(P.up * scale), dn = Math.round(P.dn * scale);
+      const raw = crop(V, W, H, cx - swL, cy - up, cx + swR, cy + dn);
+      if (!raw.w || !raw.h) return { text: '?', conf: 0, glyphs: [] };
+      sub = resample(raw, Math.max(1, Math.round(raw.w / targetScale)), Math.max(1, Math.round(raw.h / targetScale)));
     } else {
-      sub = crop(V, W, H, cx - P.stripWidth, cy - P.up, cx + P.stripWidth, cy + P.dn);
+      sub = crop(V, W, H, cx - stripL, cy - P.up, cx + stripR, cy + P.dn);
     }
-    if (!sub.w || !sub.h) return { text: '?', conf: 0 };
+    if (!sub.w || !sub.h) return { text: '?', conf: 0, glyphs: [] };
     const bin = binarize(sub, P.floor);
+
+    // Auto-detect how far the real number extends and mask off everything past it -
+    // skipped when a user has manually pinned stripRight for this exact slot (see the OCR
+    // debug panel), which already built a tighter bin above and means "trust my number,
+    // not the detector". A few reference px of margin keeps a slightly-wider-than-expected
+    // last digit (or its own anti-aliased edge) from being clipped by the mask itself.
+    if (P.stripRight == null && !P.noAutoRight) {
+      const span = detectDigitSpan(bin);
+      if (span) {
+        const cutX = Math.min(bin.w, span.endX + 3);
+        for (let y = 0; y < bin.h; y++)
+          for (let x = cutX; x < bin.w; x++) bin.data[y * bin.w + x] = 0;
+      }
+    }
 
     let cands = collect(bin, templates, P.iouThresh, P);
 
@@ -339,12 +430,66 @@
       } catch (e) { /* proceed with empty */ }
     }
 
-    if (!cands.length) return { text: '?', conf: 0 };
+    if (!cands.length) return { text: '?', conf: 0, glyphs: [] };
 
-    // greedy non-overlapping, highest IoU first
-    cands.sort((a, b) => b.score - a.score);
+    // Pick ONE winner per contested footprint, then greedily accept non-overlapping
+    // winners. P.preferWideOnTie (opt-in, default off - existing regimes are unaffected):
+    // when two candidates at close scores compete for the same ink, a thin "1" can score
+    // deceptively high against just ONE stroke of a wider digit (e.g. "4"'s vertical) and
+    // win outright, silently eating the wider glyph's position - "348" reads "318".
+    // Preferring the wider template on a near-tie favours the full-glyph match.
+    //
+    // Two earlier attempts at this both broke on real captures:
+    //  - a single comparator returning b.tw-a.tw within 0.08 of score, b.score-a.score
+    //    otherwise, isn't transitive (A~B by width, B~C by width, A and C differ by score
+    //    alone), so Array.sort - which only assumes a strict weak order - gave a result
+    //    that depended on cands' incoming order, not just the scores: same candidates,
+    //    different collect() iteration order, different winner. Measured: "261" lost its
+    //    "6" to an unrelated "1".
+    //  - sorting by score then merging *consecutive* candidates within 0.08 of each
+    //    other's neighbour (or of a running chain start) is transitive, but still wrong:
+    //    it ties candidates by score alone regardless of WHERE they sit. A dominant "3" at
+    //    one x and a middling "1" at a completely different, non-overlapping x can end up
+    //    "tied" by score with nothing to do with each other, while the "1" and the real
+    //    "4" it should be competing against (close by score, close by position) end up
+    //    split into different chains because the "1" chained onto the "3" first. Measured:
+    //    still broke "348" into "318" this way.
+    //
+    // The two candidates a width-preference should ever compare are ones that can never
+    // BOTH be accepted anyway - i.e. their footprints overlap (directly, or transitively
+    // through a shared neighbour). So: group into overlap-connected clusters first (a
+    // property of x/width alone, unaffected by score), then resolve one winner per
+    // cluster (highest score; on a near-tie within that cluster, widest template), then
+    // run the ordinary greedy accept over just the per-cluster winners.
+    function clusterByOverlap(items) {
+      const clusters = items.map((c) => [c]);
+      for (let merged = true; merged;) {
+        merged = false;
+        for (let i = 0; i < clusters.length && !merged; i++) {
+          for (let j = i + 1; j < clusters.length; j++) {
+            if (clusters[i].some((a) => clusters[j].some((b) => overlaps(a.x, a.tw, [b])))) {
+              clusters[i] = clusters[i].concat(clusters[j]);
+              clusters.splice(j, 1);
+              merged = true;
+              break;
+            }
+          }
+        }
+      }
+      return clusters;
+    }
+    const TIE = 0.08;
+    const winners = clusterByOverlap(cands).map((cluster) => {
+      cluster.sort((a, b) => b.score - a.score);
+      if (!P.preferWideOnTie) return cluster[0];
+      const top = cluster[0].score;
+      const tied = cluster.filter((c) => top - c.score < TIE);
+      tied.sort((a, b) => b.tw - a.tw);
+      return tied[0];
+    });
+    winners.sort((a, b) => b.score - a.score);
     const accepted = [];
-    for (const c of cands) if (!overlaps(c.x, c.tw, accepted)) accepted.push(c);
+    for (const c of winners) if (!overlaps(c.x, c.tw, accepted)) accepted.push(c);
 
     // GAP-FILL between and after digits (lower threshold second pass)
     gapFill(bin, templates, accepted, P);
@@ -371,17 +516,55 @@
       }
       filtered.push(c);
     }
-    if (!filtered.length) return { text: '?', conf: 0 };
+
+    // POST-FILTER: drop a trailing cluster separated from the rest by a gap wider
+    // than gapFill's own "plausible missing digit" range (MAX_DIGIT_GAP). A real
+    // number's digits are always tightly kerned, so a gap that wide means whatever
+    // comes after was never part of the number - typically a desaturated icon edge
+    // (icon art sits right after short numbers inside the wide capture strip)
+    // that happened to score above threshold on its own, read as a stray "1".
+    for (let i = 1; i < filtered.length; i++) {
+      const gap = filtered[i].x - (filtered[i - 1].x + (filtered[i - 1].tw || 0));
+      if (gap > MAX_DIGIT_GAP) { filtered.length = i; break; }
+    }
+    if (!filtered.length) return { text: '?', conf: 0, glyphs: [] };
     // confidence = mean IoU match score of the accepted glyphs (gap-filled ones default
     // to the base threshold). Surfaced per-line in the UI so misreads are easy to spot.
     const scores = filtered.map((c) => (typeof c.score === 'number' ? c.score : P.iouThresh));
     const conf = scores.reduce((a, b) => a + b, 0) / scores.length;
-    return { text: filtered.map((c) => c.ch).join(''), conf };
+    // DEBUG: which template key won each accepted position, and at what score - so a
+    // misread can be inspected ("why did it pick THIS glyph") instead of guessed at.
+    // Gap-filled glyphs (no c.score) are marked estimated rather than given a fake score.
+    const glyphs = filtered.map((c) => ({
+      ch: c.ch, x: c.x,
+      score: typeof c.score === 'number' ? +c.score.toFixed(3) : null,
+      gapFilled: typeof c.score !== 'number',
+    }));
+    return { text: filtered.map((c) => c.ch).join(''), conf, glyphs };
   }
 
   // string-only wrapper: back-compat for callers that just want the count text.
   function readCell(V, W, H, cx, cy, templates, P, scale) {
     return readCellEx(V, W, H, cx, cy, templates, P, scale).text;
+  }
+
+  // DEBUG ONLY: expose the exact intermediate images readCellEx works from - the
+  // shrunk-to-reference-size cell it hands to binarize/template matching, and the
+  // binarized result - so a misread can be inspected visually instead of guessed at.
+  // Not used by the live reader; see main.js's stash-debug-live tooling.
+  function debugShrunkCell(V, W, H, cx, cy, P, scale) {
+    scale = scale && scale > 0 ? scale : 1;
+    const stripL = P.stripLeft != null ? P.stripLeft : P.stripWidth;
+    const stripR = P.stripRight != null ? P.stripRight : P.stripWidth;
+    let sub;
+    if (scale !== 1) {
+      const swL = Math.round(stripL * scale), swR = Math.round(stripR * scale), up = Math.round(P.up * scale), dn = Math.round(P.dn * scale);
+      const raw = crop(V, W, H, cx - swL, cy - up, cx + swR, cy + dn);
+      sub = resample(raw, Math.max(1, Math.round(raw.w / scale)), Math.max(1, Math.round(raw.h / scale)));
+    } else {
+      sub = crop(V, W, H, cx - stripL, cy - P.up, cx + stripR, cy + P.dn);
+    }
+    return { shrunk: sub, binarized: binarize(sub, P.floor) };
   }
 
   // Binarisation floors tried per cell by readCellAdaptive, spanning "dim glyph on bright
@@ -421,9 +604,11 @@
       // different wrong answer. The cap still exists so a strip of art cannot win by
       // being long.
       const score = r.conf * Math.min(r.text.length, 6);
-      if (!best || score > best.score) best = { text: r.text, conf: r.conf, score, floor };
+      if (!best || score > best.score) best = { text: r.text, conf: r.conf, score, floor, glyphs: r.glyphs };
     }
-    return best ? { text: best.text, conf: best.conf, floor: best.floor } : { text: '?', conf: 0 };
+    return best
+      ? { text: best.text, conf: best.conf, floor: best.floor, glyphs: best.glyphs }
+      : { text: '?', conf: 0, glyphs: [] };
   }
 
   // collect candidates over all templates at a given IoU threshold.
@@ -541,11 +726,20 @@
   // and the reference is unaffected, because nothing is removed.
   //
   // Each exemplar needs a distinct key so it can compete as its own template; the keys
-  // are mapped back to digits by `unmap` after assembly.
-  const ALT_POOL = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  // are mapped back to digits by `unmap` after assembly. Extended with Greek letters
+  // (49/52 Latin slots were already spoken for by 5 baked variants - a 6th would have
+  // silently dropped 7 of its 10 digits) - Greek never collides with real OCR'd digit
+  // output, so it is safe filler for more variant capacity without touching `unmap`'s
+  // per-character replace logic.
+  const ALT_POOL = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    + 'αβγδεζηθικλμνξοπρστυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ';
   function bankFromJSON(obj) {
     const bank = templatesFromJSON(obj);
     const back = new Map();
+    // DEBUG: which baked source each key came from, so a misread can say "the '4' that
+    // won came from cap-1920x1080-a at score .81" instead of just a bare character.
+    const src = new Map();
+    for (const ch of Object.keys(bank)) src.set(ch, 'base');
     const variants = (obj && obj.variants) || [];
     let slot = 0;
     for (const v of variants) {
@@ -555,10 +749,12 @@
         const key = ALT_POOL[slot++];
         bank[key] = t[ch];
         back.set(key, ch);
+        src.set(key, v.source || 'variant');
       }
     }
     const unmap = (text) => String(text || '').replace(/./g, (c) => (back.has(c) ? back.get(c) : c));
-    return { bank, unmap, variantCount: variants.length };
+    const sourceOf = (key) => src.get(key) || 'unknown';
+    return { bank, unmap, sourceOf, variantCount: variants.length };
   }
 
   // Rehydrate a baked template set ({ templates: { ch: {w,h,data:[…]} } } or the
@@ -573,9 +769,37 @@
     return out;
   }
 
+  // EXPERIMENTAL: nearest-neighbour pixel duplication, factor x. Templates are already
+  // binary bitmaps (no anti-aliasing to interpolate), so exact integer duplication is a
+  // faithful enlargement - unlike resampling a real capture, there is no new information
+  // to invent or blur away. Pairs with P.matchScale in readCellEx.
+  function upscaleTemplate(t, factor) {
+    factor = Math.max(1, Math.round(factor));
+    if (factor === 1) return t;
+    const w = t.w * factor, h = t.h * factor;
+    const out = new Uint8Array(w * h);
+    for (let y = 0; y < t.h; y++) {
+      for (let x = 0; x < t.w; x++) {
+        const v = t.data[y * t.w + x];
+        if (!v) continue;
+        for (let dy = 0; dy < factor; dy++) {
+          const row = (y * factor + dy) * w;
+          for (let dx = 0; dx < factor; dx++) out[row + x * factor + dx] = 1;
+        }
+      }
+    }
+    return { w, h, data: out };
+  }
+  function upscaleTemplateBank(bank, factor) {
+    const out = {};
+    for (const ch of Object.keys(bank)) out[ch] = upscaleTemplate(bank[ch], factor);
+    return out;
+  }
+
   return {
-    otsu, crop, binarize, components, iou, slideMatch, greyOpening, resampleRGBA,
+    otsu, crop, binarize, components, iou, slideMatch, greyOpening, resampleRGBA, resample,
     extractTemplates, readCell, readCellEx, readCellAdaptive, valueChannelFromRGBA, valueChannelDesatMax,
-    templatesFromJSON, bankFromJSON, DEFAULTS, DESAT_SAT,
+    templatesFromJSON, bankFromJSON, DEFAULTS, DESAT_SAT, debugShrunkCell, detectDigitSpan,
+    upscaleTemplate, upscaleTemplateBank,
   };
 });
