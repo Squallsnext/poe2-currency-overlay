@@ -15,65 +15,52 @@
 })(typeof self !== 'undefined' ? self : this, function () {
 
   // { cx, cy, apiId }  — apiId matches the poe2scout catalog slug.
-  // Re-calibrated 2026-09-25 (second pass, after the in-game UI text size was increased)
-  // from a live capture via the stash-debug-live adjust tool. Box size back to
-  // digit-reader.js's DEFAULTS (stripWidth 17, up/dn 12) - this pass measured the same
-  // size as the shared default, no per-tab override needed.
   const STATIC_SLOTS = [
     // top row — Transmutation (base/greater/perfect), Alchemy, Vaal, Annul, Jeweller's (lesser/greater/perfect)
-    { cx: 55.62, cy: 211.11, apiId: 'transmute' },
-    { cx: 112.57, cy: 210.05, apiId: 'greater-orb-of-transmutation' },
-    { cx: 169.27, cy: 210.41, apiId: 'perfect-orb-of-transmutation' },
-    { cx: 244.92, cy: 211.16, apiId: 'alch' },
-    { cx: 308.73, cy: 211.11, apiId: 'vaal' },
-    { cx: 371.69, cy: 211.11, apiId: 'annul' },
-    { cx: 448.18, cy: 211.11, apiId: 'lesser-jewellers-orb' },
-    { cx: 505.54, cy: 210.41, apiId: 'greater-jewellers-orb' },
-    { cx: 560.54, cy: 210.46, apiId: 'perfect-jewellers-orb' },
+    { cx: 50, cy: 209, apiId: 'transmute' },
+    { cx: 108, cy: 209, apiId: 'greater-orb-of-transmutation' },
+    { cx: 164, cy: 209, apiId: 'perfect-orb-of-transmutation' },
+    { cx: 240, cy: 208, apiId: 'alch' },
+    { cx: 301, cy: 209, apiId: 'vaal' },
+    { cx: 378, cy: 209, apiId: 'annul' },
+    { cx: 438, cy: 209, apiId: 'lesser-jewellers-orb' },
+    { cx: 495, cy: 209, apiId: 'greater-jewellers-orb' },
+    { cx: 550, cy: 208, apiId: 'perfect-jewellers-orb' },
     // 2nd row — Augmentation (b/g/p), Chance, Fracturing, Divine, Artificer's Orb
-    { cx: 55.43, cy: 273.81, apiId: 'aug' },
-    { cx: 111.56, cy: 274.16, apiId: 'greater-orb-of-augmentation' },
-    { cx: 169.08, cy: 273.41, apiId: 'perfect-orb-of-augmentation' },
-    { cx: 245.27, cy: 273.76, apiId: 'chance' },
-    { cx: 308.43, cy: 273.41, apiId: 'fracturing-orb' },
-    { cx: 370.81, cy: 273.11, apiId: 'divine' },
-    { cx: 562.08, cy: 273.81, apiId: 'artificers' },
+    { cx: 47, cy: 271, apiId: 'aug' },
+    { cx: 107, cy: 271, apiId: 'greater-orb-of-augmentation' },
+    { cx: 161, cy: 272, apiId: 'perfect-orb-of-augmentation' },
+    { cx: 240, cy: 272, apiId: 'chance' },
+    { cx: 300, cy: 272, apiId: 'fracturing-orb' },
+    { cx: 368, cy: 271, apiId: 'divine' },
+    { cx: 554, cy: 271, apiId: 'artificers' },
     // 3rd row — Regal (b/g/p). Mirror + Hinekora's Lock slots sit here too but were
     // empty in the reference tab; their coords are TODO (add on next capture that has them).
-    { cx: 55.92, cy: 337.51, apiId: 'regal' },
-    { cx: 112.78, cy: 336.81, apiId: 'greater-regal-orb' },
-    { cx: 168.83, cy: 336.81, apiId: 'perfect-regal-orb' },
+    { cx: 51, cy: 334, apiId: 'regal' },
+    { cx: 104, cy: 334, apiId: 'greater-regal-orb' },
+    { cx: 159, cy: 334, apiId: 'perfect-regal-orb' },
     // offset row — Arcanist's Etcher, Armourer's Scrap, Blacksmith's Whetstone
-    { cx: 434.97, cy: 356.46, apiId: 'etcher' },
-    { cx: 498.72, cy: 356.17, apiId: 'scrap' },
-    { cx: 560.97, cy: 355.76, apiId: 'whetstone' },
+    { cx: 429, cy: 354, apiId: 'etcher' },
+    { cx: 491, cy: 353, apiId: 'scrap' },
+    { cx: 555, cy: 354, apiId: 'whetstone' },
     // 4th row — Exalted (b/g/p)
-    { cx: 55.41, cy: 400.52, apiId: 'exalted' },
-    { cx: 112.32, cy: 400.87, apiId: 'greater-exalted-orb' },
-    { cx: 168.97, cy: 400.17, apiId: 'perfect-exalted-orb' },
+    { cx: 54, cy: 397, apiId: 'exalted' },
+    { cx: 106, cy: 397, apiId: 'greater-exalted-orb' },
+    { cx: 163, cy: 397, apiId: 'perfect-exalted-orb' },
     // offset row — Glassblower's Bauble, Gemcutter's Prism
-    { cx: 497.78, cy: 419.51, apiId: 'bauble' },
-    { cx: 561.62, cy: 419.86, apiId: 'gcp' },
+    { cx: 489, cy: 416, apiId: 'bauble' },
+    { cx: 556, cy: 416, apiId: 'gcp' },
     // 5th row — Chaos (b/g/p)
-    { cx: 55.81, cy: 463.51, apiId: 'chaos' },
-    { cx: 113.3, cy: 462.75, apiId: 'greater-chaos-orb' },
-    { cx: 170.34, cy: 462.45, apiId: 'perfect-chaos-orb' },
+    { cx: 53, cy: 460, apiId: 'chaos' },
+    { cx: 101, cy: 461, apiId: 'greater-chaos-orb' },
+    { cx: 157, cy: 460, apiId: 'perfect-chaos-orb' },
     // offset row — Scroll of Wisdom
-    { cx: 562.48, cy: 501.87, apiId: 'wisdom' },
+    { cx: 553, cy: 498, apiId: 'wisdom' },
     // shard row — Transmutation / Regal / Chance / Artificer's shards
-    { cx: 213.69, cy: 583.1, apiId: 'transmutation-shard' },
-    { cx: 276.99, cy: 582.81, apiId: 'regal-shard' },
-    { cx: 339.94, cy: 582.76, apiId: 'chance-shard' },
-    { cx: 403.34, cy: 582.76, apiId: 'artificers-shard' },
-    // Extra Exalted stacks in the dynamic bottom rows - the user keeps overflow Exalted
-    // (15k+ total) there, so these cells are read as Exalted and priced like it
-    // (priceAs). Own apiIds so each keeps its own reader settings/alignment; the net worth
-    // total adds them up like any other line. Coords ESTIMATED from the old DYNAMIC_ROWS
-    // anchors plus the shift the static slots showed after the 2026-09-25 UI-text
-    // recalibration (~+2 x, +3 y) - fix with "Ausrichten" if a box sits off.
-    { cx: 129, cy: 653, apiId: 'exalted-2', priceAs: 'exalted', suffix: ' #2' },
-    { cx: 130, cy: 709, apiId: 'exalted-3', priceAs: 'exalted', suffix: ' #3' },
-    { cx: 183, cy: 709, apiId: 'exalted-4', priceAs: 'exalted', suffix: ' #4' },
+    { cx: 200, cy: 581, apiId: 'transmutation-shard' },
+    { cx: 264, cy: 580, apiId: 'regal-shard' },
+    { cx: 328, cy: 581, apiId: 'chance-shard' },
+    { cx: 390, cy: 581, apiId: 'artificers-shard' },
   ];
 
   // Known static slots that were empty in the reference tab (coords TBD via a
@@ -81,7 +68,6 @@
   const EMPTY_STATIC_TODO = ['mirror', 'hinekoras-lock'];
 
   // The 2 dynamic bottom rows: contents are arbitrary -> icon match required.
-  // (Exception: the three cells read as extra Exalted stacks above.)
   // Row anchors (y) known; per-cell identification deferred to the icon matcher.
   const DYNAMIC_ROWS = [
     { y: 650, xs: [127, 184, 241, 299, 353, 412, 468] },
@@ -114,13 +100,6 @@
     // unflagged, which is the one combination this table exists to prevent.
     regal: 'mixed', 'perfect-exalted-orb': 'mixed',
   };
-
-  // Reverted 2026-09-25: a wider readParams override (22.82/12.29/12.29, from the
-  // stash-debug-live adjust tool) made every slot come back unread, which sends EVERY
-  // threshold in readCellAdaptive down the expensive grey-tophat fallback
-  // (digit-reader.js's readCellEx) for EVERY slot - that combination is what turned a
-  // few-second read into minutes. Back on digit-reader.js's DEFAULTS (stripWidth 17,
-  // up/dn 12) until the box size is re-measured without also breaking recognition.
 
   return {
     tab: 'currency',
