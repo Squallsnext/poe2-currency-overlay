@@ -11,6 +11,9 @@ below).
   on top of upstream `master` (`20ea30a`, v3.0.7 + changelog)
 - One commit per step, in the order the work was done, so single features can be
   cherry-picked or reverted on their own (see "Where things live" at the end).
+- Authorship: written with AI assistance (Claude, Codex); tested in game and reviewed by
+  **Squallsnext**. Commits made with Claude carry a `Co-Authored-By` trailer, the same
+  way upstream's own history does.
 
 ---
 
