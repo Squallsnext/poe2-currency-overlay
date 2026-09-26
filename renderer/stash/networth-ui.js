@@ -1564,6 +1564,10 @@
       const small = scale < 0.92;
       const smallMsg = small ? t('networth.calibrate.small_panel_warning', { scalePercent: Math.round(scale * 100) }) : '';
       if (state.wizard && state.wizard.step === 1) state.wizard.step = 2; // calibrated - now scan
+      if (res && res.scanning) { // saved; the test scan runs and reports like any scan
+        state.notice = { kind: small ? 'warn' : 'ok', msg: t('networth.calibrate.saved_scanning', { smallPanelWarning: smallMsg }) };
+        render(); return;
+      }
       if (res && res.ok && !res.mismatch) {
         wizardOnScan(res);
         applyResult(res);

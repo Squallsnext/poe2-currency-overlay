@@ -4368,10 +4368,12 @@ ipcMain.on('stash-calibrate-confirm', async (_e, frame) => {
     // how big the calibrated panel is vs the reference - below ~1 the digits shrink
     // and reads get unreliable (surfaced as a warning in the UI).
     const calScale = config.stashCalibration.h / REF_BOX.h;
-    // immediately test-scan the open tab so the user gets pass/fail feedback
-    const res = await doStashCapture(() => {});
-    const send = (ch, p) => { if (win && !win.isDestroyed()) win.webContents.send(ch, p); };
-    send('stash-calibrated', Object.assign({ calScale }, res));
+    // Tell the UI at once (the setup wizard moves on to step 2), then test-scan the open
+    // tab the normal way - its result arrives like any scan. This called doStashCapture,
+    // which a refactor had removed: the call threw, 'stash-calibrated' was never sent, and
+    // the setup wizard stayed on "step 1 of 5" after a successful calibration (reported).
+    if (win && !win.isDestroyed()) win.webContents.send('stash-calibrated', { calScale, ok: true, scanning: true });
+    captureAndBroadcast();
   } catch (err) { console.error('calibrate-confirm failed:', err.message); }
 });
 ipcMain.handle('clear-stash-calibration', () => { config.stashCalibration = null; saveConfig(); return true; });

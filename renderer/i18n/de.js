@@ -673,6 +673,7 @@ window.I18N_CATALOGS.de = {
   "itemtab.search.pill_greater_runes": "Höhere Runen",
   "itemtab.search.pill_otherworldly": "Jenseitig",
   "itemtab.settings.hide_tab_tooltip": "Diesen Tab ausblenden - wieder einschalten unter Einstellungen → App",
+  "networth.calibrate.saved_scanning": "Kalibrierung gespeichert ✓ – das offene Fach wird jetzt zum Test gelesen.{smallPanelWarning}",
   "networth.calibrate.no_tab_read": "Kalibrierung gespeichert ✓, aber kein Tab gelesen. Öffne einen Currency-Tab (voll sichtbar), stell sicher, dass dein Rahmen die farbige Markierung abgedeckt hat, dann neu kalibrieren oder {hotkey} drücken.{smallPanelWarning}",
   "networth.calibrate.small_panel_warning": " Dein Panel ist {scalePercent}% der Referenzgröße - unter 1920×1080, daher können manche Zahlen falsch gelesen werden. Spiel mit 1920×1080 oder größer für zuverlässige Reads, und korrigier alles, was daneben liegt.",
   "networth.calibrate.success": "Kalibrierung gespeichert ✓ - {tabName} erkannt, {readCount}/{slotCount} Items gelesen.{smallPanelWarning}",

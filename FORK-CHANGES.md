@@ -358,6 +358,13 @@ cells whose frame differs by tier work too, since nothing is compared with a mod
   player's hand-aligned boxes the spread inside a tab is ≤ 1 reference px; the saved size
   is exactly theirs (stripWidth 21.94, up/dn 9.65). Tested headless in the align page
   (essence 82/82). **Not yet tested in game.**
+- **At 1080p** (the currency picture scaled down to 582 px, as a stand-in for a real 1080p
+  capture): 37 of 38 boxes set, all on the count and inside their own cell (44×19 px),
+  the one unsure is a map slot with no cell. Boxes aligned by hand at 5K do NOT carry over
+  to 1080p exactly (reported: they sat half in the neighbour cell) - stored in reference
+  units, they still hold that setup's small panel-box offsets; G at the new resolution
+  places them anew. Also seen: `currency-tab-map.js` puts exalted #3/#4 one row too low
+  (cy 709; the player's own alignment has them at ~653, next to #2).
 
 ### 4.6 Other Net Worth changes
 
@@ -416,6 +423,12 @@ cells whose frame differs by tier work too, since nothing is compared with a mod
   `stash-adjusted` event), 4. rescan, 5. result with the number of unsure slots and a
   one-click switch to OCR debug + confidence. "Next tab" repeats 2–5. Aimed at controller
   players, who otherwise have to discover calibration, Align and the debug panel alone.
+  **Fixed: stuck on "step 1 of 5" after calibrating** (reported at 1080p). Confirming the
+  calibration called `doStashCapture`, which an upstream refactor had removed - the call
+  threw, `stash-calibrated` was never sent, so neither the wizard nor the "calibrated"
+  notice moved on (upstream bug, v3.0.7). Now the calibration is reported at once
+  (wizard -> step 2, "saved, the open tab is being read as a test") and the test read runs
+  as a normal scan (`captureAndBroadcast`), whose result moves the wizard on as usual.
 - **Release notes:** a fork entry in the in-app Release notes viewer lists these changes,
   including the German client fixes. Its version string differs from the app version, so it
   never triggers the "What's new" popup.
