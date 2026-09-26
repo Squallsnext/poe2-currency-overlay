@@ -61,5 +61,26 @@
     { cx: 492, cy: 681, apiId: 'refined-necrotic-catalyst' },
   ];
   const EMPTY_STATIC_TODO = [];
-  return { tab: 'breach', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
+  // Inner frame corner of each slot's cell (reference coordinates), measured 2026-09-26
+  // on a player's 1080p and 1440p captures (calibrated from the currency cells; both sizes
+  // agree within ~1 reference px). The automatic box placement starts from these and only
+  // searches a few px around them - from the count centres above it had to search wide,
+  // and at some cells the neighbour's frame edge won (runes at 1080p, abyss omens at 1440p).
+  const CELL_CORNERS = {
+    'breach-splinter': [251.5, 268.2], 'breachstone': [314.4, 268.2], 'breachlord-sac': [258.3,
+    331.6], 'flesh-catalyst': [125.2, 462.8], 'neural-catalyst': [188.1, 462.8],
+    'adaptive-catalyst': [251.5, 462.8], 'uul-netols-catalyst': [314.4, 462.8],
+    'xophs-catalyst': [377.8, 462.8], 'tuls-catalyst': [440.8, 462.8], 'eshs-catalyst': [93.5,
+    526.1], 'chayulas-catalyst': [156.9, 526.1], 'carapace-catalyst': [219.8, 526.1],
+    'reaver-catalyst': [283.2, 526.1], 'sibilant-catalyst': [346.1, 526.1],
+    'skittering-catalyst': [409.5, 526.1], 'necrotic-catalyst': [472.5, 526.1],
+    'refined-flesh-catalyst': [125.2, 608.4], 'refined-neural-catalyst': [188.1, 608.4],
+    'refined-adaptive-catalyst': [251.5, 608.4], 'refined-uul-netols-catalyst': [314.4, 608.4],
+    'refined-xophs-catalyst': [377.8, 608.4], 'refined-tuls-catalyst': [440.8, 608.4],
+    'refined-eshs-catalyst': [93.5, 671.3], 'refined-chayulas-catalyst': [156.9, 671.3],
+    'refined-carapace-catalyst': [219.8, 671.3], 'refined-reaver-catalyst': [283.2, 671.3],
+    'refined-sibilant-catalyst': [346.1, 671.3], 'refined-skittering-catalyst': [409.5, 671.3],
+    'refined-necrotic-catalyst': [472.5, 671.3]
+  };
+  return { CELL_CORNERS, tab: 'breach', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
 });

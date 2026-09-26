@@ -79,5 +79,40 @@
     { cx: 388, cy: 698, apiId: 'atziris-soul-core-of-inoculation' },
   ];
   const EMPTY_STATIC_TODO = [];
-  return { tab: 'soulcore', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
+  // Inner frame corner of each slot's cell (reference coordinates), measured 2026-09-26
+  // on a player's 1080p and 1440p captures (calibrated from the currency cells; both sizes
+  // agree within ~1 reference px). The automatic box placement starts from these and only
+  // searches a few px around them - from the count centres above it had to search wide,
+  // and at some cells the neighbour's frame edge won (runes at 1080p, abyss omens at 1440p).
+  const CELL_CORNERS = {
+    'soul-core-of-topotante': [61.8, 252.6], 'soul-core-of-tacati': [125.2, 252.6],
+    'soul-core-of-opiloti': [188.1, 252.6], 'soul-core-of-jiquani': [251.5, 252.6],
+    'soul-core-of-zalatl': [314.4, 252.6], 'soul-core-of-citaqualotl': [377.8, 252.6],
+    'soul-core-of-puhuarte': [440.8, 252.6], 'soul-core-of-tzamoto': [504.2, 252.6],
+    'soul-core-of-xopec': [93.5, 316.0], 'soul-core-of-quipolatl': [156.4, 316.0],
+    'soul-core-of-ticaba': [219.8, 316.0], 'soul-core-of-atmohua': [282.7, 316.0],
+    'soul-core-of-cholotl': [346.1, 316.0], 'soul-core-of-zantipi': [409.1, 316.0],
+    'soul-core-of-azcapa': [472.5, 316.0], 'atmohuas-soul-core-of-retreat': [61.8, 398.2],
+    'hayoxis-soul-core-of-heatproofing': [125.2, 398.2], 'zalatls-soul-core-of-insulation': [188.1,
+    398.2], 'topotantes-soul-core-of-dampening': [251.5, 398.2], 'cholotls-soul-core-of-war': [314.4,
+    398.2], 'quipolatls-soul-core-of-flow': [377.8, 398.2], 'tzamotos-soul-core-of-ferocity': [440.8,
+    398.2], 'uromotis-soul-core-of-attenuation': [504.2, 398.2],
+    'opilotis-soul-core-of-assault': [93.5, 461.1], 'guatelitzis-soul-core-of-endurance': [156.4,
+    461.1], 'xopecs-soul-core-of-power': [219.8, 461.1],
+    'estazuntis-soul-core-of-convalescence': [282.7, 461.1],
+    'tacatis-soul-core-of-affliction': [346.1, 461.1], 'xipocados-soul-core-of-dominion': [409.1,
+    461.1], 'citaqualotls-soul-core-of-foulness': [472.5, 461.1],
+    'jiquanis-soul-core-of-automation': [93.5, 543.3], 'jiquanis-soul-core-of-malediction': [156.4,
+    543.3], 'jiquanis-soul-core-of-targeting': [219.8, 543.3],
+    'jiquanis-soul-core-of-rallying': [282.7, 543.3], 'jiquanis-soul-core-of-radiance': [346.1,
+    543.3], 'jiquanis-soul-core-of-severing': [409.1, 543.3],
+    'jiquanis-soul-core-of-rippling': [472.5, 543.3], 'jiquanis-soul-core-of-quaking': [125.2,
+    606.3], 'jiquanis-soul-core-of-munitions': [188.1, 606.3],
+    'jiquanis-soul-core-of-snares': [251.5, 606.3], 'jiquanis-soul-core-of-abundance': [314.4,
+    606.3], 'jiquanis-soul-core-of-squalls': [377.8, 606.3],
+    'jiquanis-soul-core-of-thundering': [440.8, 606.3], 'atziris-soul-core-of-devotion': [188.6,
+    688.5], 'atziris-soul-core-of-vitality': [251.5, 688.5], 'atziris-soul-core-of-alacrity': [314.9,
+    688.5], 'atziris-soul-core-of-inoculation': [377.8, 688.5]
+  };
+  return { CELL_CORNERS, tab: 'soulcore', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
 });

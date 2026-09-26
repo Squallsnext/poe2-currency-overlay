@@ -3883,8 +3883,21 @@ function ruleProposal(tab, cap) {
   const kx = data.width / data.refBox.w, ky = data.height / data.refBox.h;
   const L = RULE_REF.l * kx, T = RULE_REF.t * ky, Wb = RULE_REF.w * kx, Hb = RULE_REF.h * ky;
   const snap = FS.create(FS.grayFromRGBA(cap.bitmap, cap.W, data.x, data.y, data.width, data.height), data.width, data.height);
-  const guesses = data.rows.map((r) => ({ x: r.x + r.w / 2 - L - Wb / 2, y: r.y + r.h / 2 - T - Hb / 2 }));
-  const found = snap.innerCorners(guesses, { scale: kx / RULE_5K });
+  // where to look: the cell's measured corner (map CELL_CORNERS) - then only a few px
+  // around it, so a neighbour's frame edge is out of reach - else from the box centre
+  const CC = TAB_MAPS[tab] && TAB_MAPS[tab].CELL_CORNERS;
+  const withCorner = [], without = [];
+  data.rows.forEach((r, i) => (CC && CC[r.apiId] ? withCorner : without).push(i));
+  const found = new Array(data.rows.length);
+  if (withCorner.length) {
+    const g = withCorner.map((i) => { const c = CC[data.rows[i].apiId]; return { x: (c[0] - data.refBox.x) * kx, y: (c[1] - data.refBox.y) * ky }; });
+    snap.innerCorners(g, { scale: kx / RULE_5K, range: Math.max(2, Math.round(4 * kx)), shiftRange: Math.round(25 * kx) })
+      .forEach((c, k) => { found[withCorner[k]] = c; });
+  }
+  if (without.length) {
+    const g = without.map((i) => { const r = data.rows[i]; return { x: r.x + r.w / 2 - L - Wb / 2, y: r.y + r.h / 2 - T - Hb / 2 }; });
+    snap.innerCorners(g, { scale: kx / RULE_5K }).forEach((c, k) => { found[without[k]] = c; });
+  }
   const deltas = {};
   let ok = 0;
   found.forEach((c, i) => {

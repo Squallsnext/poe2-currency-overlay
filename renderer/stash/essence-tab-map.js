@@ -94,5 +94,53 @@
     { cx: 277, cy: 714, apiId: 'essence-of-the-abyss' },
     { cx: 330, cy: 714, apiId: 'essence-of-the-breach' },
   ];
-  return { tab: 'essence', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS };
+  // Inner frame corner of each slot's cell (reference coordinates), measured 2026-09-26
+  // on a player's 1080p and 1440p captures (calibrated from the currency cells; both sizes
+  // agree within ~1 reference px). The automatic box placement starts from these and only
+  // searches a few px around them - from the count centres above it had to search wide,
+  // and at some cells the neighbour's frame edge won (runes at 1080p, abyss omens at 1440p).
+  const CELL_CORNERS = {
+    'lesser-essence-of-the-body': [39.6, 192.1], 'essence-of-the-body': [90.2, 192.1],
+    'greater-essence-of-the-body': [140.7, 192.1], 'perfect-essence-of-the-body': [194.5, 192.1],
+    'lesser-essence-of-the-mind': [39.6, 248.6], 'essence-of-the-mind': [90.6, 248.6],
+    'greater-essence-of-the-mind': [140.7, 248.6], 'perfect-essence-of-the-mind': [194.5, 248.6],
+    'lesser-essence-of-enhancement': [39.6, 305.6], 'essence-of-enhancement': [90.2, 305.6],
+    'greater-essence-of-enhancement': [140.7, 305.6], 'perfect-essence-of-enhancement': [194.5,
+    305.6], 'lesser-essence-of-flames': [39.6, 362.5], 'essence-of-flames': [90.2, 362.5],
+    'greater-essence-of-flames': [140.7, 362.5], 'perfect-essence-of-flames': [194.5, 362.5],
+    'lesser-essence-of-insulation': [39.6, 419.5], 'essence-of-insulation': [90.2, 419.5],
+    'greater-essence-of-insulation': [140.7, 419.5], 'perfect-essence-of-insulation': [194.5, 419.5],
+    'lesser-essence-of-ice': [39.6, 476.0], 'essence-of-ice': [90.6, 476.0],
+    'greater-essence-of-ice': [140.7, 476.0], 'perfect-essence-of-ice': [194.5, 476.0],
+    'lesser-essence-of-thawing': [39.6, 532.9], 'essence-of-thawing': [90.2, 532.9],
+    'greater-essence-of-thawing': [140.7, 532.9], 'perfect-essence-of-thawing': [194.5, 532.9],
+    'lesser-essence-of-electricity': [39.6, 589.9], 'essence-of-electricity': [90.2, 589.9],
+    'greater-essence-of-electricity': [140.7, 589.9], 'perfect-essence-of-electricity': [194.5,
+    589.9], 'lesser-essence-of-grounding': [39.6, 646.9], 'essence-of-grounding': [90.2, 646.9],
+    'greater-essence-of-grounding': [140.7, 646.9], 'perfect-essence-of-grounding': [194.5, 646.9],
+    'lesser-essence-of-ruin': [39.6, 703.4], 'essence-of-ruin': [90.6, 703.4],
+    'greater-essence-of-ruin': [140.7, 703.4], 'perfect-essence-of-ruin': [194.5, 703.4],
+    'lesser-essence-of-command': [377.4, 192.1], 'essence-of-command': [427.9, 192.1],
+    'greater-essence-of-command': [478.5, 192.1], 'perfect-essence-of-command': [532.3, 192.1],
+    'lesser-essence-of-abrasion': [377.4, 248.6], 'essence-of-abrasion': [427.9, 248.6],
+    'greater-essence-of-abrasion': [478.5, 248.6], 'perfect-essence-of-abrasion': [532.3, 248.6],
+    'lesser-essence-of-sorcery': [377.4, 305.6], 'essence-of-sorcery': [427.9, 305.6],
+    'greater-essence-of-sorcery': [478.5, 305.6], 'perfect-essence-of-sorcery': [532.3, 305.6],
+    'lesser-essence-of-haste': [377.4, 362.5], 'essence-of-haste': [427.9, 362.5],
+    'greater-essence-of-haste': [478.5, 362.5], 'perfect-essence-of-haste': [532.3, 362.5],
+    'lesser-essence-of-alacrity': [377.4, 419.5], 'essence-of-alacrity': [427.9, 419.5],
+    'greater-essence-of-alacrity': [478.5, 419.5], 'perfect-essence-of-alacrity': [532.3, 419.5],
+    'lesser-essence-of-seeking': [377.4, 476.0], 'essence-of-seeking': [427.9, 476.0],
+    'greater-essence-of-seeking': [478.5, 476.0], 'perfect-essence-of-seeking': [532.3, 476.0],
+    'lesser-essence-of-battle': [377.4, 532.9], 'essence-of-battle': [427.9, 532.9],
+    'greater-essence-of-battle': [478.5, 532.9], 'perfect-essence-of-battle': [532.3, 532.9],
+    'lesser-essence-of-the-infinite': [377.4, 589.9], 'essence-of-the-infinite': [427.9, 589.9],
+    'greater-essence-of-the-infinite': [478.5, 589.9], 'perfect-essence-of-the-infinite': [532.3,
+    589.9], 'lesser-essence-of-opulence': [377.4, 646.9], 'essence-of-opulence': [427.9, 646.9],
+    'greater-essence-of-opulence': [478.5, 646.9], 'perfect-essence-of-opulence': [532.3, 646.9],
+    'essence-of-hysteria': [261.1, 589.9], 'essence-of-horror': [311.6, 589.9],
+    'essence-of-delirium': [261.1, 646.9], 'essence-of-insanity': [311.6, 646.9],
+    'essence-of-the-abyss': [261.1, 703.4], 'essence-of-the-breach': [311.6, 703.4]
+  };
+  return { CELL_CORNERS, tab: 'essence', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS };
 });

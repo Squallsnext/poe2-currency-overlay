@@ -101,10 +101,31 @@
     regal: 'mixed', 'perfect-exalted-orb': 'mixed',
   };
 
+  // Inner frame corner of each slot's cell (reference coordinates), measured 2026-09-26
+  // on a player's 1080p and 1440p captures (calibrated from the currency cells; both sizes
+  // agree within ~1 reference px). The automatic box placement starts from these and only
+  // searches a few px around them - from the count centres above it had to search wide,
+  // and at some cells the neighbour's frame edge won (runes at 1080p, abyss omens at 1440p).
+  const CELL_CORNERS = {
+    'transmute': [30.0, 198.1], 'greater-orb-of-transmutation': [87.0, 198.1],
+    'perfect-orb-of-transmutation': [144.0, 198.1], 'alch': [219.8, 198.1], 'vaal': [282.7, 198.1],
+    'annul': [346.1, 198.1], 'lesser-jewellers-orb': [421.9, 198.1], 'greater-jewellers-orb': [478.9,
+    198.1], 'perfect-jewellers-orb': [535.9, 198.1], 'aug': [30.0, 261.5],
+    'greater-orb-of-augmentation': [87.0, 261.5], 'perfect-orb-of-augmentation': [144.0, 261.5],
+    'chance': [219.8, 261.5], 'fracturing-orb': [282.7, 261.5], 'divine': [346.1, 261.5],
+    'artificers': [535.4, 261.5], 'regal': [30.0, 324.4], 'greater-regal-orb': [87.0, 324.4],
+    'perfect-regal-orb': [144.0, 324.4], 'etcher': [409.1, 343.7], 'scrap': [472.5, 343.7],
+    'whetstone': [535.4, 343.7], 'exalted': [30.0, 387.8], 'greater-exalted-orb': [87.0, 387.8],
+    'perfect-exalted-orb': [144.0, 387.8], 'bauble': [472.5, 406.6], 'gcp': [535.4, 406.6],
+    'chaos': [30.0, 450.7], 'greater-chaos-orb': [87.0, 450.7], 'perfect-chaos-orb': [144.0, 450.7],
+    'wisdom': [535.4, 488.8], 'transmutation-shard': [188.1, 571.1], 'regal-shard': [251.5, 571.1],
+    'chance-shard': [314.4, 571.1], 'artificers-shard': [377.8, 571.1]
+  };
   return {
     tab: 'currency',
     SLOT_RELIABILITY,
     captureSize: { w: 1920, h: 1032 },
+    CELL_CORNERS,
     STATIC_SLOTS,
     EMPTY_STATIC_TODO,
     DYNAMIC_ROWS,

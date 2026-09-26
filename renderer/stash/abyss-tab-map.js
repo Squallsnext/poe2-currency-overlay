@@ -47,5 +47,22 @@
 
   const EMPTY_STATIC_TODO = ['kurgals-gaze', 'tecrods-gaze', 'ulamans-gaze', 'amanamus-gaze'];
 
-  return { tab: 'abyss', captureSize: { w: 1920, h: 1032 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
+  // Inner frame corner of each slot's cell (reference coordinates), measured 2026-09-26
+  // on a player's 1080p and 1440p captures (calibrated from the currency cells; both sizes
+  // agree within ~1 reference px). The automatic box placement starts from these and only
+  // searches a few px around them - from the count centres above it had to search wide,
+  // and at some cells the neighbour's frame edge won (runes at 1080p, abyss omens at 1440p).
+  const CELL_CORNERS = {
+    'kulemaks-invitation': [282.7, 227.0], 'preserved-cranium': [282.7, 320.4],
+    'gnawed-jawbone': [221.0, 382.2], 'preserved-jawbone': [282.7, 382.2], 'ancient-jawbone': [343.7,
+    382.2], 'gnawed-collarbone': [190.1, 443.9], 'preserved-collarbone': [252.3, 443.9],
+    'ancient-collarbone': [314.4, 443.9], 'altered-collarbone': [376.2, 443.9], 'gnawed-rib': [221.0,
+    506.0], 'preserved-rib': [282.7, 506.0], 'ancient-rib': [343.7, 506.0],
+    'preserved-vertebrae': [282.7, 567.8], 'omen-of-abyssal-echoes': [66.5, 660.1],
+    'omen-of-the-sovereign': [128.3, 660.1], 'omen-of-the-liege': [190.3, 660.1],
+    'omen-of-the-blackblooded': [252.3, 660.1], 'omen-of-putrefaction': [314.4, 660.1],
+    'omen-of-light': [376.2, 660.1], 'omen-of-sinistral-necromancy': [438.0, 660.1],
+    'omen-of-dextral-necromancy': [499.7, 660.1]
+  };
+  return { CELL_CORNERS, tab: 'abyss', captureSize: { w: 1920, h: 1032 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
 });

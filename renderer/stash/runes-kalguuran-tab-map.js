@@ -79,5 +79,40 @@
   // a tighter read window (stripWidth 12 vs default 15) drops it. Fits 2-digit counts
   // (Masterwork=10 reads fine); 3+ digit counts on these runes would clip (rare).
   const readParams = { stripWidth: 12 };
-  return { tab: 'runes-kalguuran', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO, readParams };
+  // Inner frame corner of each slot's cell (reference coordinates), measured 2026-09-26
+  // on a player's 1080p and 1440p captures (calibrated from the currency cells; both sizes
+  // agree within ~1 reference px). The automatic box placement starts from these and only
+  // searches a few px around them - from the count centres above it had to search wide,
+  // and at some cells the neighbour's frame edge won (runes at 1080p, abyss omens at 1440p).
+  const CELL_CORNERS = {
+    'warding-rune-of-reinforcement': [125.2, 243.0], 'warding-rune-of-protection': [188.1, 243.0],
+    'warding-rune-of-disintegration': [251.5, 243.0], 'warding-rune-of-desperation': [314.4, 243.0],
+    'warding-rune-of-courage': [377.8, 243.0], 'warding-rune-of-nourishment': [440.8, 243.0],
+    'warding-rune-of-symbiosis': [125.2, 306.4], 'warding-rune-of-stability': [188.1, 306.4],
+    'warding-rune-of-glancing': [251.5, 306.4], 'warding-rune-of-heart': [314.4, 306.4],
+    'warding-rune-of-annihilation': [377.8, 306.4], 'warding-rune-of-salvaging': [440.8, 306.4],
+    'warding-rune-of-armature': [156.9, 369.3], 'warding-rune-of-obsession': [219.8, 369.3],
+    'warding-rune-of-equinox': [283.2, 369.3], 'warding-rune-of-bodyguards': [346.1, 369.3],
+    'warding-rune-of-hollowing': [409.5, 369.3], 'ancient-rune-of-splinters': [30.0, 439.1],
+    'ancient-rune-of-dueling': [93.5, 439.1], 'ancient-rune-of-the-titan': [156.4, 439.1],
+    'ancient-rune-of-shattering': [219.8, 439.1], 'ancient-rune-of-prowess': [282.7, 439.1],
+    'ancient-rune-of-control': [346.1, 439.1], 'ancient-rune-of-discovery': [409.1, 439.1],
+    'ancient-rune-of-decay': [472.5, 439.1], 'ancient-rune-of-witchcraft': [535.4, 439.1],
+    'ancient-rune-of-the-horde': [30.0, 502.1], 'ancient-rune-of-animosity': [93.5, 502.1],
+    'ancient-rune-of-detonation': [156.4, 502.1], 'ancient-rune-of-retaliation': [219.8, 502.1],
+    'rune-of-vitality': [346.1, 502.1], 'rune-of-the-hunt': [409.1, 502.1],
+    'rune-of-acrobatics': [472.5, 502.1], 'rune-of-culmination': [535.4, 502.1],
+    'rune-of-renown': [30.0, 565.4], 'rune-of-accumulation': [93.5, 565.4],
+    'rune-of-foundations': [156.4, 565.4], 'rune-of-the-prism': [219.8, 565.4],
+    'rune-of-the-blossom': [282.7, 565.4], 'rune-of-consistency': [346.1, 565.4],
+    'rune-of-reach': [409.1, 565.4], 'rune-of-vital-flame': [472.5, 565.4],
+    'rune-of-confrontation': [535.4, 565.4], 'passion-of-aldur': [93.5, 634.8],
+    'breath-of-aldur': [156.9, 634.8], 'ire-of-aldur': [219.8, 634.8], 'betrayal-of-aldur': [283.2,
+    634.8], 'serles-triumph': [346.1, 634.8], 'cadigans-epiphany': [409.5, 634.8],
+    'astrids-creativity': [472.5, 634.8], 'uhtreds-sidereus': [30.5, 697.7], 'kolrs-hunt': [93.5,
+    697.7], 'voranas-carnage': [156.9, 697.7], 'thruds-might': [219.8, 697.7],
+    'medveds-tending': [283.2, 697.7], 'katlas-gloom': [346.1, 697.7], 'masterwork-rune': [409.5,
+    697.7]
+  };
+  return { CELL_CORNERS, tab: 'runes-kalguuran', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO, readParams };
 });

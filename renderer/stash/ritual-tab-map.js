@@ -52,5 +52,27 @@
     { cx: 468, cy: 700, apiId: 'omen-of-reinforcements' },
   ];
   const EMPTY_STATIC_TODO = [];
-  return { tab: 'ritual', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
+  // Inner frame corner of each slot's cell (reference coordinates), measured 2026-09-26
+  // on a player's 1080p and 1440p captures (calibrated from the currency cells; both sizes
+  // agree within ~1 reference px). The automatic box placement starts from these and only
+  // searches a few px around them - from the count centres above it had to search wide,
+  // and at some cells the neighbour's frame edge won (runes at 1080p, abyss omens at 1440p).
+  const CELL_CORNERS = {
+    'an-audience-with-the-king': [188.9, 198.1], 'head-of-the-king': [258.3, 198.1],
+    'omen-of-gambling': [324.9, 293.2], 'omen-of-bartering': [381.8, 293.2],
+    'omen-of-sinistral-exaltation': [99.9, 374.9], 'omen-of-dextral-exaltation': [156.4, 374.9],
+    'omen-of-greater-exaltation': [213.4, 374.9], 'omen-of-sinistral-erasure': [295.6, 374.9],
+    'omen-of-dextral-erasure': [352.6, 374.9], 'omen-of-whittling': [409.1, 374.9],
+    'omen-of-catalysing-exaltation': [185.3, 431.9], 'omen-of-chaotic-rarity': [295.6, 431.9],
+    'omen-of-chaotic-quantity': [352.6, 431.9], 'omen-of-chaotic-monsters': [409.1, 431.9],
+    'omen-of-chaotic-effectiveness': [466.1, 431.9], 'omen-of-sinistral-annulment': [115.4, 514.1],
+    'omen-of-dextral-annulment': [172.4, 514.1], 'omen-of-the-ancients': [311.6, 514.1],
+    'omen-of-the-blessed': [393.4, 514.1], 'omen-of-sanctification': [450.4, 514.1],
+    'omen-of-chance': [254.7, 514.1], 'omen-of-dextral-crystallisation': [115.4, 596.3],
+    'omen-of-sinistral-crystallisation': [172.4, 596.3], 'omen-of-resurgence': [99.9, 691.0],
+    'omen-of-amelioration': [156.4, 691.0], 'omen-of-refreshment': [213.4, 691.0],
+    'omen-of-the-hunt': [295.6, 691.0], 'omen-of-answered-prayers': [352.6, 691.0],
+    'omen-of-secret-compartments': [409.1, 691.0], 'omen-of-reinforcements': [464.2, 691.0]
+  };
+  return { CELL_CORNERS, tab: 'ritual', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
 });

@@ -97,5 +97,43 @@
 
   const EMPTY_STATIC_TODO = []; // R6 unknown slots pending a capture (see header)
 
-  return { tab: 'runes', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
+  // Inner frame corner of each slot's cell (reference coordinates), measured 2026-09-26
+  // on a player's 1080p and 1440p captures (calibrated from the currency cells; both sizes
+  // agree within ~1 reference px). The automatic box placement starts from these and only
+  // searches a few px around them - from the count centres above it had to search wide,
+  // and at some cells the neighbour's frame edge won (runes at 1080p, abyss omens at 1440p).
+  const CELL_CORNERS = {
+    'lesser-desert-rune': [30.2, 242.8], 'desert-rune': [87.2, 242.8], 'greater-desert-rune': [144.3,
+    242.8], 'lesser-glacial-rune': [226.7, 242.8], 'glacial-rune': [282.8, 242.8],
+    'greater-glacial-rune': [340.8, 242.8], 'lesser-storm-rune': [422.2, 242.8],
+    'storm-rune': [479.3, 242.8], 'greater-storm-rune': [536.4, 242.8], 'lesser-iron-rune': [30.2,
+    306.4], 'iron-rune': [87.2, 306.4], 'greater-iron-rune': [144.3, 306.4],
+    'lesser-body-rune': [226.7, 306.4], 'body-rune': [282.8, 306.4], 'greater-body-rune': [340.8,
+    306.4], 'lesser-mind-rune': [422.2, 306.4], 'mind-rune': [479.3, 306.4],
+    'greater-mind-rune': [536.4, 306.4], 'lesser-vision-rune': [30.2, 369.1], 'vision-rune': [87.2,
+    369.1], 'greater-vision-rune': [144.3, 369.1], 'lesser-rebirth-rune': [226.7, 369.1],
+    'rebirth-rune': [282.8, 369.1], 'greater-rebirth-rune': [340.8, 369.1],
+    'lesser-inspiration-rune': [422.2, 369.1], 'inspiration-rune': [479.3, 369.1],
+    'greater-inspiration-rune': [536.4, 369.1], 'lesser-robust-rune': [30.2, 432.7],
+    'robust-rune': [87.2, 432.7], 'greater-robust-rune': [144.3, 432.7], 'lesser-adept-rune': [226.7,
+    432.7], 'adept-rune': [282.8, 432.7], 'greater-adept-rune': [340.8, 432.7],
+    'lesser-resolve-rune': [422.2, 432.7], 'resolve-rune': [479.3, 432.7],
+    'greater-resolve-rune': [536.4, 432.7], 'lesser-stone-rune': [30.2, 495.3], 'stone-rune': [87.2,
+    495.3], 'greater-stone-rune': [144.3, 495.3], 'lesser-ward-rune': [226.7, 495.3],
+    'ward-rune': [282.8, 495.3], 'greater-ward-rune': [340.8, 495.3], 'charging-rune': [479.3,
+    495.3], 'greater-charging-rune': [536.4, 495.3], 'greater-rune-of-leadership': [30.2, 571.1],
+    'greater-rune-of-tithing': [93.8, 571.1], 'greater-rune-of-alacrity': [156.5, 571.1],
+    'greater-rune-of-nobility': [220.1, 571.1], 'farruls-rune-of-the-hunt': [409.1, 571.1],
+    'thane-myrks-rune-of-summer': [472.7, 571.1], 'lady-hestras-rune-of-winter': [535.4, 571.1],
+    'thane-lelds-rune-of-spring': [30.2, 634.7], 'fenumus-rune-of-agony': [93.8, 633.7],
+    'thane-girts-rune-of-wildness': [156.5, 634.7], 'hedgewitch-assandras-rune-of-wisdom': [220.1,
+    633.7], 'saqawals-rune-of-the-sky': [282.8, 633.7], 'the-greatwolfs-rune-of-willpower': [346.4,
+    634.7], 'craiceanns-rune-of-recovery': [409.1, 633.7], 'craiceanns-rune-of-warding': [472.7,
+    633.7], 'countess-seskes-rune-of-archery': [535.4, 633.7], 'saqawals-rune-of-erosion': [30.2,
+    697.3], 'saqawals-rune-of-memory': [93.8, 697.3], 'the-greatwolfs-rune-of-claws': [156.5, 697.3],
+    'courtesan-mannans-rune-of-cruelty': [220.1, 697.3], 'thane-grannells-rune-of-mastery': [282.8,
+    697.3], 'fenumus-rune-of-spinning': [346.4, 697.3], 'fenumus-rune-of-draining': [409.1, 697.3],
+    'farruls-rune-of-grace': [472.7, 697.3], 'farruls-rune-of-the-chase': [535.4, 697.3]
+  };
+  return { CELL_CORNERS, tab: 'runes', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
 });

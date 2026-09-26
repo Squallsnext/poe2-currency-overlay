@@ -62,5 +62,27 @@
     { cx: 487, cy: 656, apiId: 'ancient-potent-liquid-contempt' }, // empty for Drew -> reads "?"
   ];
   const EMPTY_STATIC_TODO = [];
-  return { tab: 'delirium', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
+  // Inner frame corner of each slot's cell (reference coordinates), measured 2026-09-26
+  // on a player's 1080p and 1440p captures (calibrated from the currency cells; both sizes
+  // agree within ~1 reference px). The automatic box placement starts from these and only
+  // searches a few px around them - from the count centres above it had to search wide,
+  // and at some cells the neighbour's frame edge won (runes at 1080p, abyss omens at 1440p).
+  const CELL_CORNERS = {
+    'simulacrum-splinter': [247.1, 227.0], 'simulacrum': [322.9, 227.0],
+    'raven-s-reflection': [283.6, 289.9], 'diluted-liquid-ire': [75.0, 359.2],
+    'diluted-liquid-guilt': [138.4, 359.2], 'diluted-liquid-greed': [201.3, 359.2],
+    'liquid-disgust': [365.8, 359.2], 'liquid-despair': [428.7, 359.2],
+    'concentrated-liquid-fear': [492.1, 359.2], 'liquid-paranoia': [106.7, 422.6],
+    'liquid-envy': [169.6, 422.6], 'concentrated-liquid-suffering': [397.5, 422.6],
+    'concentrated-liquid-isolation': [460.4, 422.6], 'ancient-diluted-liquid-ire': [75.0, 501.2],
+    'ancient-diluted-liquid-guilt': [138.4, 501.2], 'ancient-diluted-liquid-greed': [201.3, 501.2],
+    'ancient-liquid-disgust': [365.8, 501.2], 'ancient-liquid-despair': [428.7, 501.2],
+    'ancient-concentrated-liquid-fear': [492.1, 501.2], 'ancient-liquid-paranoia': [106.7, 564.6],
+    'ancient-liquid-envy': [169.6, 564.6], 'ancient-concentrated-liquid-suffering': [397.5, 564.6],
+    'ancient-concentrated-liquid-isolation': [460.4, 564.6], 'potent-liquid-melancholy': [87.8,
+    646.9], 'potent-liquid-ferocity': [153.2, 646.9], 'potent-liquid-contempt': [218.2, 646.9],
+    'ancient-potent-liquid-melancholy': [346.1, 646.9], 'ancient-potent-liquid-ferocity': [411.5,
+    646.9], 'ancient-potent-liquid-contempt': [476.5, 646.9]
+  };
+  return { CELL_CORNERS, tab: 'delirium', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
 });

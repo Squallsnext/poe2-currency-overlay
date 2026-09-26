@@ -31,5 +31,20 @@
     { cx: 389, cy: 707, apiId: 'carved-tenacity' },
   ];
   const EMPTY_STATIC_TODO = [];
-  return { tab: 'ancient-augment', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
+  // Inner frame corner of each slot's cell (reference coordinates), measured 2026-09-26
+  // on a player's 1080p and 1440p captures (calibrated from the currency cells; both sizes
+  // agree within ~1 reference px). The automatic box placement starts from these and only
+  // searches a few px around them - from the count centres above it had to search wide,
+  // and at some cells the neighbour's frame edge won (runes at 1080p, abyss omens at 1440p).
+  const CELL_CORNERS = {
+    'amanamus-gaze': [188.6, 255.8], 'tecrods-gaze': [251.5, 255.8], 'kurgals-gaze': [314.9, 255.8],
+    'ulamans-gaze': [377.8, 255.8], 'guatelitzis-thesis': [188.6, 363.3],
+    'citaqualotls-thesis': [251.5, 363.3], 'jiquanis-thesis': [314.9, 363.3],
+    'quipolatls-thesis': [377.8, 363.3], 'raven-touched-shard': [283.2, 470.4],
+    'emergent-vigour': [188.6, 577.8], 'emergent-possibility': [251.5, 577.8],
+    'emergent-protection': [314.9, 577.8], 'emergent-instinct': [377.8, 577.8],
+    'carved-cunning': [188.6, 685.3], 'carved-majesty': [251.5, 685.3], 'carved-mischief': [314.9,
+    685.3], 'carved-tenacity': [377.8, 685.3]
+  };
+  return { CELL_CORNERS, tab: 'ancient-augment', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
 });

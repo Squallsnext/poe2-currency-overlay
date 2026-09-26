@@ -44,5 +44,24 @@
     { cx: 358, cy: 673, apiId: 'idol-of-the-pharisee' },
   ];
   const EMPTY_STATIC_TODO = [];
-  return { tab: 'idol', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
+  // Inner frame corner of each slot's cell (reference coordinates), measured 2026-09-26
+  // on a player's 1080p and 1440p captures (calibrated from the currency cells; both sizes
+  // agree within ~1 reference px). The automatic box placement starts from these and only
+  // searches a few px around them - from the count centres above it had to search wide,
+  // and at some cells the neighbour's frame edge won (runes at 1080p, abyss omens at 1440p).
+  const CELL_CORNERS = {
+    'snake-idol': [61.8, 265.4], 'primate-idol': [125.2, 265.4], 'owl-idol': [188.1, 265.4],
+    'cat-idol': [251.5, 265.4], 'wolf-idol': [314.4, 265.4], 'boar-idol': [377.8, 265.4],
+    'bear-idol': [440.8, 265.4], 'ox-idol': [504.2, 265.4], 'stag-idol': [125.2, 341.2],
+    'rabbit-idol': [188.1, 341.2], 'fox-idol': [251.5, 341.2], 'panther-idol': [314.4, 341.2],
+    'stoat-idol': [377.8, 341.2], 'hawk-idol': [440.8, 341.2], 'idol-of-sirrius': [93.5, 448.7],
+    'idol-of-thruldana': [156.4, 448.7], 'idol-of-grold': [219.8, 448.7], 'idol-of-eeshta': [282.7,
+    448.7], 'idol-of-egrin': [346.1, 448.7], 'idol-of-maxarius': [409.1, 448.7],
+    'idol-of-ralakesh': [472.5, 448.7], 'idol-of-greust': [93.5, 555.7], 'idol-of-yeena': [156.9,
+    555.7], 'idol-of-eramir': [219.8, 555.7], 'idol-of-oak': [283.2, 555.7], 'idol-of-alira': [346.1,
+    555.7], 'idol-of-kraityn': [409.5, 555.7], 'idol-of-silk': [472.5, 555.7],
+    'idol-of-the-sycophant': [219.8, 663.2], 'idol-of-the-martyr': [283.2, 663.2],
+    'idol-of-the-pharisee': [346.1, 663.2]
+  };
+  return { CELL_CORNERS, tab: 'idol', captureSize: { w: 1920, h: 1080 }, STATIC_SLOTS, EMPTY_STATIC_TODO };
 });

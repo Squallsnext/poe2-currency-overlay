@@ -718,6 +718,25 @@ currency read is identical to their own full settings (38 of 38 records).
   whole tab" on a slot never aligned) got NaN coordinates: a box stuck at the left edge
   that could not be dragged, fixable only with "column". Now the map's spot is used.
 
+**Measured cell corners in every tab map** (`CELL_CORNERS`, as a safeguard for other
+setups). The tab maps place their slots at count centres, which sit a different distance
+from the cell per column and digit count (up to 22 px at 1080p on runes). The automatic
+box placement therefore had to search wide, and wide searches sometimes took a
+neighbour's frame edge: runes at 1080p, the abyss omen row at 1440p (thin 2 px frames,
+cells almost touching). Now each map carries the inner corner of every slot's cell,
+measured on the player's 1080p and 1440p captures (both calibrated from the currency
+cells; they agree within ~1 reference px). Two corners measured wrong at both sizes the
+same way (abyss "Omen of the Liege", ritual "secret compartments" / "reinforcements") were
+set from their row's pitch and confirmed: searched from there, both sizes find them within
+0.3 px. `ruleProposal` starts from these corners and searches only 4 reference px around
+them (one shift for the whole tab first, up to 25); slots without a corner (no cell there)
+keep the old way. Result on all pictures (1080p, 1440p, 5K, 12 tabs each): every cell
+found, none more than 2.5 reference px from its measured corner.
+(Tried first and dropped: requiring a near-black line behind the frame - at 1080p that
+line is often 1 px and not black, and half the cells were lost.)
+The count centres (`STATIC_SLOTS`) are unchanged, so shipped reads without placement stay
+as they were.
+
 These existed in the player's own build and were **deliberately left out** here:
 
 - The currency tab coordinates recalibrated for an enlarged in-game UI text and three extra

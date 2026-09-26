@@ -33,7 +33,30 @@ Windows, built with Electron. It reads public data only — no game memory hooks
 - Pick the mods you'd keep and the worst tier you'd accept; each is weighted by its real spawn chance.
 - It prices your item as it stands and with a hit, autofills consumable costs from live rates, and compares the routes (Preserved / Ancient / Altered) to a per-route EV and a plain verdict.
 
-## Net Worth (stash) – setting it up (fork)
+## What this fork adds
+
+Built and tested by one player (German client, 5K / 1440p / 1080p, DualSense controller).
+Full change log with the reasons and measurements: [FORK-CHANGES.md](FORK-CHANGES.md).
+German step-by-step guide: [ANLEITUNG.md](ANLEITUNG.md).
+
+- **German client fixes** – price checks for rare tablets, uniques, exceptional items and
+  renamed runes work from a German client.
+- **Controller support (DualSense, USB)** – every hotkey action can be bound to a button
+  or a combo (e.g. PS + L2, the mic mute button too); "open overlay in front".
+- **Net Worth (stash) reader, reworked**
+  - automatic calibration from the currency tab's cells (keyboard or controller UI, any
+    position, 1080p to 5K), with a test read right after;
+  - tab tour ("scan tabs") with the scan key, boxes placed onto the cells automatically;
+  - align tool (drag, mark, row/column, snap to frame, place by rule, undo, help);
+  - OCR debug panel with per-slot filters, live preview, teaching digits, and a guide;
+  - read filters shipped per resolution (1080p, 1440p, 4K/5K); faster 5K scans;
+  - own prices per item, "don't count" lists, reset with backup, support pictures and
+    settings export.
+- **Currency tab** – rate editor ("fix rate") in the arbitrage tooltip, every way to get
+  the base currency, optional vendor splits, a pinned route window that stays up.
+- **Recipes tab** – combine / split recipes with profit per round, pinnable.
+
+## Net Worth (stash) – setting it up
 
 The quick way, with keyboard or controller UI, at 1080p, 1440p, 4K or 5K:
 
@@ -53,9 +76,8 @@ The quick way, with keyboard or controller UI, at 1080p, 1440p, 4K or 5K:
    - teach: ✓ on a right count under 85 %, or type the right number at *Learn from this
      image* (each digit must be one piece in the black/white picture).
 
-Read filters tuned at 1080p, 1440p and 5K ship as defaults for those sizes; your own
-settings always win. *Reset calibration & tabs* starts over and writes a backup first.
-Details: [FORK-CHANGES.md](FORK-CHANGES.md).
+Your own settings always win over the shipped ones. *Reset calibration & tabs* starts
+over and writes a backup first; learned digits are kept.
 
 ## Install
 
