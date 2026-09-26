@@ -611,6 +611,16 @@ and get the 🔍 (images, sliders, live preview). Before, only slots that had re
 could be opened - reported at 1080p with 5K-tuned per-slot filters: nothing was read, so
 nothing could be picked to tune.
 
+**Fixed: nothing read at reference scale with aligned boxes** (1080p, reported: every slot
+"leer?", and the debug view stayed at "…"). The align tool saves fractional strips
+(21.94 x 9.65 reference px - the 125x55 px rule at 5K). At reference scale the reader
+crops the frame directly and `crop()` took those coordinates unrounded: fractional array
+indexes, every pixel `undefined`, an empty cell (the debug view's image then failed on a
+43.88 px wide bitmap). Scaled captures round before cropping, so 5K was never affected.
+`crop()` now rounds. Measured on the currency picture scaled to 1080p with the player's
+5K boxes: 0 of 12 read before, 12 of 12 read after (counts depend on the filters). The
+debug view now shows the error instead of a bare "…".
+
 ### 4.8 Setup-specific parts – already removed from this branch
 
 These existed in the player's own build and were **deliberately left out** here:

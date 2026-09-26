@@ -619,7 +619,8 @@
         } else if (cached && cached.ok === false) {
           // no screenshot for this tab (restored after a restart, or it expired) - say so
           // instead of re-requesting forever
-          dbg.textContent = cached.reason === 'no-recent-capture' ? t('networth.line.debug_need_rescan') : '…';
+          // anything else: say what went wrong (a bare "…" looked like it was still loading)
+          dbg.textContent = cached.reason === 'no-recent-capture' ? t('networth.line.debug_need_rescan') : t('networth.line.debug_error', { error: cached.error || cached.reason || '?' });
         } else if (cached && cached.ok) {
           const imgs = el('div', 'nw-dbg-imgs');
           // original | the greyscale the reader works from after colour limit/contrast

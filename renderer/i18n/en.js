@@ -741,6 +741,7 @@ window.I18N_CATALOGS.en = {
   "networth.line.debug_learn_title": "Learns the digits from the black/white image on the right, with the current sliders (saved or not). The number in the box must be right.",
   "networth.line.debug_local_off": "local cut: off (floor applies to everything)",
   "networth.line.debug_local_val": "local cut: stroke {v} brighter than surroundings",
+  "networth.line.debug_error": "Debug view failed: {error}",
   "networth.line.debug_need_rescan": "Scan this tab again for the debug view (screenshots are not kept across a restart).",
   "networth.line.debug_open_title": "Open/close the debug view for this row (one at a time)",
   "networth.line.debug_preset_off": "All filters off",

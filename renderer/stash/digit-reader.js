@@ -38,8 +38,12 @@
   // Crop [x0,x1) x [y0,y1) from a value channel, clamped to bounds.
   // Returns { data, w, h }.
   function crop(V, W, H, x0, y0, x1, y1) {
-    x0 = Math.max(0, x0); y0 = Math.max(0, y0);
-    x1 = Math.min(W, x1); y1 = Math.min(H, y1);
+    // whole pixels: a strip saved by the align tool is fractional (21.94 x 9.65 reference
+    // px); at reference scale that went in unrounded, the array index was fractional and
+    // every pixel read as undefined -> an empty cell, nothing read (reported at 1080p;
+    // the scaled paths round before they get here)
+    x0 = Math.max(0, Math.round(x0)); y0 = Math.max(0, Math.round(y0));
+    x1 = Math.min(W, Math.round(x1)); y1 = Math.min(H, Math.round(y1));
     const w = Math.max(0, x1 - x0), h = Math.max(0, y1 - y0);
     const out = new Uint8Array(w * h);
     for (let y = 0; y < h; y++) {

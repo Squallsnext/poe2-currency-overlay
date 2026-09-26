@@ -736,6 +736,7 @@ window.I18N_CATALOGS.de = {
   "networth.line.debug_learn_title": "Lernt die Ziffern aus dem rechten Schwarz-Weiß-Bild, mit den aktuellen Reglern (auch ungespeichert). Die Zahl im Feld muss stimmen.",
   "networth.line.debug_local_off": "lokaler Schnitt: aus (floor gilt für alles)",
   "networth.line.debug_local_val": "lokaler Schnitt: Strich {v} heller als Umgebung",
+  "networth.line.debug_error": "Debug-Ansicht fehlgeschlagen: {error}",
   "networth.line.debug_need_rescan": "Für die Debug-Ansicht dieses Fach bitte neu scannen (Screenshots werden nicht über einen Neustart gespeichert).",
   "networth.line.debug_open_title": "Debug-Ansicht für diese Zeile öffnen/schließen (immer nur eine gleichzeitig)",
   "networth.line.debug_preset_off": "Alle Filter aus",
