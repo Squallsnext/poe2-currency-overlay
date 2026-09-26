@@ -666,6 +666,15 @@ speck or item art beside the count). On the currency picture scaled to 1080p: 4 
 counts could not be taught before, 1 after. The learn result now stays in the debug
 panel (it vanished with the re-render the learn itself triggers), with the error if any.
 
+**Tour messages and the "not worse" check** (reported at 1080p: "no count sure enough
+to snap to" on currency and abyss with 38/12 counts read; essence stayed on the shipped
+boxes). The rule placement WAS kept there - the dialog only looked at the model count
+(0 when the rule did the job). It now says "boxes placed onto the cells by the rule (x of
+y): a instead of b counts read surely - kept", or that the rule was tried and discarded,
+then what the model snapping did. And both compare SURE reads (>= 80 %) instead of all
+reads: unsure "counts" are mostly item art in empty cells, which boxes on the right spot
+drop - counting every read called the better boxes worse (essence: 54 -> 46).
+
 ### 4.8 Setup-specific parts – already removed from this branch
 
 These existed in the player's own build and were **deliberately left out** here:

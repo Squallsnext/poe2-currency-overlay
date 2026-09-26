@@ -1328,11 +1328,15 @@
         if (st.slotCount) info.appendChild(el('div', 'nw-dim', t('networth.tour.read', { read: st.readCount, empty: st.slotCount - st.readCount })));
         // what the automatic snapping did (main.js tourAutoSnap)
         const a = st.auto;
-        if (a) {
-          const line = !a.models ? t('networth.tour.auto_nomodel')
+        if (a && a.rule && a.rule.kept) {
+          info.appendChild(el('div', 'nw-tour-auto', t('networth.tour.rule_kept', { cells: a.rule.cells, of: a.rule.of, before: a.rule.before, after: a.rule.after })));
+        } else if (a) {
+          // the rule was tried and not kept: say so, then what the model snapping did
+          const ruleLine = a.rule && !a.rule.few ? t('networth.tour.rule_discarded', { before: a.rule.before, after: a.rule.after }) + ' ' : '';
+          const line = ruleLine + (!a.models ? t('networth.tour.auto_nomodel')
             : a.kept ? t('networth.tour.auto_kept', { moved: a.moved, models: a.models, before: a.readBefore, after: a.readAfter })
               : a.moved ? t('networth.tour.auto_discarded', { moved: a.moved, before: a.readBefore, after: a.readAfter == null ? '?' : a.readAfter })
-                : t('networth.tour.auto_none', { models: a.models });
+                : t('networth.tour.auto_none', { models: a.models }));
           info.appendChild(el('div', 'nw-tour-auto', line + (a.unsure ? ' ' + t('networth.tour.auto_unsure', { n: a.unsure }) : '')));
         }
         if (st.old) info.appendChild(el('div', 'nw-dim', t('networth.tour.from_before')));

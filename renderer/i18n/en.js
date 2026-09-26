@@ -885,6 +885,8 @@ window.I18N_CATALOGS.en = {
   "networth.tour.support_busy": "Capturing …",
   "networth.tour.support_summary": "{done} of {total} tabs captured.",
   "networth.tour.support_done": "Done - open folder ({n} pictures)",
+  "networth.tour.rule_kept": "⚙ Boxes placed onto the cells by the rule ({cells} of {of}): {after} instead of {before} counts read surely – kept.",
+  "networth.tour.rule_discarded": "⚙ Rule tried and discarded ({after} instead of {before} read surely).",
   "networth.tour.auto_kept": "⚙ Snapped automatically: {moved} boxes, modelled on {models} counts read with high confidence. Afterwards {after} instead of {before} counts read - kept.",
   "networth.tour.auto_discarded": "⚙ Automatic snapping ({moved} boxes) discarded again: it would have read {after} instead of {before} counts.",
   "networth.tour.auto_none": "⚙ Every box already sits in its frame (models: {models} confidently read counts).",

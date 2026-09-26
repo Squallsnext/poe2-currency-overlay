@@ -3905,16 +3905,24 @@ async function trialDeltas(tab, cap, res, deltas) {
   try { pending = runReaderWorker(cap.bitmap, cap.W, cap.H, null, cap.calBox ? { calBox: cap.calBox } : undefined); } finally { config.stashSlotOverrides = saved; }
   const res2 = await pending;
   if (!res2 || !res2.ok || res2.mismatch || res2.tab !== tab) return { kept: false, readAfter: null };
+  // Counted: SURE reads (>= 80 %), not all reads. Unsure "counts" are mostly item art in
+  // empty cells read as digits - a box moved onto the right spot drops those, and
+  // counting every read then called the better boxes worse (reported at 1080p: the
+  // essence tab stayed on the shipped boxes, half on the frame).
+  const SURE = 0.8;
+  const sure = (list) => (list || []).filter((r) => r.count != null && (r.conf || 0) >= SURE).length;
+  const sureBefore = sure(res.reads), sureAfter = sure(res2.reads);
   const before = new Map((res.reads || []).map((r) => [r.apiId, r]));
   const after = new Map((res2.reads || []).map((r) => [r.apiId, r]));
   let confBefore = 0, confAfter = 0, n = 0;
   for (const [id, r] of before) {
-    if (r.count == null || !after.get(id)) continue;
-    confBefore += r.conf || 0; confAfter += after.get(id).conf || 0; n++;
+    const a = after.get(id);
+    if (r.count == null || !a || a.count == null) continue;
+    confBefore += r.conf || 0; confAfter += a.conf || 0; n++;
   }
-  const notWorse = res2.readCount >= res.readCount && (!n || confAfter / n >= confBefore / n - 0.02);
+  const notWorse = sureAfter >= sureBefore && (!n || confAfter / n >= confBefore / n - 0.02);
   if (notWorse) mergeSlotOverrides(tab, deltas);
-  return { kept: notWorse, readAfter: res2.readCount, res: notWorse ? res2 : null };
+  return { kept: notWorse, readAfter: res2.readCount, sureBefore, sureAfter, res: notWorse ? res2 : null };
 }
 // a tab scanned for the first time (no own positions yet): put its boxes on the cells
 async function autoPlaceNewTab(tab, cap, res) {
@@ -3930,14 +3938,21 @@ async function autoPlaceNewTab(tab, cap, res) {
 }
 async function tourAutoSnap(tab, cap, res) {
   // the rule first (needs no confident read); the model snapping below if it did not help
+  let rule = null;
   try {
     const rp = ruleProposal(tab, cap);
     if (rp && rp.ok >= rp.total * 0.5) {
       const t = await trialDeltas(tab, cap, res, rp.deltas);
-      logToggle('stash-learn', `tab tour rule ${tab}: ${rp.ok}/${rp.total} cells, reads ${res.readCount} -> ${t.readAfter} ${t.kept ? 'kept' : 'discarded'}`);
-      if (t.kept) return { models: 0, rule: true, moved: rp.ok, unsure: rp.total - rp.ok, kept: true, readBefore: res.readCount || 0, readAfter: t.readAfter, res: t.res };
-    }
+      logToggle('stash-learn', `tab tour rule ${tab}: ${rp.ok}/${rp.total} cells, sure reads ${t.sureBefore} -> ${t.sureAfter} ${t.kept ? 'kept' : 'discarded'}`);
+      rule = { cells: rp.ok, of: rp.total, kept: t.kept, before: t.sureBefore, after: t.sureAfter };
+      if (t.kept) return { models: 0, rule, moved: rp.ok, unsure: rp.total - rp.ok, kept: true, readBefore: res.readCount || 0, readAfter: t.readAfter, res: t.res };
+    } else if (rp) rule = { cells: rp.ok, of: rp.total, kept: false, few: true };
   } catch (e) { logToggle('stash-learn', `tab tour rule failed: ${e && e.message}`); }
+  const out = await tourModelSnap(tab, cap, res);
+  out.rule = rule;
+  return out;
+}
+async function tourModelSnap(tab, cap, res) {
   const out = { models: 0, moved: 0, unsure: 0, kept: false, readBefore: res.readCount || 0, readAfter: null };
   try {
     const data = buildAdjustSlotData(tab, cap, true);
@@ -3965,35 +3980,11 @@ async function tourAutoSnap(tab, cap, res) {
       out.moved++;
     }
     if (!out.moved) return out;
-    // read again with the new positions (not saved yet) and compare
-    const saved = config.stashSlotOverrides;
-    const trial = JSON.parse(JSON.stringify(saved || {}));
-    trial[tab] = trial[tab] || {};
-    for (const [id, d] of Object.entries(deltas)) trial[tab][id] = Object.assign({}, trial[tab][id], d);
-    // the worker is handed the overrides synchronously when it starts - restore right
-    // away, so a config save during the read can never write the trial positions
-    config.stashSlotOverrides = trial;
-    let pending;
-    try { pending = runReaderWorker(cap.bitmap, cap.W, cap.H, null); } finally { config.stashSlotOverrides = saved; }
-    const res2 = await pending;
-    if (!res2 || !res2.ok || res2.mismatch || res2.tab !== tab) return out;
-    out.readAfter = res2.readCount;
-    const before = new Map((res.reads || []).map((r) => [r.apiId, r]));
-    const after = new Map((res2.reads || []).map((r) => [r.apiId, r]));
-    let confBefore = 0, confAfter = 0, n = 0;
-    for (const [id, r] of before) {
-      if (r.count == null || !after.get(id)) continue;
-      confBefore += r.conf || 0; confAfter += after.get(id).conf || 0; n++;
-    }
-    const notWorse = res2.readCount >= res.readCount && (!n || confAfter / n >= confBefore / n - 0.02);
-    if (notWorse) {
-      mergeSlotOverrides(tab, deltas);
-      out.kept = true;
-      out.res = res2;
-      logToggle('stash-learn', `tab tour auto-snap ${tab}: ${out.moved} moved, reads ${res.readCount} -> ${res2.readCount}`);
-    } else {
-      logToggle('stash-learn', `tab tour auto-snap ${tab}: discarded (reads ${res.readCount} -> ${res2.readCount})`);
-    }
+    const t = await trialDeltas(tab, cap, res, deltas);
+    out.readAfter = t.readAfter;
+    out.kept = t.kept;
+    if (t.kept) out.res = t.res;
+    logToggle('stash-learn', `tab tour auto-snap ${tab}: ${out.moved} moved, sure reads ${t.sureBefore} -> ${t.sureAfter} ${t.kept ? 'kept' : 'discarded'}`);
   } catch (e) { logToggle('stash-learn', `tab tour auto-snap failed: ${e && e.message}`); }
   return out;
 }

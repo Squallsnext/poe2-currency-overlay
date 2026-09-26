@@ -880,6 +880,8 @@ window.I18N_CATALOGS.de = {
   "networth.tour.support_busy": "Nehme auf …",
   "networth.tour.support_summary": "{done} von {total} Fächern aufgenommen.",
   "networth.tour.support_done": "Fertig – Ordner öffnen ({n} Bilder)",
+  "networth.tour.rule_kept": "⚙ Kästchen nach der Regel an die Zellen gesetzt ({cells} von {of}): {after} statt {before} Zahlen sicher gelesen – übernommen.",
+  "networth.tour.rule_discarded": "⚙ Regel ausprobiert und verworfen ({after} statt {before} sicher gelesen).",
   "networth.tour.auto_kept": "⚙ Automatisch eingerastet: {moved} Kästchen, Vorbild waren {models} sicher gelesene Zahlen. Danach {after} statt {before} Zahlen gelesen – übernommen.",
   "networth.tour.auto_discarded": "⚙ Automatisches Einrasten ({moved} Kästchen) wieder verworfen: danach wären {after} statt {before} Zahlen gelesen worden.",
   "networth.tour.auto_none": "⚙ Alle Kästchen sitzen schon im Rahmen (Vorbild: {models} sicher gelesene Zahlen).",
