@@ -199,6 +199,9 @@ Only red/yellow boxes are shown by default ("also show good slots" reveals the r
   is within 25 reference px left/right takes the same x (y untouched). Wider than the row
   tolerance because hand-placed boxes drift sideways more, still under half the column
   spacing.
+- **Move all (key A):** while on, dragging or nudging the selected box moves every box
+  by the same offset – for a tab that is consistently off (calibration not quite hit):
+  align one box and the rest follows. Checked in headless Chromium (keys, drag, undo).
 - **Undo (Ctrl+Z)** for drags, nudges and both align actions (50 steps).
 - **Grid** toggle with adjustable spacing, plus a dashed guide line through the selected
   box's centre. Both settings are remembered.

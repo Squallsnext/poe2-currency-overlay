@@ -2407,7 +2407,7 @@ button#cancel{background:#3a3a3a;color:#eee}
 #wrap.hide-ok .box.ok{display:none}
 .box.sel{outline:2px solid #fff;z-index:3}
 .box .t{position:absolute;left:0;top:-22px;white-space:nowrap;font:700 16px Consolas,monospace;color:inherit;text-shadow:0 0 4px #000,0 0 4px #000}
-#toggleok,#togglegrid{display:flex;align-items:center;gap:5px;font-size:13px;color:#cfc3aa}
+#toggleok,#togglegrid,#togglemoveall{display:flex;align-items:center;gap:5px;font-size:13px;color:#cfc3aa}
 #togglegrid input[type=number]{width:52px;background:#0b0b0b;color:#ddd;border:1px solid #555;border-radius:6px;padding:4px 6px;font:12px Consolas,monospace}
 #grid{position:absolute;inset:0;pointer-events:none;display:none;z-index:2}
 #wrap.show-grid #grid{display:block}
@@ -2426,8 +2426,9 @@ button#cancel{background:#3a3a3a;color:#eee}
   <button id="rowalign" title="Alle Kästchen rechts vom ausgewählten, die höchstens 10 px höher oder tiefer sitzen, auf dieselbe Höhe setzen (nur die Höhe, links/rechts bleibt). Taste R">Reihe angleichen →</button>
   <button id="colalign" title="Alle Kästchen unter dem ausgewählten, die höchstens 25 px links oder rechts davon sitzen, auf dieselbe Spalte setzen (nur links/rechts, die Höhe bleibt). Taste S">Spalte angleichen ↓</button>
   <button id="undo" title="Letztes Angleichen / Verschieben rückgängig machen. Strg+Z">Rückgängig</button>
+  <label id="togglemoveall" title="An: Ziehen oder Pfeiltasten verschieben ALLE Kästchen um dieselbe Strecke - ein Kästchen ausrichten, der Rest folgt. Taste A"><input id="moveall" type="checkbox"> Alle mitbewegen</label>
   <label id="togglegrid"><input id="showgrid" type="checkbox"> Gitter <input id="gridstep" type="number" min="2" step="1" title="Gitterabstand in Pixeln"> px</label>
-  <span id="hint">Nur unsichere/falsche Felder werden standardmäßig gezeigt. Ziehen = verschieben, Pfeiltasten = 1px, Shift+Pfeil = 5px. Breite/Höhe = Größe für ALLE Kästchen auf einmal (auch die ausgeblendeten guten). Reihe angleichen (R): erstes Kästchen der Reihe auswählen, alle rechts davon übernehmen die Höhe. Spalte angleichen (S): oberstes Kästchen der Spalte auswählen, alle darunter übernehmen die Position links/rechts. Strg+Z = rückgängig. Gitter: gestrichelte Linie = Mitte des ausgewählten Kästchens.</span>
+  <span id="hint">Nur unsichere/falsche Felder werden standardmäßig gezeigt. Ziehen = verschieben, Pfeiltasten = 1px, Shift+Pfeil = 5px. Breite/Höhe = Größe für ALLE Kästchen auf einmal (auch die ausgeblendeten guten). Reihe angleichen (R): erstes Kästchen der Reihe auswählen, alle rechts davon übernehmen die Höhe. Spalte angleichen (S): oberstes Kästchen der Spalte auswählen, alle darunter übernehmen die Position links/rechts. Alle mitbewegen (A): ein Kästchen ausrichten, alle anderen verschieben sich genauso mit. Strg+Z = rückgängig. Gitter: gestrichelte Linie = Mitte des ausgewählten Kästchens.</span>
 </div>
 <div id="wrap" class="hide-ok"><img id="panel" src="data:image/png;base64,${data.panelBase64}"><div id="grid"></div><div id="guide"></div></div>
 <script>
@@ -2483,6 +2484,19 @@ function updateGuide(){
 // half-rows (~19), so a neighbouring row is never pulled in. Hidden good boxes on the
 // row move too - they are on the same line.
 const ROW_TOL = 10 * KY;
+// "Alle mitbewegen": a drag or nudge of the selected box moves EVERY box by the same
+// offset - for a whole tab that sits consistently off (calibration not quite hit): line
+// up one box and the rest follows. Hidden good boxes move too; they have the same offset.
+const moveAllEl = document.getElementById('moveall');
+function moveAll(){ return !!(moveAllEl && moveAllEl.checked); }
+function shiftAll(dx, dy, except){
+  for (let i = 0; i < DATA.length; i++) {
+    if (i === except) continue;
+    DATA[i].x += dx; DATA[i].y += dy;
+    const el = document.querySelector('.box[data-i="' + i + '"]');
+    if (el) place(el, DATA[i]);
+  }
+}
 // Undo: a snapshot of every box's position before each align/drag/nudge
 const history = [];
 function snapshot(){
@@ -2552,13 +2566,15 @@ DATA.forEach((r, i) => {
   el.addEventListener('pointerdown', (ev) => {
     snapshot();
     select(el); el.setPointerCapture(ev.pointerId);
-    drag = { i, sx: ev.clientX, sy: ev.clientY, x: r.x, y: r.y };
+    drag = { i, sx: ev.clientX, sy: ev.clientY, x: r.x, y: r.y, lx: r.x, ly: r.y };
     ev.preventDefault();
   });
   el.addEventListener('pointermove', (ev) => {
     if (!drag || drag.i !== i) return;
     r.x = drag.x + (ev.clientX - drag.sx);
     r.y = drag.y + (ev.clientY - drag.sy);
+    if (moveAll()) { shiftAll(r.x - drag.lx, r.y - drag.ly, i); }
+    drag.lx = r.x; drag.ly = r.y;
     place(el, r); updateGuide();
   });
   el.addEventListener('pointerup', () => { drag = null; });
@@ -2570,6 +2586,7 @@ document.addEventListener('keydown', (ev) => {
   if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'z' || ev.key === 'Z')) { undo(); ev.preventDefault(); return; }
   if (ev.key === 'r' || ev.key === 'R') { alignRow(); ev.preventDefault(); return; }
   if (ev.key === 's' || ev.key === 'S') { alignCol(); ev.preventDefault(); return; }
+  if (ev.key === 'a' || ev.key === 'A') { if (moveAllEl) moveAllEl.checked = !moveAllEl.checked; ev.preventDefault(); return; }
   const i = +selected.dataset.i, r = DATA[i];
   const n = ev.shiftKey ? 5 : 1;
   let dx = 0, dy = 0;
@@ -2580,6 +2597,7 @@ document.addEventListener('keydown', (ev) => {
   else return;
   if (!ev.repeat) snapshot(); // one undo step per key press, not per auto-repeat
   r.x += dx; r.y += dy;
+  if (moveAll()) shiftAll(dx, dy, i);
   place(selected, r); updateGuide(); ev.preventDefault();
 });
 document.getElementById('copy').onclick = async () => {
