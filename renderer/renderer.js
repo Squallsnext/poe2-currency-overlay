@@ -2009,7 +2009,6 @@ async function initSettings() {
 
   bindGamepadAction('repriceToggle', 'reprice-gamepad-toggle-input', 'reprice-gamepad-toggle-clear');
   bindGamepadAction('repriceRead', 'reprice-gamepad-read-input', 'reprice-gamepad-read-clear');
-  bindGamepadAction('repricePaste', 'reprice-gamepad-paste-input', 'reprice-gamepad-paste-clear');
 
   const rpEls = {
     branches: $('reprice-branches'), addBranch: $('reprice-add-branch'),

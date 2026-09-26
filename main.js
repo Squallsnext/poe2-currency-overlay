@@ -219,7 +219,6 @@ const DEFAULT_CONFIG = {
   // missing from this object is unbound - a controller is optional everywhere.
   gamepadBindings: {
     repriceRead: 2,  // Square: start a reprice read, same as right-click
-    repricePaste: 0, // X: Ctrl+A/Ctrl+V, only right after a successful read
   },
   // A ready-made ruleset shipped as a saved option named "Default" - load it, ignore it,
   // or delete it. Seeded through the DEFAULT_CONFIG merge, so it only appears while the
@@ -1156,7 +1155,6 @@ const GAMEPAD_ACTIONS = {
   stashCapture: () => captureAndBroadcast(),
   repriceToggle: () => reprice.toggle(),
   repriceRead: () => reprice.startAttempt(),
-  repricePaste: () => reprice.pasteIfReady(),
 };
 let gamepadStarted = false;
 function startGamepadListener() {
@@ -3470,7 +3468,7 @@ ipcMain.handle('capture-gamepad-button', () => {
 // arbitrary string from the renderer can't land as a live config key.
 const GAMEPAD_ACTION_IDS = new Set([
   'overlay', 'closeOverlay', 'itemPin', 'itemTemp', 'stashCapture',
-  'repriceToggle', 'repriceRead', 'repricePaste',
+  'repriceToggle', 'repriceRead',
 ]);
 ipcMain.handle('set-gamepad-binding', (_e, { action, button } = {}) => {
   if (!GAMEPAD_ACTION_IDS.has(action)) return false;

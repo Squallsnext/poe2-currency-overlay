@@ -45,18 +45,21 @@ HID reports instead (`node-hid`, new dependency), in `gamepad.js`.
 - **Every hotkey action can also be bound to a controller button** (Settings → the
   "Controller" field next to each hotkey, click and press a button):
   toggle overlay, **close overlay** (new, hide-only, like Escape), item check pin/temp
-  (toggles on a second press), stash capture, reprice toggle, reprice read, reprice paste,
-  and each chat command hotkey.
-- Defaults: Square = start reprice read, Cross = paste reprice result.
+  (toggles on a second press), stash capture, reprice toggle, reprice read, and each chat
+  command hotkey.
+- Default: Square = start reprice read.
 - Config: `gamepadBindings` (action → button index), `commandHotkeys[].gamepad`.
 
 ### Reprice with a controller
 
 - **Read** (Square): same as right-clicking – reads the price in the Set Item Price dialog
   and computes the new one.
-- **Paste** (Cross): sends Ctrl+A, Ctrl+V – **only** within 5 s of a successful
-  clipboard-writing read while reprice mode is on. It never fires on a stale clipboard or
-  during normal play.
+- **No paste button, on purpose.** An earlier version of this fork had one (Cross sent
+  Ctrl+A, Ctrl+V right after a read). It was taken out: `REPRICE.md` states "The app
+  never sends a key or a click", and GGG's developer policy forbids macro invocations
+  triggered "from reading the screen" and apps that "interact with the game". A key
+  press prepared by a screen read is at best a grey zone, which has no place in a
+  public build. You paste with Ctrl+V as before.
 
 ---
 
@@ -410,7 +413,7 @@ These existed in the player's own build and were **deliberately left out** here:
 
 | Key | Default | Meaning |
 |---|---|---|
-| `gamepadBindings` | `{ repriceRead: 2, repricePaste: 0 }` | Controller button per action |
+| `gamepadBindings` | `{ repriceRead: 2 }` | Controller button per action |
 | `commandHotkeys[].gamepad` | – | Controller button per chat command |
 | `stashSlotOverrides[tab][apiId]` | – | Per-slot position (4.5) + reader settings (4.3) |
 | `stashShowOcrDebug` | `false` | Debug panel; also gates debug file writes |
@@ -450,7 +453,7 @@ Each feature sits mostly in its own file; the shared files only get a hook.
 |---|---|---|
 | German client fixes | – | `renderer/item/item-tab.js` (base type / unique name), `renderer/vendor/ee2/data/de/client_strings.js` |
 | Controller input | `gamepad.js` (HID reading, button map in `CONTROLLER_PROFILES`) | `main.js`: `GAMEPAD_ACTIONS`, `startGamepadListener`, `capture-gamepad-button` / `set-gamepad-binding`; `renderer/renderer.js`: binding inputs; `renderer/index.html`: controller fields |
-| Reprice controller paste, 2-frame confirmation | – | `reprice.js`: `pasteIfReady`, `prevBase` in `attempt()` |
+| Reprice 2-frame confirmation | – | `reprice.js`: `prevBase` in `attempt()` |
 | Stash read path (scan = preview = teach) | `renderer/stash/read-pipeline.js` | `renderer/stash/reader-worker.js` (scan), `main.js`: `stash-slot-debug-image`, `stash-teach-count` |
 | Reader filters (local cut, speck filter, contrast gate, saturation, ×2 scaling) | `renderer/stash/digit-reader.js` (`binarizeLocal`, `dropSmallBlobs`, `contrastGate`, `adjustRGBA`, scale factor `S`) | per-slot values: `stashSlotOverrides` via `main.js` `stash-slot-save-read-settings` |
 | Align tool | window built in `main.js` `buildAdjustWindowHtml` (self-contained HTML+JS), `renderer/stash/adjust-preload.js` | `stash-adjust-open` / `stash-adjust-save`, button in `networth-ui.js` `rowCard` |

@@ -1205,8 +1205,6 @@ window.I18N_CATALOGS.de = {
   "ui.settings.reprice.hotkey_tooltip": "Globale Taste, die den Neupreis-Modus ein- und ausschaltet. Solange er an ist, legt ein Rechtsklick auf einen Gegenstand den angepassten Preis in die Zwischenablage, bereit zum Einfügen.",
   "ui.settings.reprice.gamepad_read_label": "Controller: Ablesen starten",
   "ui.settings.reprice.gamepad_read_tooltip": "Optional: eine DualSense-Taste, die einen Neupreis-Lesevorgang startet, genau wie ein Rechtsklick. Benötigt einen angeschlossenen Controller.",
-  "ui.settings.reprice.gamepad_paste_label": "Controller: Ergebnis einfügen",
-  "ui.settings.reprice.gamepad_paste_tooltip": "Optional: eine DualSense-Taste, die Strg+A, Strg+V sendet - nur direkt nach einem erfolgreichen Neupreis-Lesevorgang.",
   "ui.settings.reprice.gamepad_placeholder": "klicken, dann eine Controller-Taste drücken",
   "ui.settings.reprice.gamepad_clear": "×",
   "ui.settings.reprice.gamepad_clear_tooltip": "Zuordnung entfernen",

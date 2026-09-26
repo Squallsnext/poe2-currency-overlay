@@ -17,7 +17,7 @@ window.RELEASE_NOTES = [
       "German 'Außergewöhnlich' (exceptional) items are parsed, and the Dexterity requirement line is read.",
       "Controller (DualSense, USB):",
       "Every hotkey can also be put on a controller button. New: a close-only overlay button.",
-      "Reprice with a controller: Square reads the price, Cross pastes the result (only right after a successful read).",
+      "Reprice with a controller: Square reads the price, exactly like right-clicking; you paste it yourself (Ctrl+V).",
       "Reprice:",
       "A price only counts once two frames in a row agree. A half-drawn dialog read 14 as 11.",
       "Faster: shorter waits between looks, no debug screenshot on every look.",

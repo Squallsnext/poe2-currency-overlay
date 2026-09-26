@@ -1195,8 +1195,6 @@ window.I18N_CATALOGS.en = {
   "ui.settings.reprice.hotkey_tooltip": "Global key that turns reprice mode on and off. While it is on, right-clicking an item to reprice puts the adjusted price on your clipboard, ready to paste.",
   "ui.settings.reprice.gamepad_read_label": "Controller: start read",
   "ui.settings.reprice.gamepad_read_tooltip": "Optional: a DualSense button that starts a reprice read, the same as right-clicking. Needs a controller plugged in.",
-  "ui.settings.reprice.gamepad_paste_label": "Controller: paste result",
-  "ui.settings.reprice.gamepad_paste_tooltip": "Optional: a DualSense button that sends Ctrl+A, Ctrl+V - only right after a successful reprice read.",
   "ui.settings.reprice.gamepad_placeholder": "click, then press a controller button",
   "ui.settings.reprice.gamepad_clear": "×",
   "ui.settings.reprice.gamepad_clear_tooltip": "Unbind",

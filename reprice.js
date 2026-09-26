@@ -34,7 +34,6 @@ const POLL_EVERY_MS = 10;
 // How long a successful read stays pasteable, e.g. by the controller's paste button.
 // Long enough to glance at the badge and confirm the number, short enough that a stale
 // result from a different item never gets pasted by an unrelated later press.
-const PASTE_WINDOW_MS = 5000;
 // Long enough for the dialog to actually be drawn. Each look now scans for the field's
 // border rather than glancing at a small saved box, so it costs more and fewer of them
 // fit in the same window - reads started giving up before the dialog appeared, and only
@@ -66,8 +65,6 @@ function create(deps) {
   // Set only right after a clipboard write, so a controller's paste button (or anything
   // else that fires later) pastes an actual computed price, never stale clipboard
   // content from the "rule left it unchanged" branch, which does not touch the clipboard.
-  let lastResult = null;
-  let pasteDeadline = 0;
 
   const cfg = () => getConfig() || {};
   const say = (msg) => { try { log && log('reprice', msg); } catch { /* logging must never break a reprice */ } };
@@ -393,7 +390,6 @@ function create(deps) {
         return;
       }
       clipboard.writeText(String(out));
-      lastResult = { base, result: out }; pasteDeadline = Date.now() + PASTE_WINDOW_MS;
       say(`read ${base}${ctx.currency ? ' ' + ctx.currency : ''} -> ${out} (after ${wait}ms)`);
       perf(perfLine() + ` -> ${out}`);
       const info = { base, result: out, currency: ctx.currency || null };
@@ -416,8 +412,7 @@ function create(deps) {
         const out = RepriceRules.apply(base, RepriceRules.fromConfig(cfg()), ctx);
         if (out != null && out !== base) {
           clipboard.writeText(String(out));
-          lastResult = { base, result: out }; pasteDeadline = Date.now() + PASTE_WINDOW_MS;
-          say(`read ${base} -> ${out} (calibrated fallback)`);
+              say(`read ${base} -> ${out} (calibrated fallback)`);
           perf(`calibrated-fallback path: total=${Date.now() - t0}ms looks=${looks} `
             + `firstShotAt=${firstShotAt == null ? 'never' : firstShotAt + 'ms'} grabMs=${grabMs} readMs=${readMs} value=${base} -> ${out}`);
           const info = { base, result: out, currency: ctx.currency || null };
@@ -476,27 +471,6 @@ function create(deps) {
   }
   const onRightClick = startAttempt;
 
-  // The controller's "paste" button (X by default). Fires Ctrl+A/Ctrl+V only when mode
-  // is on and a clipboard-writing read happened within the last PASTE_WINDOW_MS - silent
-  // no-op otherwise, so it never touches anything during normal gameplay.
-  function pasteIfReady() {
-    if (!on || !lastResult || Date.now() > pasteDeadline) return false;
-    const hook = deps.getHook && deps.getHook();
-    if (!hook || !hook.uIOhook) { say('paste failed: no input hook'); return false; }
-    const { uIOhook, UiohookKey } = hook;
-    try {
-      uIOhook.keyToggle(UiohookKey.Ctrl, 'down');
-      uIOhook.keyTap(UiohookKey.A);
-      uIOhook.keyTap(UiohookKey.V);
-      uIOhook.keyToggle(UiohookKey.Ctrl, 'up');
-    } catch (err) {
-      say('paste failed: ' + (err && err.message || err));
-      return false;
-    }
-    say(`pasted ${lastResult.result}`);
-    lastResult = null; // one paste per successful read
-    return true;
-  }
 
   // ---- mode ----------------------------------------------------------------
   async function setOn(next) {
@@ -543,7 +517,6 @@ function create(deps) {
     closeStream,
     setOnChange: (fn) => { onChange = fn; },
     startAttempt,
-    pasteIfReady,
   };
 }
 
