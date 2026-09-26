@@ -513,7 +513,8 @@ function arbGoldPlan(route, qty) {
   let held = qty, gold = 0;
   for (let i = 0; i < route.legRates.length; i++) {
     const got = held * route.legRates[i];
-    const g = Math.ceil(got) * GOLD_PER_ITEM; // you pay per whole item received
+    // you pay per whole item received - on the exchange; a vendor split costs nothing
+    const g = route.legFree && route.legFree[i] ? 0 : Math.ceil(got) * GOLD_PER_ITEM;
     gold += g;
     legs.push({ spent: held, got, gold: g, pair: route.legPairs[i] });
     held = got;
@@ -583,6 +584,106 @@ function buildArbRoute(baseId, itemId, direct, cross) {
   return { below, middle: M, steps, legPairs, legRates, loopRoi: (best.final - 1) * 100 };
 }
 
+// ---------- disenchanting at a vendor (Settings > Currency, off by default) ----------
+// A vendor splits a higher tier into 3 of the tier below - never the other way round,
+// tiers cannot be combined up. That is why a Perfect costs so much: it is 3 Greater or
+// 9 normal. So when a Greater Chaos is cheaper than 3 Chaos on the exchange, buying it
+// and splitting it is profit. Splitting costs nothing (no gold), only the trades do.
+const TIER_FAMILIES = [
+  ['transmute', 'greater-orb-of-transmutation', 'perfect-orb-of-transmutation'],
+  ['aug', 'greater-orb-of-augmentation', 'perfect-orb-of-augmentation'],
+  ['regal', 'greater-regal-orb', 'perfect-regal-orb'],
+  ['exalted', 'greater-exalted-orb', 'perfect-exalted-orb'],
+  ['chaos', 'greater-chaos-orb', 'perfect-chaos-orb'],
+];
+const DISENCHANT_YIELD = 3;
+// what 1 unit of `id` splits into, one and two tiers down: [{ to, n }]
+function splitsOf(id) {
+  for (const fam of TIER_FAMILIES) {
+    const i = fam.indexOf(id);
+    if (i <= 0) continue;
+    const out = [];
+    for (let j = i - 1, n = DISENCHANT_YIELD; j >= 0; j--, n *= DISENCHANT_YIELD) out.push({ to: fam[j], n });
+    return out;
+  }
+  return [];
+}
+// the higher tiers that split into `id`: [{ from, n }]
+function splitSources(id) {
+  const out = [];
+  for (const fam of TIER_FAMILIES) {
+    const i = fam.indexOf(id);
+    if (i < 0) continue;
+    for (let j = i + 1, n = DISENCHANT_YIELD; j < fam.length; j++, n *= DISENCHANT_YIELD) out.push({ from: fam[j], n });
+  }
+  return out;
+}
+// A route with a vendor split in it, for a bucket row (item priced in base, direct =
+// base per 1 item). Two shapes:
+//  - the item is a higher tier: base -> item (direct pair) -> split into n of a lower
+//    tier L -> L back to base (skipped when L is the base itself)
+//  - the base is a higher tier of the item: split 1 base into n items -> sell them for
+//    base on the direct pair
+// Same return shape as buildArbRoute plus vendor/whyKey/legFree (legs without gold).
+function buildVendorRoute(baseId, itemId, direct) {
+  if (!config.arbVendorSplit || !(direct > 0)) return null;
+  const B = nameOf(baseId), X = nameOf(itemId);
+  let best = null;
+  for (const sp of splitsOf(itemId)) {
+    const L = sp.to;
+    let vLB = 1;
+    if (L !== baseId) {
+      vLB = pairVal(L, baseId);
+      if (!vLB || !pairIsCurrent(L, baseId)) continue;
+      const vol = ovrRate(L, baseId) != null ? Infinity : pairVol(L, baseId);
+      if (vol < MIN_LEG_VOLUME) continue;
+    }
+    const final = (1 / direct) * sp.n * vLB;
+    if (final <= 1.02 || (best && final <= best.final)) continue;
+    const Ln = nameOf(L);
+    const steps = [
+      t('currency.arb.step_direct', { from: B, to: X, leg: legStr(B, X, 1 / direct) }),
+      t('currency.arb.step_vendor', { from: X, to: Ln, n: sp.n }),
+    ];
+    const legPairs = [{ have: baseId, want: itemId }, { have: itemId, want: L, vendor: true }];
+    const legRates = [1 / direct, sp.n];
+    const legFree = [false, true];
+    if (L !== baseId) {
+      steps.push(t('currency.arb.step_via', { from: Ln, to: B, leg: legStr(Ln, B, vLB) }));
+      legPairs.push({ have: L, want: baseId });
+      legRates.push(vLB);
+      legFree.push(false);
+    }
+    best = { final, vendor: true, below: true, middle: Ln, steps, legPairs, legRates, legFree,
+      whyKey: 'currency.arb.why_vendor_item', whyVars: { item: X, base: B, n: sp.n, lower: Ln } };
+  }
+  for (const src of splitSources(itemId)) {
+    if (src.from !== baseId) continue;
+    const final = src.n * direct;
+    if (final <= 1.02 || (best && final <= best.final)) continue;
+    best = { final, vendor: true, below: false, middle: X,
+      steps: [
+        t('currency.arb.step_vendor', { from: B, to: X, n: src.n }),
+        t('currency.arb.step_direct', { from: X, to: B, leg: legStr(X, B, direct) }),
+      ],
+      legPairs: [{ have: baseId, want: itemId, vendor: true }, { have: itemId, want: baseId }],
+      legRates: [src.n, direct], legFree: [true, false],
+      whyKey: 'currency.arb.why_vendor_base', whyVars: { item: X, base: B, n: src.n } };
+  }
+  if (!best) return null;
+  best.loopRoi = (best.final - 1) * 100;
+  return best;
+}
+// The better of the market route (only when the row's gap makes one worth looking for)
+// and the vendor route (only with the setting on).
+function bestRoute(baseId, itemId, direct, cross, allowMarket) {
+  const m = allowMarket ? buildArbRoute(baseId, itemId, direct, cross) : null;
+  const v = buildVendorRoute(baseId, itemId, direct);
+  if (!m) return v;
+  if (!v) return m;
+  return v.loopRoi > m.loopRoi ? v : m;
+}
+
 // ---------- live rates (GGG trade-site bulk listings) ----------
 let liveRates = {}; // 'have|want' -> { best, median, count, at }
 
@@ -609,6 +710,25 @@ function acquireOptions(baseId) {
     if (!pairIsCurrent(baseId, m)) continue; // acquisition quote must be executable at current prices
     const feed = marketPairVal(baseId, m);
     out.push({ m, vBM, costEx: vBM * mInfo.price, feedCostEx: feed > 0 ? feed * mInfo.price : null, manual: ovrRate(baseId, m) != null });
+  }
+  // with vendor splits on: buy a higher tier with a major and split it (Greater -> 3)
+  if (config.arbVendorSplit) {
+    // only the cheapest way per higher tier (one line, not one per major), and never
+    // paying with the base itself - "buy Chaos with Chaos" is not a way to get Chaos
+    for (const src of splitSources(baseId)) {
+      let best = null;
+      for (const m of MAJORS) {
+        if (m === src.from || m === baseId) continue;
+        const vHM = pairVal(src.from, m); // 1 higher-tier unit in m
+        const mInfo = catalog[m];
+        if (!vHM || !mInfo || !(mInfo.price > 0) || !pairIsCurrent(src.from, m)) continue;
+        const feed = marketPairVal(src.from, m);
+        const o = { m, via: src.from, n: src.n, vHM, vBM: vHM / src.n, costEx: vHM * mInfo.price / src.n,
+          feedCostEx: feed > 0 ? feed * mInfo.price / src.n : null, manual: ovrRate(src.from, m) != null };
+        if (!best || o.costEx < best.costEx) best = o;
+      }
+      if (best) out.push(best);
+    }
   }
   return out.sort((p, q) => p.costEx - q.costEx);
 }
@@ -652,7 +772,7 @@ let lastArbCtx = null; // route context for the live check button
 function arbTooltipHtml(baseId, itemId, direct, cross, gapPct) {
   const B = nameOf(baseId);
   const X = nameOf(itemId);
-  const route = buildArbRoute(baseId, itemId, direct, cross);
+  const route = bestRoute(baseId, itemId, direct, cross, gapPct >= 3);
   const acqOptions = acquireOptions(baseId);
   const acq = acqOptions[0] || null;
   lastArbCtx = { baseId, itemId, route, acq, acqOptions };
@@ -670,14 +790,18 @@ function arbTooltipHtml(baseId, itemId, direct, cross, gapPct) {
     `<div class="tip-sub">${esc(subText)}</div>`;
   // why the route exists, in one plain sentence - the numbers alone did not say it
   if (route) {
-    const why = t(route.below ? 'currency.arb.why_below' : 'currency.arb.why_above',
-      { item: X, base: B, pct: gapPct.toFixed(1), middle: route.middle });
+    const why = route.whyKey ? t(route.whyKey, route.whyVars)
+      : t(route.below ? 'currency.arb.why_below' : 'currency.arb.why_above',
+        { item: X, base: B, pct: gapPct.toFixed(1), middle: route.middle });
     html += `<div class="tip-step tip-why"><span>?</span><span class="tip-dim2">${esc(why)}</span></div>`;
   }
 
   const lines = [t('currency.arb.copy_prefix', { headline: headText }), subText.trim()];
   let n = 1;
-  const acqLine = t('currency.arb.acquire_base', { base: B }) + (acq ? t('currency.arb.acquire_cheapest_suffix', { leg: legStr(nameOf(acq.m), B, 1 / acq.vBM) }) : '');
+  const acqLeg = (o) => (o.via
+    ? t('currency.arb.acquire_split_leg', { leg: legStr(nameOf(o.m), nameOf(o.via), 1 / o.vHM), n: o.n, base: B })
+    : legStr(nameOf(o.m), B, 1 / o.vBM));
+  const acqLine = t('currency.arb.acquire_base', { base: B }) + (acq ? t('currency.arb.acquire_cheapest_suffix', { leg: acqLeg(acq) }) : '');
   html += `<div class="tip-step"><span>${n}.</span><span>${esc(acqLine)}</span></div>`;
   lines.push(`${n}. ${acqLine}`);
   // every way to get the base, cheapest first, with its cost - and when your own rates
@@ -685,18 +809,18 @@ function arbTooltipHtml(baseId, itemId, direct, cross, gapPct) {
   if (acqOptions.length > 1) {
     for (const o of acqOptions) {
       const mark = o === acq ? '★ ' : o.manual ? '✎ ' : '';
-      const line = t('currency.arb.acquire_option', { mark, via: nameOf(o.m), leg: legStr(nameOf(o.m), B, 1 / o.vBM), cost: fmt(o.costEx), base: B });
+      const line = t('currency.arb.acquire_option', { mark: mark + (o.via ? '⚒ ' : ''), via: nameOf(o.via || o.m), leg: acqLeg(o), cost: fmt(o.costEx), base: B });
       html += `<div class="tip-step tip-acq"><span></span><span class="tip-dim2">${esc(line)}</span></div>`;
     }
     if (acqOptions.some((o) => o.manual)) {
       // on the feed alone: which way was cheapest? (within 0.5 % counts as a tie - the
       // chosen way was then already among the cheapest)
       const byFeed = acqOptions.filter((o) => o.feedCostEx != null).sort((p, q) => p.feedCostEx - q.feedCostEx)[0];
-      const wasCheapest = !byFeed || byFeed.m === acq.m || (acq.feedCostEx != null && acq.feedCostEx <= byFeed.feedCostEx * 1.005);
+      const wasCheapest = !byFeed || byFeed === acq || (acq.feedCostEx != null && acq.feedCostEx <= byFeed.feedCostEx * 1.005);
       const verdict = wasCheapest
-        ? t('currency.arb.acquire_verdict_same', { via: nameOf(acq.m) })
-        : t('currency.arb.acquire_verdict_changed', { via: nameOf(acq.m), old: nameOf(byFeed.m),
-          pct: ((1 - acq.costEx / acqOptions.find((o) => o.m === byFeed.m).costEx) * 100).toFixed(1) });
+        ? t('currency.arb.acquire_verdict_same', { via: nameOf(acq.via || acq.m) })
+        : t('currency.arb.acquire_verdict_changed', { via: nameOf(acq.via || acq.m), old: nameOf(byFeed.via || byFeed.m),
+          pct: ((1 - acq.costEx / byFeed.costEx) * 100).toFixed(1) });
       html += `<div class="tip-step tip-acq"><span></span><span class="tip-dim2"><b>${esc(verdict)}</b></span></div>`;
       lines.push(verdict);
     }
@@ -743,6 +867,7 @@ function arbTooltipHtml(baseId, itemId, direct, cross, gapPct) {
     // those wildly, volume it can't touch.)
     let thin = null;
     for (const lp of route.legPairs) {
+      if (lp.vendor) continue; // a vendor split has no market to be thin
       const lq = pairLiquidity(lp.have, lp.want);
       if (lq && (!thin || lq.units < thin.lq.units)) thin = { pa: lp.have, pb: lp.want, lq };
     }
@@ -797,8 +922,8 @@ function rateLegs(ctx) {
   };
   if (!ctx) return legs;
   // every way to get the base, so each can carry your own rate
-  for (const o of ctx.acqOptions || (ctx.acq ? [ctx.acq] : [])) addLeg(o.m, ctx.baseId);
-  for (const lp of (ctx.route && ctx.route.legPairs) || []) addLeg(lp.have, lp.want);
+  for (const o of ctx.acqOptions || (ctx.acq ? [ctx.acq] : [])) addLeg(o.m, o.via || ctx.baseId);
+  for (const lp of (ctx.route && ctx.route.legPairs) || []) if (!lp.vendor) addLeg(lp.have, lp.want);
   if (!legs.length) addLeg(ctx.itemId, ctx.baseId);
   return legs;
 }
@@ -1497,14 +1622,18 @@ function render() {
               gapCol.title = t('currency.row.no_volume_title');
             }
           }
-          if (hot) {
-            const route = buildArbRoute(baseId, itemId, direct, cross);
+          // with vendor splits on, a route can exist without a market gap (a Greater
+          // Chaos simply cheaper than 3 Chaos) - but not on a stale direct rate
+          const vendorOk = config.arbVendorSplit && !stale;
+          if (hot || vendorOk) {
+            const route = bestRoute(baseId, itemId, direct, cross, hot);
             if (route) {
               const r = route.loopRoi;
-              arbCol.textContent = (r >= 0 ? '+' : '') + r.toFixed(Math.abs(r) >= 10 ? 0 : 1) + '%';
+              arbCol.textContent = (r >= 0 ? '+' : '') + r.toFixed(Math.abs(r) >= 10 ? 0 : 1) + '%' + (route.vendor ? '⚒' : '');
+              if (route.vendor) arbCol.title = t('currency.arb.vendor_col_title');
               if (r >= 3) arbCol.classList.add('hot');
               attachTip(arbCol, () => arbTooltipHtml(baseId, itemId, direct, cross, gap));
-            } else {
+            } else if (hot) {
               arbCol.textContent = ' - ';
               arbCol.title = t('currency.row.no_route_title');
             }
@@ -3236,6 +3365,16 @@ async function initSettings() {
   renderDefaults();
 
   renderOverridesGrid();
+
+  // vendor splits in arbitrage (buildVendorRoute) - off unless asked for
+  const vSplit = $('arb-vendor-split');
+  vSplit.checked = !!config.arbVendorSplit;
+  vSplit.addEventListener('change', async () => {
+    config.arbVendorSplit = vSplit.checked;
+    logAction(`vendor splits in arb: ${vSplit.checked}`);
+    await window.api.setArbVendorSplit(vSplit.checked);
+    render();
+  });
 
   const exArb = $('exclude-exalted-arb');
   exArb.checked = !!config.excludeExaltedArb;

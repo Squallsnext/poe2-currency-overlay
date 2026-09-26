@@ -440,6 +440,18 @@ These existed in the player's own build and were **deliberately left out** here:
   (★ cheapest, ✎ uses your rate); each gets a line in the rate editor. With your own
   rates in play, a verdict: "still the cheapest" or "now going via Divine is cheaper
   than via Exalted (6.3 % less)" (feed costs within 0.5 % count as a tie).
+- **Vendor splits in arbitrage** (Settings → Currency, **off by default**; config
+  `arbVendorSplit`). A vendor splits a higher tier into 3 of the tier below, free -
+  never upwards (Perfect → 3 Greater → 3 normal; transmutation, augmentation, regal,
+  exalted, chaos). With it on, a bucket row also looks for split routes: buy the item on
+  the direct pair and split it (a Greater Chaos cheaper than 3 Chaos), sell the split
+  lower tier back if it is not the base, or split the base into the item. The row's
+  column shows the better of market and split route, a split route marked ⚒, with its
+  own "Why" line; the split leg costs no gold in the estimate and is left out of the
+  thinnest-leg check and the rate editor. Buying a higher tier and splitting it also
+  appears as a way to get the base (cheapest major per tier, never paid with the base
+  itself). Tested headless: Greater Chaos at 2.8 Chaos → +7.1 % ⚒ (market route alone
+  +5.5 %); at 3.1 no split route, the market one is shown.
 - Fixed on the way (German client): the route subline and the "thinnest leg" note showed
   no currency names - `abbr()` only knows English names; the full name is used now.
   The tooltip is capped at the window height and scrolls, since a route with every
@@ -462,6 +474,7 @@ These existed in the player's own build and were **deliberately left out** here:
 | `stashUserTabSigs` | `{}` | Extra tab-detection fingerprints from "Wrong tab?" |
 | `stashShowReliability` | `false` | "Often misread" row tints |
 | `stashSkipGroups` | `[]` | "Don't count" lists `[{ id, name, on, items }]` |
+| `arbVendorSplit` | `false` | Arbitrage also considers vendor splits (Greater → 3 normal) |
 | `priceOverrides` | `{}` | `apiId → { ex, at }`: the player's own price per unit |
 
 Learned templates (`userData/learned-digit-templates.json`) gained `byScale[ms]` for

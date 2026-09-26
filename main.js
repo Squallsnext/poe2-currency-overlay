@@ -204,6 +204,7 @@ const DEFAULT_CONFIG = {
   autoAddDefaults: false,
   overrides: { enabled: false, rates: {}, ratesAt: {} }, // ratesAt: when each was pinned
   excludeExaltedArb: false, // Ange charges gold per unit; exclude exalted as a route middle
+  arbVendorSplit: false, // arbitrage also considers splitting a higher tier at a vendor (Greater -> 3 normal)
   currencyIcons: false, // show currency icons instead of names next to denominations/prices (dyslexia aid)
   dyslexicFont: false, // render the whole app in the bundled OpenDyslexic typeface (accessibility)
   theme: 'default', // 'default' | 'industry' - alternate palette, see renderer/themes.css
@@ -1596,6 +1597,12 @@ ipcMain.handle('get-app-version', () => app.getVersion());
 // config file both builds SHARE - a suffixed version there would make the packaged app
 // re-show its patch notes.
 ipcMain.handle('is-dev-build', () => !app.isPackaged);
+
+ipcMain.handle('set-arb-vendor-split', (_e, on) => {
+  config.arbVendorSplit = !!on;
+  saveConfig();
+  return config.arbVendorSplit;
+});
 
 ipcMain.handle('set-exclude-exalted-arb', (_e, on) => {
   config.excludeExaltedArb = !!on;

@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('api', {
   setUiScale: (v) => ipcRenderer.invoke('set-ui-scale', v),
   setBgOpacity: (v) => ipcRenderer.invoke('set-bg-opacity', v),
   setExcludeExaltedArb: (on) => ipcRenderer.invoke('set-exclude-exalted-arb', on),
+  setArbVendorSplit: (on) => ipcRenderer.invoke('set-arb-vendor-split', on),
   setCurrencyIcons: (on) => ipcRenderer.invoke('set-currency-icons', on),
   checkUpdates: () => ipcRenderer.send('check-updates-now'),
   getLiveRates: () => ipcRenderer.invoke('get-live-rates'),
