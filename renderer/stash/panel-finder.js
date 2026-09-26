@@ -187,5 +187,16 @@
     };
   }
 
-  return { findPanel, frameToContent, hueBucket, ringCoverage, MIN_SIDE, REF_CONTENT, REF_FRAME };
+  // Is a found content box plausibly THE stash panel? It is about half the screen height
+  // (606 of 1080 at reference size; less with a smaller UI scale) and nearly square.
+  // Something else with a coloured outline - a 282x249 patch around a flame at the bottom
+  // of a 5K hideout - was taken for the panel and sent the support crop to the map
+  // device. MIN_SIDE alone (200 px) cannot catch that at 4K/5K.
+  function plausible(box, W, H) {
+    if (!box || !(box.w > 0) || !(box.h > 0)) return false;
+    const aspect = box.w / box.h;
+    return box.h >= 0.28 * H && box.h <= 0.9 * H && aspect >= 0.7 && aspect <= 1.35;
+  }
+
+  return { findPanel, frameToContent, plausible, hueBucket, ringCoverage, MIN_SIDE, REF_CONTENT, REF_FRAME };
 });

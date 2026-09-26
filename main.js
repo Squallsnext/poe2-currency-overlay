@@ -3918,7 +3918,7 @@ async function tourCapture(expected) {
     let res = await runReaderWorker(bitmap, W, H, null);
     // panel not found by its frame (its colour is the tab's own): read again at the spot
     // it was found for an earlier tab of this run - the stash does not move between tabs
-    if (res && res.ok && res.autoFound && res.box) tourLastBox = { box: res.box, W, H };
+    if (res && res.ok && res.autoFound && res.box && require('./renderer/stash/panel-finder.js').plausible(res.box, W, H)) tourLastBox = { box: res.box, W, H };
     else if (tourLastBox && tourLastBox.W === W && tourLastBox.H === H) res = await runReaderWorker(bitmap, W, H, null, { calBox: tourLastBox.box });
     const detected = res && res.ok && !res.mismatch ? res.tab : (res && res.detectedTab) || null;
     if (detected !== expected) {
@@ -3997,6 +3997,7 @@ async function supportShot(tab) {
       const PF = require('./renderer/stash/panel-finder.js');
       const found = PF.findPanel(bitmap, W, H);
       if (found) box = PF.frameToContent(found);
+      if (box && !PF.plausible(box, W, H)) box = null; // not the stash (too small / wrong shape)
     } catch { /* fall back below */ }
     if (box) supportLastBox = { box, W, H };
     else if (supportLastBox && supportLastBox.W === W && supportLastBox.H === H) { box = supportLastBox.box; source = 'earlier-tab'; }

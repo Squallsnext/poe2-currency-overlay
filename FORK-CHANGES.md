@@ -457,6 +457,14 @@ The dialog says which was used. The full tour does the same: a tab whose frame i
 found is read again at the panel position of an earlier tab (`runReaderWorker` got an
 optional `calBox`).
 
+**Second real run - a wrong "panel" carried forward.** At 5K a 282×249 region near the
+hideout's flame was accepted as the panel frame (its colour matched), and the fallback
+above then reused it for every later tab ("earlier-tab"). A found panel must now be
+plausible before it is used or remembered (`plausible` in `panel-finder.js`): height
+28-90 % of the screen, width/height 0.7-1.35 (the real panel is ~0.96; checked against
+1080p, 1440p at 70 % UI scale and 5K). Applied in the normal scan (`reader-worker.js`), the
+tour and the support pictures; an implausible find counts as "not found".
+
 **Scan key takes the tour picture.** Reported with a controller: clicking the dialog's
 button took the player out of the stash every time - three tries per tab. While the tour
 dialog is open, the stash scan key (F7) and its controller button press the dialog's

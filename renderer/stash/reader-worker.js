@@ -92,7 +92,9 @@ parentPort.on('message', (msg) => {
     let panelCoverage = null;
     let autoFound = false;
     try {
-      const found = PF.findPanel(buf, W, H);
+      let found = PF.findPanel(buf, W, H);
+      // a coloured outline that is not the stash (too small / wrong shape) is no panel
+      if (found && !PF.plausible(PF.frameToContent(found), W, H)) found = null;
       if (found) {
         const autoBox = PF.frameToContent(found);
         if (!calBox) {
