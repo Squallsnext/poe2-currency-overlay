@@ -499,7 +499,10 @@
     const all = r.lines.slice();
     const owned = all.filter((ln) => !ln.missing).sort(state.sortLayout ? bySlot : byVal);
     const missing = all.filter((ln) => ln.missing).sort(bySlot); // shown only with "Show missing", at the bottom
-    const shown = state.showMissing ? owned.concat(missing) : owned;
+    // with this tab's debug on, the unread slots are listed too - they are the ones that
+    // need tuning (reported: at 1080p nothing was read, so there was nothing to pick)
+    const dbgOn = state.showOcrDebug && state.debugRows.has(row.id);
+    const shown = state.showMissing || dbgOn ? owned.concat(missing) : owned;
     for (const ln of shown) {
       // Rows our own testing says to distrust are marked, so a wrong number is visible
       // rather than silently averaged into the total. `rel` is measured per slot against
@@ -595,7 +598,7 @@
       // with this tab's debug on: one 🔍 per row, and only the ONE row picked gets images,
       // sliders and live previews - they are computed one slot at a time instead of every
       // slot of the tab at once
-      if (state.showOcrDebug && state.debugRows.has(row.id) && !ln.missing) {
+      if (state.showOcrDebug && state.debugRows.has(row.id)) {
         const lb = el('button', 'nw-line-dbg' + (state.dbgLine === ln.apiId ? ' nw-line-dbg-on' : ''), '🔍');
         lb.title = t('networth.line.debug_open_title');
         lb.onclick = (e) => { e.stopPropagation(); state.dbgLine = state.dbgLine === ln.apiId ? null : ln.apiId; render(); };
@@ -608,7 +611,7 @@
       // number (the count field above already teaches on a real correction) or confirm it
       // (the checkmark above already teaches on confirmation), and if the digit templates
       // themselves seem to be the problem, forget them and let them rebuild from scratch.
-      if (state.showOcrDebug && state.debugRows.has(row.id) && state.dbgLine === ln.apiId && !ln.missing && window.api.stashSlotDebugImage) {
+      if (state.showOcrDebug && state.debugRows.has(row.id) && state.dbgLine === ln.apiId && window.api.stashSlotDebugImage) {
         const dbg = el('div', 'nw-dbg');
         const cached = dbgImgCache[ln.apiId];
         if (cached === 'loading') {

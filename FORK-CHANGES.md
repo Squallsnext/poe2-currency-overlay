@@ -606,6 +606,11 @@ grouped: Calibrate + Scan tabs; other ways (wizard, box by hand, reset); for sup
 a row, ritual after them (it sat between Kalguur runes and soul cores - out of the runes
 tab and back in).
 
+**OCR debug for unread slots.** With a tab's debug on, its unread slots are listed too
+and get the 🔍 (images, sliders, live preview). Before, only slots that had read a count
+could be opened - reported at 1080p with 5K-tuned per-slot filters: nothing was read, so
+nothing could be picked to tune.
+
 ### 4.8 Setup-specific parts – already removed from this branch
 
 These existed in the player's own build and were **deliberately left out** here:
