@@ -4140,6 +4140,13 @@ ipcMain.handle('stash-reset-setup', async () => {
     config.stashUserTabSigs = {};
     saveConfig();
     lastCaptureByTab.clear();
+    // the tab tour's saved pictures too (they made the tour show every tab as done after
+    // a reset - reported): moved into a backup folder next to them, not deleted
+    try {
+      const dir = TOUR_DIR(), keep = path.join(dir, `sicherung-${stamp}`);
+      const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /\.(png|json)$/i.test(f)) : [];
+      if (files.length) { fs.mkdirSync(keep, { recursive: true }); for (const f of files) fs.renameSync(path.join(dir, f), path.join(keep, f)); }
+    } catch (e) { logToggle('stash', 'reset: moving tab pictures failed: ' + (e && e.message)); }
     logToggle('stash', 'setup reset, backup ' + file);
     return { ok: true, backup: path.basename(file) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
@@ -4420,6 +4427,7 @@ ipcMain.on('stash-calibrate-start', async (_e, opts) => {
         calNote = 'calib.auto_not_found';
       } catch (err) { console.error('auto calibration failed:', err.message); }
     }
+    if (calibTarget === 'stash' && win && !win.isDestroyed()) win.webContents.send('stash-calibrate-state', { phase: 'window', note: calNote });
     // seed the box at the previous frame, else FRAME_BOX scaled to this capture
     let seed;
     if (CALIB_TARGETS[calibTarget]) {
@@ -4464,7 +4472,7 @@ ipcMain.on('stash-calibrate-start', async (_e, opts) => {
     });
   } catch (err) { console.error('calibrate-start failed:', err.message); }
 });
-ipcMain.on('stash-calibrate-cancel', () => closeCalibWin());
+ipcMain.on('stash-calibrate-cancel', () => { const was = calibTarget; closeCalibWin(); if (was === 'stash' && win && !win.isDestroyed()) win.webContents.send('stash-calibrate-state', { phase: 'cancelled' }); });
 ipcMain.on('stash-calibrate-snap', (_e, frame) => {
   try {
     if (!calibWin || calibWin.isDestroyed() || !frame) return;

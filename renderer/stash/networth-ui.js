@@ -100,6 +100,19 @@
     state.rows.splice(ti, 0, moved);
   }
 
+  // "Kalibrieren" from anywhere (settings, wizard): the settings close and the Net Worth
+  // view shows what is happening - before, the result appeared behind the open settings
+  // and the player waited, not knowing it was done (reported)
+  function calibrateNow() {
+    const settings = document.getElementById('settings');
+    if (settings) settings.classList.add('hidden');
+    const tabBtn = document.getElementById('tab-networth');
+    if (tabBtn && !tabBtn.classList.contains('active')) tabBtn.click();
+    state.notice = { kind: 'ok', msg: t('networth.calibrate.running') };
+    render();
+    try { window.api.stashCalibrateStart(); } catch {}
+  }
+
   // ---------- test read right after a calibration ----------
   // The calibration says how it was measured (from the currency tab's cells, or the box
   // as dragged); the first scan after it says whether that worked: many unsure slots ->
@@ -164,7 +177,7 @@
     const tabName = w.tab ? (TAB_LABEL[w.tab] || w.tab) : '';
     if (w.step === 1) {
       body.innerHTML = t('networth.wizard.s1', { tabs: esc(Object.values(TAB_LABEL).join(', ')) });
-      btn(t('networth.wizard.s1_calibrate'), () => { try { window.api.stashCalibrateStart(); } catch {} });
+      btn(t('networth.wizard.s1_calibrate'), () => calibrateNow());
       btn(t('networth.wizard.s1_skip'), () => { w.step = 2; render(); }, true);
     } else if (w.step === 2) {
       body.innerHTML = t('networth.wizard.s2', { hotkey: esc(state.hotkey) })
@@ -360,7 +373,7 @@
     };
     const mk = (label, title, fn, ghost) => { const b = el('button', 'nw-set-btn' + (ghost ? ' nw-set-btn-ghost' : ''), esc(label)); if (title) b.title = title; b.onclick = fn; return b; };
     group(null, [
-      mk(t('networth.settings.cal_auto'), t('networth.settings.cal_auto_title'), () => { try { window.api.stashCalibrateStart(); } catch {} }),
+      mk(t('networth.settings.cal_auto'), t('networth.settings.cal_auto_title'), () => calibrateNow()),
       mk(t('networth.tour.start'), t('networth.tour.start_title'), () => startTour()),
     ]);
     group(t('networth.settings.cal_group_more'), [
@@ -1619,6 +1632,12 @@
     });
     if (window.api.onStashAdjusted) window.api.onStashAdjusted(() => {
       if (state.wizard && state.wizard.step === 3) { state.wizard.step = 4; render(); }
+    });
+    if (window.api.onStashCalibrateState) window.api.onStashCalibrateState((st) => {
+      if (!st) return;
+      if (st.phase === 'window') state.notice = { kind: 'warn', msg: t(st.note ? 'networth.calibrate.window_not_found' : 'networth.calibrate.window') };
+      else if (st.phase === 'cancelled') state.notice = { kind: 'warn', msg: t('networth.calibrate.cancelled') };
+      render();
     });
     if (window.api.onStashCalibrated) window.api.onStashCalibrated((res) => {
       state.busy = false; state.phase = 'idle'; state.pendingTab = null; state.calibrated = true;

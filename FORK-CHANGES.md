@@ -648,7 +648,14 @@ the values there say little). **Not yet tested in game.**
 **"Kalibrierung & Fächer zurücksetzen"** (settings, other ways): calibration, all box
 positions and per-slot filters, and the learned tab fingerprints back to the start - two
 clicks, and a backup of all of it goes to the support folder first
-(`einstellungen-sicherung-<time>.json`).
+(`einstellungen-sicherung-<time>.json`). The tab tour's saved pictures are moved into
+`tab-shots/sicherung-<time>/` as well - after a reset the tour showed every tab as done.
+
+**Calibrating from the settings:** the settings close, the Net Worth view says what is
+happening ("looking for the currency tab ..."), then the result and the offer to scan the
+other tabs. If the calibration window has to open it says so, and cancelling it says
+"nothing changed". Before, the result appeared behind the open settings (reported: waited,
+not knowing it was done).
 
 ### 4.8 Setup-specific parts – already removed from this branch
 
