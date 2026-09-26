@@ -565,8 +565,67 @@ async function getCategoryItems(league, category, force = false) {
       .map((l) => ({ p: l.Price, t: l.Time, q: l.Quantity }))
       .sort((a, b) => new Date(a.t) - new Date(b.t))
   }));
+  // thin-market outliers replaced by what actually trades (see sanitizeThinPrices)
+  let cx = null;
+  try { cx = await getCxPairMapShared(league); } catch { /* exchange feed down - logs still help */ }
+  sanitizeThinPrices(items, cx);
   itemsCache.set(key, { at: Date.now(), items });
   return items;
+}
+
+// ---------- implausible prices on thin markets ----------
+// poe2scout's CurrentPrice for a rarely traded item can come from a handful of fills:
+// the base Rebirth Rune showed 339 Ex on 6 trades, while the days before sat at 5-20 Ex
+// and GGG's own Currency Exchange had it at 5 Ex (18 units against Exalted). Such a
+// price is taken as IMPLAUSIBLE when it is more than PRICE_OUTLIER x off the reference:
+// the exchange rate against Exalted when at least CX_MIN_UNITS of the item traded, else
+// the median of the item's last days. It is then replaced by that reference; the raw
+// price stays on the item (priceRaw) and the item is flagged (priceEstimated,
+// priceSource 'cx' | 'median') so the UI can say so. Liquid items are never touched -
+// their price and reference agree.
+const PRICE_OUTLIER = 3;
+const CX_MIN_UNITS = 5;
+const THIN_UNITS = 20; // latest daily quantity below this = a thin market
+function sanitizeThinPrices(items, cx) {
+  for (const it of items) {
+    if (!(it.price > 0)) continue;
+    // reference 1: GGG exchange, direct against Exalted, with enough units traded
+    let ref = null, src = null;
+    if (cx) {
+      const e = cx[[it.apiId, 'exalted'].sort().join('|')];
+      // crossed volumes (cx-feed.js): e.exalted holds the ITEM's traded units
+      const units = e ? e.exalted : 0;
+      const v = cxPairVal(cx, it.apiId, 'exalted');
+      if (v != null && units >= CX_MIN_UNITS) { ref = v; src = 'cx'; }
+    }
+    // reference 2: median of the recent daily prices - only for an item that is thin
+    // RIGHT NOW (few units in the latest log); a liquid item that rose 3x in a week is a
+    // real move, not an outlier, and a lagging median must not flatten it
+    const last = it.logs && it.logs.length ? it.logs[it.logs.length - 1] : null;
+    const thinNow = last && typeof last.q === 'number' && last.q < THIN_UNITS;
+    if (ref == null && thinNow && it.logs.length >= 3) {
+      const ps = it.logs.map((l) => l.p).filter((p) => p > 0).sort((a, b) => a - b);
+      if (ps.length >= 3) { ref = ps[Math.floor(ps.length / 2)]; src = 'median'; }
+    }
+    if (!(ref > 0)) continue;
+    const ratio = it.price / ref;
+    if (ratio > PRICE_OUTLIER || ratio < 1 / PRICE_OUTLIER) {
+      it.priceRaw = it.price;
+      it.price = ref;
+      it.priceEstimated = true;
+      it.priceSource = src;
+    }
+  }
+  return items;
+}
+// one exchange-map fetch shared by the parallel per-category loads
+const cxShared = new Map(); // league -> Promise
+function getCxPairMapShared(league) {
+  if (!cxShared.has(league)) {
+    const p = getCxPairMapCached(league).finally(() => setTimeout(() => cxShared.delete(league), 60_000));
+    cxShared.set(league, p);
+  }
+  return cxShared.get(league);
 }
 
 // Direct pair snapshot (executed exchange trades, per pair). league -> {at, map}
@@ -1559,7 +1618,7 @@ async function getStashPriceMap(force) {
   if (!force && stashPriceCache && Date.now() - stashPriceCache.at < 5 * 60_000) return stashPriceCache.map;
   const full = await fetchFullCatalog();
   const map = {};
-  for (const g of full.groups) for (const it of g.items) if (!map[it.apiId]) map[it.apiId] = { price: it.price, icon: it.icon, name: it.text };
+  for (const g of full.groups) for (const it of g.items) if (!map[it.apiId]) map[it.apiId] = { price: it.price, icon: it.icon, name: it.text, estimated: !!it.priceEstimated, priceRaw: it.priceRaw, priceSource: it.priceSource };
   // Fill CX-only items poe2scout doesn't carry, valued in Exalted via a direct or
   // one-hop (chaos/divine) pair from the same official feed the currency tab uses.
   const needed = Object.keys(CX_FALLBACK).filter((id) => !(map[id] && typeof map[id].price === 'number'));
@@ -2778,6 +2837,8 @@ async function readStashFrame(shot, onDetected) {
       const info = prices[r.priceAs || r.apiId] || {};
       const name = info.name || r.apiId;
       const suffix = r.suffix || null;
+      // price replaced by the exchange rate / recent median (sanitizeThinPrices)
+      const est = info.estimated ? { raw: info.priceRaw, src: info.priceSource } : null;
       const price = typeof info.price === 'number' ? info.price : null;
       const icon = info.icon || null;
       // slot = read order = stash reading order (top-to-bottom, left-to-right)
@@ -2785,12 +2846,12 @@ async function readStashFrame(shot, onDetected) {
         // empty / unread slot: a 0-count line the UI shows (editable) only when
         // "Show missing" is on. flags kept for the read-count summary.
         flags.push({ apiId: r.apiId, name });
-        lines.push({ apiId: r.apiId, name, suffix, icon, count: 0, price, valueEx: price != null ? 0 : null, slot: i, missing: true, conf: null });
+        lines.push({ apiId: r.apiId, name, suffix, icon, count: 0, price, est, valueEx: price != null ? 0 : null, slot: i, missing: true, conf: null });
         return;
       }
       const valueEx = price != null ? r.count * price : null;
       if (valueEx != null) total += valueEx;
-      lines.push({ apiId: r.apiId, name, suffix, icon, count: r.count, price, valueEx, slot: i, conf: typeof r.conf === 'number' ? r.conf : null, rel: r.rel || null });
+      lines.push({ apiId: r.apiId, name, suffix, icon, count: r.count, price, est, valueEx, slot: i, conf: typeof r.conf === 'number' ? r.conf : null, rel: r.rel || null });
     });
     lines.sort((a, b) => (b.valueEx || 0) - (a.valueEx || 0));
     return {

@@ -716,6 +716,8 @@ window.I18N_CATALOGS.de = {
   "networth.line.forget_button": "Vorlage vergessen",
   "networth.line.forget_title": "Die gelernten Vorlagen für diese Ziffern vergessen und neu aufbauen lassen",
   "networth.line.no_price": "<span class=\"nw-noprice\">kein Preis</span>",
+  "networth.line.price_est_cx": "Geschätzter Preis: Die Preisquelle meldete {raw} pro Stück, das ist bei so wenig Handel unplausibel. Verwendet wird der tatsächliche Kurs aus GGGs Währungsbörse.",
+  "networth.line.price_est_median": "Geschätzter Preis: Die Preisquelle meldete {raw} pro Stück, das ist bei so wenig Handel unplausibel. Verwendet wird der mittlere Preis der letzten Tage.",
   "networth.line.reset_title": "Diese Zeile auf den gescannten Wert zurücksetzen",
   "networth.line.unreliable_low": "Diese Zeile wird auf jedem getesteten System falsch gelesen. Vergleiche die Zahl mit deiner Truhe und korrigiere sie.",
   "networth.line.unreliable_mixed": "Diese Zeile wird auf manchen Systemen falsch gelesen. Vergleiche die Zahl mit deiner Truhe und korrigiere sie, falls nötig.",

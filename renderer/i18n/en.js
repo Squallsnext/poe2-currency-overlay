@@ -721,6 +721,8 @@ window.I18N_CATALOGS.en = {
   "networth.line.forget_button": "Forget template",
   "networth.line.forget_title": "Forget the learned templates for these digits and let them rebuild from scratch",
   "networth.line.no_price": "<span class=\"nw-noprice\">no price</span>",
+  "networth.line.price_est_cx": "Estimated price: the price feed said {raw} each, which is implausible on so little trading. Using the actual rate from GGG's Currency Exchange.",
+  "networth.line.price_est_median": "Estimated price: the price feed said {raw} each, which is implausible on so little trading. Using the median price of the last days.",
   "networth.line.reset_title": "Reset this line to its scanned value",
   "networth.line.unreliable_low": "This row misreads on every setup tested. Check the count against your stash and edit it.",
   "networth.line.unreliable_mixed": "This row is known to misread on some setups. Check the count against your stash and edit it if it is wrong.",

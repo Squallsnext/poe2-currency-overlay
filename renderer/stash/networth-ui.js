@@ -540,7 +540,10 @@
       cnt.title = t('networth.line.edit_count_title');
       cnt.onclick = (e) => { e.stopPropagation(); startEdit(ln, cnt); };
       line.appendChild(cnt);
-      line.appendChild(el('div', 'nw-val', ln.price == null ? t('networth.line.no_price') : fmtEx(lineVal(ln))));
+      const valEl = el('div', 'nw-val', ln.price == null ? t('networth.line.no_price') : (ln.est ? '≈ ' : '') + fmtEx(lineVal(ln)));
+      // thin market: the feed's price was implausible and replaced (main.js sanitizeThinPrices)
+      if (ln.est) valEl.title = t(ln.est.src === 'cx' ? 'networth.line.price_est_cx' : 'networth.line.price_est_median', { raw: fmtEx(ln.est.raw) });
+      line.appendChild(valEl);
       const rb = el('button', 'nw-line-reset' + ((ln.userCount != null || ln.excluded) ? '' : ' nw-line-reset-off'), '↺');
       rb.title = t('networth.line.reset_title');
       rb.onclick = (e) => { e.stopPropagation(); ln.userCount = undefined; ln.excluded = false; render(); };

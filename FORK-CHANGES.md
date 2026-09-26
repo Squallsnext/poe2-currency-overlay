@@ -227,6 +227,17 @@ the extra Exalted cells, 4.7) appear in the tool automatically.
 
 ### 4.6 Other Net Worth changes
 
+- **Implausible prices on thin markets** (`sanitizeThinPrices` in `main.js`, applied when
+  a price category is loaded, so the currency tab, price checks and Net Worth all get it):
+  poe2scout's current price for a rarely traded item can come from a handful of fills
+  (base Rebirth Rune: 339 Ex on 6 trades; the days before 5–20 Ex; GGG's exchange 5 Ex).
+  A price more than 3× off its reference is replaced: reference = the GGG Currency
+  Exchange rate against Exalted when ≥5 units traded, else – only if the item is thin
+  *right now* (latest daily quantity < 20) – the median of the last days. Raw price kept
+  (`priceRaw`, `priceSource`); Net Worth shows such values with "≈" and explains on hover.
+  Checked against live data (Forbidden Rites): core currency untouched (0 of 38 changed),
+  34 of 142 runes and 23 of 82 essences corrected; Rebirth Rune 339 → 22 Ex.
+
 - **"Wrong tab?"** on every tab card: tab detection correlates the panel's edge structure
   against one baked fingerprint per tab, and on a setup unlike the baked one two tabs can
   swap (Kalguuran runes were detected as Ancient Augment at 5K). The player picks the right
