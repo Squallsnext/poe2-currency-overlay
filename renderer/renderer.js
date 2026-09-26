@@ -2324,6 +2324,7 @@ async function initSettings() {
   });
   bindGamepadAction('overlay', 'gamepad-overlay-input', 'gamepad-overlay-clear');
   bindGamepadAction('closeOverlay', 'gamepad-close-input', 'gamepad-close-clear');
+  bindGamepadAction('overlayFocus', 'gamepad-focus-input', 'gamepad-focus-clear');
   bindHotkeyInput($('item-hotkey-input'), () => config.itemHotkey || '', async (acc) => {
     const ok = await window.api.setItemHotkeys({ pin: acc, temp: config.itemHotkeyTemp });
     if (ok) {

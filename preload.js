@@ -6,6 +6,7 @@ const GAMEPAD_BUTTON_KEYS = [
   'cross', 'circle', 'square', 'triangle', 'l1', 'r1', 'l2', 'r2',
   'create', 'options', 'l3', 'r3',
   'dpad_up', 'dpad_down', 'dpad_left', 'dpad_right', 'ps', 'touchpad',
+  'mute',
 ];
 
 contextBridge.exposeInMainWorld('api', {

@@ -17,6 +17,7 @@ const BUTTON_KEYS = [
   'cross', 'circle', 'square', 'triangle', 'l1', 'r1', 'l2', 'r2',
   'create', 'options', 'l3', 'r3',
   'dpad_up', 'dpad_down', 'dpad_left', 'dpad_right', 'ps', 'touchpad',
+  'mute', // DualSense microphone button - beyond the standard mapping, which ends at 17
 ];
 
 // USB only - Bluetooth wraps the same payload behind an extra byte (different report ID,
@@ -56,6 +57,7 @@ function decodeButtons(buf, profile) {
   bits[15] = hat === 1 || hat === 2 || hat === 3; // D-pad right
   bits[16] = !!(b3 & 0x01); // PS/Home
   bits[17] = !!(b3 & 0x02); // Touchpad click
+  bits[18] = !!(b3 & 0x04); // Mic mute - the game does not read it, a free button
   return bits;
 }
 

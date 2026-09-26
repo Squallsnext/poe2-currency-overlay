@@ -1156,6 +1156,15 @@ const GAMEPAD_ACTIONS = {
   // mouse - hideOverlay(true) hands focus straight back to the game, same as Quick
   // check's self-close does.
   closeOverlay: () => { if (overlayShown) hideOverlay(true); },
+  // Open the overlay AND make it the active window - what a mouse click on it does: the
+  // game goes to the background, so the controller no longer drives it. Pressed again
+  // while the overlay is in front: close it and hand focus back to the game.
+  overlayFocus: () => {
+    if (overlayShown && win.isFocused()) { hideOverlay(true); return; }
+    if (!overlayShown) showOverlay();
+    try { win.focus(); } catch {}
+    try { const r = focusNative.focusOwn(win.getTitle()); logToggle('overlayFocus', r.detail); } catch (e) { logToggle('overlayFocus', 'ERROR ' + (e && e.message)); }
+  },
   // Unlike the keyboard hotkey (which always re-checks and "stays open"), the
   // controller button toggles: a second press closes what the first one opened,
   // since a controller player has no separate close button they'd reliably reach for.
@@ -3515,12 +3524,12 @@ ipcMain.handle('capture-gamepad-button', () => {
 // Keep in sync with GAMEPAD_ACTIONS above - this is the write-side allowlist so an
 // arbitrary string from the renderer can't land as a live config key.
 const GAMEPAD_ACTION_IDS = new Set([
-  'overlay', 'closeOverlay', 'itemPin', 'itemTemp', 'stashCapture',
+  'overlay', 'closeOverlay', 'overlayFocus', 'itemPin', 'itemTemp', 'stashCapture',
   'repriceToggle', 'repriceRead',
 ]);
 // one button 0..17, or a combo of 2-3 distinct ones (sorted)
 function cleanGamepadBinding(b) {
-  const ok = (v) => Number.isInteger(v) && v >= 0 && v <= 17;
+  const ok = (v) => Number.isInteger(v) && v >= 0 && v <= 18; // 18 = mic mute
   if (ok(b)) return b;
   if (Array.isArray(b)) {
     const list = [...new Set(b.filter(ok))].sort((x, y) => x - y).slice(0, 3);

@@ -122,46 +122,63 @@ function findGame() {
 // Force the game window to the foreground. Returns { ok, detail } - ok means
 // GetForegroundWindow actually reports the game afterwards, not just that the
 // calls didn't throw.
+// Put a window in front and give it keyboard focus - SetForegroundWindow from THIS
+// process, wrapped in the AttachThreadInput combo (the documented escape hatch from the
+// foreground lock; same combo node-window-manager's bringToTop uses). ok = the window
+// really is foreground afterwards.
+function bringToFront(a, hwnd) {
+  if (a.IsIconic(hwnd)) a.ShowWindow(hwnd, SW_RESTORE);
+  const ourTid = a.GetCurrentThreadId();
+  const targetTid = a.GetWindowThreadProcessId(hwnd, null);
+  const fg = a.GetForegroundWindow();
+  const fgTid = fg ? a.GetWindowThreadProcessId(fg, null) : 0;
+  const attached = [];
+  for (const tid of [fgTid, targetTid]) {
+    if (tid && tid !== ourTid && attached.indexOf(tid) < 0) {
+      try { if (a.AttachThreadInput(ourTid, tid, 1)) attached.push(tid); } catch {}
+    }
+  }
+  try {
+    a.BringWindowToTop(hwnd);
+    a.SetForegroundWindow(hwnd);
+    a.SetFocus(hwnd);
+    const now = a.GetForegroundWindow();
+    return !!now && a.koffi.address(now) === a.koffi.address(hwnd);
+  } finally {
+    for (const tid of attached) {
+      try { a.AttachThreadInput(ourTid, tid, 0); } catch {}
+    }
+  }
+}
+
 function focus() {
   if (process.platform !== 'win32') return { ok: false, detail: 'focus-native is Win32-only' };
   const a = bind();
   if (!a) return { ok: false, detail: 'koffi unavailable: ' + loadError };
   if (!cached || !a.IsWindow(cached.hwnd)) cached = findGame();
   if (!cached) return { ok: false, detail: 'game window not found' };
-  const hwnd = cached.hwnd;
   try {
-    if (a.IsIconic(hwnd)) a.ShowWindow(hwnd, SW_RESTORE);
-    const ourTid = a.GetCurrentThreadId();
-    const targetTid = a.GetWindowThreadProcessId(hwnd, null);
-    const fg = a.GetForegroundWindow();
-    const fgTid = fg ? a.GetWindowThreadProcessId(fg, null) : 0;
-    // Attach our input queue to both the current-foreground thread and the
-    // game's - the documented escape hatch from the foreground lock (same combo
-    // node-window-manager's bringToTop uses).
-    const attached = [];
-    for (const tid of [fgTid, targetTid]) {
-      if (tid && tid !== ourTid && attached.indexOf(tid) < 0) {
-        try { if (a.AttachThreadInput(ourTid, tid, 1)) attached.push(tid); } catch {}
-      }
-    }
-    let landed = false;
-    try {
-      a.BringWindowToTop(hwnd);
-      a.SetForegroundWindow(hwnd);
-      a.SetFocus(hwnd);
-      const now = a.GetForegroundWindow();
-      landed = !!now && a.koffi.address(now) === a.koffi.address(hwnd);
-    } finally {
-      for (const tid of attached) {
-        try { a.AttachThreadInput(ourTid, tid, 0); } catch {}
-      }
-    }
-    return {
-      ok: landed,
-      detail: (landed ? 'focused ' : 'refused ') + (cached.exe || cached.title),
-    };
+    const landed = bringToFront(a, cached.hwnd);
+    return { ok: landed, detail: (landed ? 'focused ' : 'refused ') + (cached.exe || cached.title) };
   } catch (err) {
     cached = null; // stale/odd handle state - re-find next time
+    return { ok: false, detail: 'ERROR ' + ((err && err.message) || err) };
+  }
+}
+
+// One of OUR windows (by its title) to the front with focus - the controller's "open
+// overlay and bring it forward": a controller press is not a user input Windows credits
+// to us, so a plain BrowserWindow.focus() is refused while the game holds the foreground.
+function focusOwn(title) {
+  if (process.platform !== 'win32') return { ok: false, detail: 'focus-native is Win32-only' };
+  const a = bind();
+  if (!a) return { ok: false, detail: 'koffi unavailable: ' + loadError };
+  const w = listWindows().find((x) => x.pid === process.pid && x.title === title);
+  if (!w) return { ok: false, detail: 'own window not found: ' + title };
+  try {
+    const landed = bringToFront(a, w.hwnd);
+    return { ok: landed, detail: (landed ? 'focused ' : 'refused ') + title };
+  } catch (err) {
     return { ok: false, detail: 'ERROR ' + ((err && err.message) || err) };
   }
 }
@@ -213,4 +230,4 @@ function gameRect() {
   } catch { return null; }
 }
 
-module.exports = { warm, focus, findGame, listWindows, foregroundIsGame, gameRect };
+module.exports = { warm, focus, focusOwn, findGame, listWindows, foregroundIsGame, gameRect };

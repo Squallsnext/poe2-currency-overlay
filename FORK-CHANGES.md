@@ -61,6 +61,18 @@ HID reports instead (`node-hid`, new dependency), in `gamepad.js`.
   containing it is what is held ("PS + Square" does not also trigger "Square").
   Old single-number bindings work unchanged. Tested with synthetic DualSense reports.
 
+- **Mic mute button** (DualSense, index 18 - beyond the standard mapping) is bindable;
+  the game does not read it, so it is a free button.
+- **"Open overlay in front"** (new controller action, Settings → General): opens the
+  overlay AND makes it the active window, like a mouse click on it - the game goes to
+  the background, so the controller no longer drives it; pressed again while the
+  overlay is in front, it closes it and hands focus back to the game. A controller
+  press is not an input Windows credits to the app, so a plain `focus()` is refused
+  while the game holds the foreground; `focus-native.js` got `focusOwn(title)`, the same
+  AttachThreadInput / SetForegroundWindow combo it already uses to focus the game.
+  **Not yet tested in game.** (Driving the overlay with the controller - move between
+  buttons, confirm, back - is planned, low priority.)
+
 ### Reprice with a controller
 
 - **Read** (Square): same as right-clicking – reads the price in the Set Item Price dialog
