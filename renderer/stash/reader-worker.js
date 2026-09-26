@@ -7,7 +7,7 @@
 // is fill/darkness independent (no per-cell detection) and resolution-robust (the box is
 // calibrated + downsampled). Reading then scales the matched tab's static slot positions
 // into the live box and OCRs each count. Pricing stays in main (needs network/cache).
-const { parentPort } = require('worker_threads');
+const { parentPort, Worker } = require('worker_threads');
 const DR = require('./digit-reader');
 const RP = require('./read-pipeline');
 const TD = require('./tab-detect');
@@ -47,7 +47,84 @@ const MIN_SCORE = 0.3; // below this the panel isn't a recognized stash tab
 // showed up again below 0.64). Normal-scale captures are completely unaffected.
 // (paramsForScale lives in read-pipeline.js now, shared with the debug preview)
 
+// One slot: its saved override (with the "high resolution" switch folded in), the pixel
+// channel it is read from, the read, and the record the UI gets. Shared by the single
+// reader and the helper threads below, so both read a slot exactly alike.
+function readOneSlot(s, c) {
+  const ovSaved = c.tabOverrides && c.tabOverrides[s.apiId];
+  // global "high resolution" switch: matchScale 2 unless the slot chose its own
+  const ov = c.hiRes && (!ovSaved || ovSaved.matchScale == null) ? Object.assign({}, ovSaved, { matchScale: 2 }) : ovSaved;
+  let ch, pos;
+  if (c.perSlot) {
+    const cut = RP.cropAroundSlot(c.buf, c.W, c.H, c.box, c.refBox, s, ov);
+    ch = RP.buildChannel(cut.buf, cut.W, cut.H, cut.box, c.refBox, RP.channelOpts(ov));
+    pos = RP.slotPos(ch, s, ov, c.refBox, cut.box);
+  } else {
+    ch = c.chFor(ov);
+    pos = RP.slotPos(ch, s, ov, c.refBox, c.box);
+  }
+  // adaptive: pick the binarisation threshold per cell rather than trusting one
+  // global floor, which only ever suited the capture the templates came from - UNLESS
+  // a user saved a floor for this exact slot (see main.js's stash-slot-save-read-settings,
+  // the OCR-debug panel's slider): background art bright enough to pass the same
+  // near-white gate as the digits confuses the sweep's own "most confident" pick
+  // (a noisier floor can score higher purely by having more ink to be confident
+  // about), and no amount of sweeping fixes that - only a floor chosen by eye does.
+  const Ps = RP.slotParams(c.map, c.scale, ov);
+  const ms = RP.effectiveMatchScale(ch, Ps);
+  const bk = c.bankFor(ms);
+  const r = RP.readSlot(ch, pos, bk.bank, RP.paramsAtScale(Ps, ms), ov && ov.floor != null ? ov.floor : null);
+  const raw = r.text === '?' ? '?' : bk.unmap(r.text); // alt keys back to digits
+  // pass the measured reliability of this slot through, so the UI can flag the
+  // rows our own testing says to distrust rather than showing them all alike
+  const rel = (c.map.SLOT_RELIABILITY && c.map.SLOT_RELIABILITY[s.apiId]) || null;
+  // DEBUG: which template each accepted glyph came from and at what score, so a
+  // misread can be inspected instead of guessed at - see stash-debug-live's strips.svg.
+  const glyphs = (r.glyphs || []).map((g) => ({
+    ch: bk.unmap(g.ch), source: bk.sourceOf(g.ch), score: g.score, gapFilled: g.gapFilled,
+  }));
+  return { apiId: s.apiId, priceAs: s.priceAs || null, suffix: s.suffix || null, count: raw === '?' ? null : parseInt(raw, 10), conf: raw === '?' ? null : r.conf, rel, glyphs };
+}
+const makeBankFor = (learnedTemplates) => {
+  const cache = new Map();
+  return (ms) => {
+    if (!cache.has(ms)) cache.set(ms, RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates, ms > 1 ? ms : undefined));
+    return cache.get(ms);
+  };
+};
+
+// Reading slots in parallel. At 5K with high-resolution matching each slot's threshold
+// sweep takes 0.3-0.7 s - a currency tab 7 s on one core, while a 1080p scan is done in
+// 1-2 s (reported: "why not at 5K"). Slots are independent, so where they are read from
+// the native frame (per-slot windows) they are split over a few helper threads reading
+// the SAME frame (shared memory, no copy each) with the same code - same results.
+const HELPERS = Math.max(1, Math.min(6, (require('os').cpus() || []).length - 2)); // leave the game two cores
+function readSlotsParallel(slots, c, msg) {
+  const shared = new SharedArrayBuffer(c.buf.length);
+  new Uint8Array(shared).set(c.buf);
+  const groups = Array.from({ length: HELPERS }, () => []);
+  slots.forEach((s, i) => groups[i % HELPERS].push(i)); // interleaved: rows cost alike
+  const out = new Array(slots.length);
+  return Promise.all(groups.map((idx) => new Promise((resolve, reject) => {
+    const w = new Worker(__filename);
+    w.once('message', (m) => { w.terminate(); if (m && m.reads) { m.reads.forEach((rec, k) => { out[idx[k]] = rec; }); resolve(); } else reject(new Error((m && m.error) || 'helper failed')); });
+    w.once('error', (e) => { w.terminate(); reject(e); });
+    w.postMessage({ mode: 'slots', shared, W: c.W, H: c.H, box: c.box, tab: c.tab, idx, learnedTemplates: msg.learnedTemplates, tabOverrides: c.tabOverrides, hiRes: c.hiRes });
+  }))).then(() => out);
+}
+
 parentPort.on('message', (msg) => {
+  if (msg && msg.mode === 'slots') { // a helper thread: read these slots, send them back
+    try {
+      const map = TABS[msg.tab], refBox = TAB_TEMPLATES.box;
+      const c = { buf: Buffer.from(msg.shared), W: msg.W, H: msg.H, box: msg.box, refBox, map, scale: msg.box.h / refBox.h, hiRes: msg.hiRes, tabOverrides: msg.tabOverrides, perSlot: true, bankFor: makeBankFor(msg.learnedTemplates) };
+      parentPort.postMessage({ reads: msg.idx.map((i) => readOneSlot(map.STATIC_SLOTS[i], c)) });
+    } catch (err) { parentPort.postMessage({ error: String(err && err.message || err) }); }
+    return;
+  }
+  readFrame(msg).catch((err) => parentPort.postMessage({ ok: false, error: String(err && err.message || err) }));
+});
+async function readFrame(msg) {
   try {
     const { bitmap, W, H, calBox, learnedTemplates, slotOverrides, hiRes, userTabSigs } = msg;
     // baked fingerprints plus the ones the player taught via "wrong tab?" (main.js
@@ -169,7 +246,15 @@ parentPort.on('message', (msg) => {
     // pixels correctly.
     // (the regime switch itself lives in read-pipeline.js, shared with the debug
     // preview and the teach step so all three see the same pixels)
-    const ch0 = RP.buildChannel(buf, W, H, box, refBox, RP.channelOpts(null));
+    // Where slots are read straight from the native frame (5K/4K, and near-1 setups),
+    // each slot gets its channel built from a window around it only (RP.cropAroundSlot -
+    // the same cut the OCR debug preview reads from, so both see the same pixels).
+    // Building it over the whole frame cost ~1.5 s at 5K - and once more for every
+    // distinct per-slot filter setting: a currency tab tuned slot by slot took 16-18 s
+    // (reported: "1-2 s at 1080p, why not at 5K"). The normalised regime (1.15-1.5x)
+    // resamples just the panel once and keeps the shared channel below.
+    const perSlot = RP.cropAroundSlot(buf, W, H, box, refBox, map.STATIC_SLOTS[0], null).buf !== buf;
+    const ch0 = perSlot ? null : RP.buildChannel(buf, W, H, box, refBox, RP.channelOpts(null));
     // A per-slot override of the channel (saturation/contrast/brightness, see the OCR
     // debug panel) needs it built again - only paid for slots that have one, and shared
     // between slots with identical settings.
@@ -184,37 +269,13 @@ parentPort.on('message', (msg) => {
     // setup. Coordinates are reference-space, same system map.STATIC_SLOTS uses, so they
     // drop straight in ahead of the scale/origin math below.
     const tabOverrides = (slotOverrides && slotOverrides[tab]) || null;
-    const reads = []; let readCount = 0;
-    for (const s of map.STATIC_SLOTS) {
-      const ovSaved = tabOverrides && tabOverrides[s.apiId];
-      // global "high resolution" switch: matchScale 2 unless the slot chose its own
-      const ov = hiRes && (!ovSaved || ovSaved.matchScale == null) ? Object.assign({}, ovSaved, { matchScale: 2 }) : ovSaved;
-      const ch = chFor(ov);
-      const pos = RP.slotPos(ch, s, ov, refBox, box);
-      // adaptive: pick the binarisation threshold per cell rather than trusting one
-      // global floor, which only ever suited the capture the templates came from - UNLESS
-      // a user saved a floor for this exact slot (see main.js's stash-slot-save-read-settings,
-      // the OCR-debug panel's slider): background art bright enough to pass the same
-      // near-white gate as the digits confuses the sweep's own "most confident" pick
-      // (a noisier floor can score higher purely by having more ink to be confident
-      // about), and no amount of sweeping fixes that - only a floor chosen by eye does.
-      const Ps = RP.slotParams(map, scale, ov);
-      const ms = RP.effectiveMatchScale(ch, Ps);
-      const bk = bankFor(ms);
-      const r = RP.readSlot(ch, pos, bk.bank, RP.paramsAtScale(Ps, ms), ov && ov.floor != null ? ov.floor : null);
-      const raw = r.text === '?' ? '?' : bk.unmap(r.text); // alt keys back to digits
-      const conf = r.conf;
-      if (raw !== '?') readCount++;
-      // pass the measured reliability of this slot through, so the UI can flag the
-      // rows our own testing says to distrust rather than showing them all alike
-      const rel = (map.SLOT_RELIABILITY && map.SLOT_RELIABILITY[s.apiId]) || null;
-      // DEBUG: which template each accepted glyph came from and at what score, so a
-      // misread can be inspected instead of guessed at - see stash-debug-live's strips.svg.
-      const glyphs = (r.glyphs || []).map((g) => ({
-        ch: bk.unmap(g.ch), source: bk.sourceOf(g.ch), score: g.score, gapFilled: g.gapFilled,
-      }));
-      reads.push({ apiId: s.apiId, priceAs: s.priceAs || null, suffix: s.suffix || null, count: raw === '?' ? null : parseInt(raw, 10), conf: raw === '?' ? null : conf, rel, glyphs });
+    const c = { buf, W, H, box, refBox, map, scale, hiRes, tabOverrides, perSlot, chFor, bankFor, tab };
+    let reads = null;
+    if (perSlot && HELPERS > 1 && map.STATIC_SLOTS.length >= 12) {
+      try { reads = await readSlotsParallel(map.STATIC_SLOTS, c, msg); } catch { reads = null; } // helpers failed: read here
     }
+    if (!reads) reads = map.STATIC_SLOTS.map((s) => readOneSlot(s, c));
+    const readCount = reads.filter((r) => r.count != null).length;
     parentPort.postMessage({
       ok: true, tab, score: det.score, readCount, slotCount: map.STATIC_SLOTS.length, reads,
       boxSource, panelCoverage, autoFound, box,
@@ -224,4 +285,4 @@ parentPort.on('message', (msg) => {
   } catch (err) {
     parentPort.postMessage({ ok: false, error: String(err && err.message || err) });
   }
-});
+}

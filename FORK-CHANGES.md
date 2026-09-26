@@ -621,6 +621,19 @@ indexes, every pixel `undefined`, an empty cell (the debug view's image then fai
 5K boxes: 0 of 12 read before, 12 of 12 read after (counts depend on the filters). The
 debug view now shows the error instead of a bare "…".
 
+**Faster reads at 5K** (reported: a 1080p scan is done in 1-2 s, 5K with high resolution
+takes long). Measured on the player's 5K currency tab with their per-slot filters:
+- 17 s: every distinct per-slot filter setting rebuilt the pixel channel over the whole
+  15-megapixel frame. Now, where slots are read from the native frame (5K/4K and
+  near-1 setups), each slot's channel is built from a window around it only - the same
+  cut the OCR debug preview already used (`RP.cropAroundSlot`) -> 7.6 s, identical reads.
+- The rest was the per-slot threshold sweep at matching scale 2 (0.3-0.7 s a slot). Slots
+  are independent, so they are split over helper threads (cores - 2, at most 6) that
+  read the same frame from shared memory with the same code (`readOneSlot`) -> 4.2 s on
+  a 4-core test machine (2 helpers), identical reads (38 of 38 records byte-equal);
+  without per-slot filters 2.0 -> 1.2 s. If a helper fails, the slots are read on the
+  one thread as before.
+
 ### 4.8 Setup-specific parts – already removed from this branch
 
 These existed in the player's own build and were **deliberately left out** here:
