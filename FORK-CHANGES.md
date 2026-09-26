@@ -580,6 +580,31 @@ read slots unsure -> "calibrate again, or correct with Align").
   dragged box is kept and the notice asks for the currency tab.
 - Calibration hint text: open the currency tab, a rough box is enough.
 - **Not yet tested in game.**
+- **Tested in game** (5K, controller mode): the boxes sat on every count right after it.
+
+**Fully automatic ("Kalibrieren").** The calibration window opens only when needed:
+`cell-calibrate.js search` looks for the currency tab on the screenshot - first where the
+last calibration and the coloured border say (instant when the stash has not moved),
+then everywhere: the capture shrunk to 1080 px high, every inner-corner-like spot found
+once (running sums, one pass), and for UI scales 0.6-1.5 each spot votes for where the
+panel would be if it were one of the 38 currency corners (votes counted with the 8
+neighbouring bins). The best few places are checked by the exact fit above, which alone
+decides. Found: saved, no window, test read, "calibrated automatically (37 of 38 cells)".
+Not found: the window opens as before and says why. "Set the box by hand" opens the
+window directly.
+- **Measured** on composites (the currency picture pasted into 5K / 4K / 1440p / 1080p
+  screens at keyboard and controller positions and UI 70-100 %, a runes panel beside it):
+  all found, box exact to 1 px, 0.3-1.2 s; with no currency tab (runes + essences): not
+  found, 0.9 s at 1080p, ~6 s at 5K before the window opens. Two of the player's real
+  screenshots (keyboard layout at 2000x878, controller calibration view): found, 36-37 of
+  38 cells.
+
+**After the test read:** read fine -> "Scan the other tabs now?" with [Scan tabs] / [Later]
+(outside the setup wizard, which has its own next step). The calibration settings are
+grouped: Calibrate + Scan tabs; other ways (wizard, box by hand, reset); for support
+(tab pictures, export). Tab tour order follows the game: the runes tab's five sub-tabs in
+a row, ritual after them (it sat between Kalguur runes and soul cores - out of the runes
+tab and back in).
 
 ### 4.8 Setup-specific parts – already removed from this branch
 

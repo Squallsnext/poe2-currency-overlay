@@ -68,5 +68,100 @@
     if (!(gw > 50 && gh > 50)) return { error: 'no-box' };
     return fit(FrameSnap.grayFromRGBA(buf, W, ox, oy, gw, gh), ox, oy, gw, gh, rough);
   }
-  return { fit, fromCapture, REF };
+  // ---- finding the currency tab anywhere on the screen (no box given) ----
+  // Quick tries first (hints: the last calibration, the panel found by its coloured border):
+  // where the stash has not moved that is all it takes. Otherwise the whole capture,
+  // shrunk to 1080 px high (the reference height - there a panel at UI scale u is u
+  // reference px per px): every inner-corner-like spot is found once (bright frame left of
+  // / above it, dark right of / below it along a short run - means via running sums, so
+  // one pass), and for each UI scale every such spot "votes" for where the panel would be
+  // if it were one of the 38 currency corners. Only the currency tab gets many votes at
+  // one place; each candidate is then checked by fromCapture (>= 60 % of the corners at
+  // their exact spot), which is what decides - the vote only proposes.
+  function shrinkGray(buf, W, H, q) {
+    const w = Math.max(1, Math.round(W * q)), h = Math.max(1, Math.round(H * q));
+    const g = new Float32Array(w * h), inv = 1 / q;
+    for (let y = 0; y < h; y++) {
+      const y0 = Math.floor(y * inv), y1 = Math.max(y0 + 1, Math.min(H, Math.floor((y + 1) * inv)));
+      for (let x = 0; x < w; x++) {
+        const x0 = Math.floor(x * inv), x1 = Math.max(x0 + 1, Math.min(W, Math.floor((x + 1) * inv)));
+        let s = 0, n = 0;
+        for (let yy = y0; yy < y1; yy++) { let p = (yy * W + x0) * 4; for (let xx = x0; xx < x1; xx++, p += 4) { s += buf[p] + buf[p + 1] + buf[p + 2]; n++; } }
+        g[y * w + x] = s / (3 * n);
+      }
+    }
+    return { g, w, h };
+  }
+  function cornerSpots(g, w, h) {
+    // per pixel: frame (2 px before) minus the brightest of the 3 px after, both ways
+    const col = new Float32Array(w * h), row = new Float32Array(w * h);
+    for (let y = 2; y < h - 3; y++) for (let x = 2; x < w - 3; x++) {
+      const i = y * w + x;
+      col[i] = (g[i - 1] + g[i - 2]) / 2 - Math.max(g[i], g[i + 1], g[i + 2]);
+      row[i] = (g[i - w] + g[i - 2 * w]) / 2 - Math.max(g[i], g[i + w], g[i + 2 * w]);
+    }
+    // running sums: down each column (for vertical lines), along each row (horizontal)
+    const cc = new Float32Array(w * (h + 1)), rc = new Float32Array((w + 1) * h);
+    for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) cc[(y + 1) * w + x] = cc[y * w + x] + col[y * w + x];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) rc[y * (w + 1) + x + 1] = rc[y * (w + 1) + x] + row[y * w + x];
+    const len = 28, m = 4;
+    const S = new Float32Array(w * h);
+    for (let y = 2; y < h - len - m - 1; y++) for (let x = 2; x < w - len - m - 1; x++) {
+      const v = (cc[(y + m + len) * w + x] - cc[(y + m) * w + x]) / len;
+      const r = (rc[y * (w + 1) + x + m + len] - rc[y * (w + 1) + x + m]) / len;
+      S[y * w + x] = Math.min(v, r);
+    }
+    const spots = [];
+    for (let y = 3; y < h - 3; y++) for (let x = 3; x < w - 3; x++) {
+      const v = S[y * w + x]; if (v < 12) continue;
+      let peak = true;
+      for (let dy = -2; dy <= 2 && peak; dy++) for (let dx = -2; dx <= 2; dx++) if ((dx || dy) && S[(y + dy) * w + x + dx] > v) { peak = false; break; }
+      if (peak) spots.push({ x, y, v });
+    }
+    spots.sort((p, q) => q.v - p.v);
+    return spots.slice(0, 2500);
+  }
+  function search(buf, W, H, hints) {
+    const t0 = Date.now();
+    for (const hb of hints || []) {
+      if (!hb || !(hb.w > 50) || !(hb.h > 50)) continue;
+      const r = fromCapture(buf, W, H, hb);
+      if (r.box) return Object.assign(r, { via: 'hint', ms: Date.now() - t0 });
+    }
+    const q = H > 1080 ? 1080 / H : 1;
+    const { g, w, h } = shrinkGray(buf, W, H, q);
+    const spots = cornerSpots(g, w, h);
+    const C = Cells.CORNERS, BIN = 6;
+    const cands = [];
+    for (let u = 0.6; u <= 1.5; u += 0.03) {
+      const votes = new Map();
+      for (const d of spots) for (const c of C) {
+        const ox = d.x - u * (c.x - REF.x), oy = d.y - u * (c.y - REF.y);
+        if (ox < -50 || oy < -50) continue;
+        const k = Math.round(ox / BIN) * 100000 + Math.round(oy / BIN);
+        votes.set(k, (votes.get(k) || 0) + 1);
+      }
+      // a spot sits between two bins as often as in one: count each bin with its 8
+      // neighbours (a scale step off, the far corners also spread over a few bins)
+      for (const [k] of votes) {
+        const bx = Math.floor(k / 100000), by = k % 100000;
+        let n = 0;
+        for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) n += votes.get((bx + dx) * 100000 + by + dy) || 0;
+        if (n >= 14) cands.push({ n, u, ox: bx * BIN, oy: by * BIN });
+      }
+    }
+    cands.sort((p, q2) => q2.n - p.n);
+    const tried = [];
+    for (const c of cands) {
+      if (tried.length >= 12 || c.n < 0.5 * cands[0].n) break; // far fewer votes than the best: not it
+      if (tried.some((t) => Math.abs(t.ox - c.ox) < 20 && Math.abs(t.oy - c.oy) < 20 && Math.abs(t.u - c.u) < 0.07)) continue;
+      tried.push(c);
+      const rough = { x: c.ox / q, y: c.oy / q, w: REF.w * c.u / q, h: REF.h * c.u / q };
+      const r = fromCapture(buf, W, H, rough);
+      if (r.box) return Object.assign(r, { via: 'search', votes: c.n, ms: Date.now() - t0 });
+    }
+    return { error: 'not-found', spots: spots.length, tried: tried.length, ms: Date.now() - t0 };
+  }
+
+  return { fit, fromCapture, search, REF };
 });

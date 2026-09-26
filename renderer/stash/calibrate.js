@@ -173,6 +173,8 @@
     capH = data.capH || 1;
     displayInfo = data.display || null;
     updateScale();
+    // why this window opened at all: the automatic search did not find the currency tab
+    if (data.note) { const msg = document.querySelector('.msg'); if (msg) msg.innerHTML = '<b>' + t(data.note) + '</b><br>' + msg.innerHTML; }
     const s = data.seedBox;
     box = capToCssBox(s);
     // The same window calibrates the Net Worth stash panel and the Reprice price box.

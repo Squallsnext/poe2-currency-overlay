@@ -123,7 +123,7 @@ contextBridge.exposeInMainWorld('api', {
   stashSampleReset: () => ipcRenderer.invoke('stash-sample-reset'),
   stashSampleSend: (payload) => ipcRenderer.invoke('stash-sample-send', payload),
   resizeWindowBy: (dx, dy) => ipcRenderer.send('resize-window-by', { dx, dy }),
-  stashCalibrateStart: () => ipcRenderer.send('stash-calibrate-start'),
+  stashCalibrateStart: (opts) => ipcRenderer.send('stash-calibrate-start', opts && opts.manual ? { manual: true } : undefined),
   clearStashCalibration: () => ipcRenderer.invoke('clear-stash-calibration'),
   onStashCalibrated: (cb) => ipcRenderer.on('stash-calibrated', (_e, res) => cb(res)),
   onStashAdjusted: (cb) => ipcRenderer.on('stash-adjusted', (_e, info) => cb(info)),

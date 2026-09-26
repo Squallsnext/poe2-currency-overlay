@@ -1319,7 +1319,10 @@ footer {
 .nw-set-cal-badge { font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--tx-dim); border: 1px solid var(--bd-12); border-radius: 10px; padding: 2px 8px; white-space: nowrap; }
 .nw-set-cal-badge.on { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
 .nw-set-cal-desc { color: var(--tx-dim); font-size: 11.5px; line-height: 1.45; margin-bottom: 11px; }
-.nw-set-cal-btns { display: flex; gap: 8px; }
+.nw-set-cal-btns { display: flex; flex-direction: column; gap: 8px; }
+.nw-set-cal-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.nw-set-cal-rowlab { flex: 0 0 100%; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--tx-faint); margin-top: 4px; }
+.nw-notice-actions { display: flex; gap: 8px; margin-top: 8px; }
 /* Auto-detection is working, so this is a fallback nobody needs to press: no card, no
    emphasis, muted button. Present and findable, but it must not read as a required step. */
 .nw-set-cal.quiet { border: none; background: none; padding: 4px 0 0; }

@@ -112,6 +112,14 @@
     const weak = lines.filter((ln) => ln.conf != null && ln.conf < 0.80).length;
     const bad = !lines.length || weak / lines.length > 0.3;
     state.notice = { kind: bad ? 'warn' : 'ok', msg: c.how + ' ' + t(bad ? 'networth.calibrate.check_bad' : 'networth.calibrate.check_ok', { tab: TAB_LABEL[res.tab] || res.tab, read: lines.length, weak }) + c.small };
+    // read fine: offer the other tabs right away (the tour), or leave it
+    if (!bad && !state.wizard) {
+      state.notice.msg += ' ' + t('networth.calibrate.offer_tour');
+      state.notice.actions = [
+        { label: t('networth.tour.start'), fn: () => startTour() },
+        { label: t('networth.calibrate.offer_skip'), fn: () => {}, ghost: true },
+      ];
+    }
     render();
   }
 
@@ -340,32 +348,30 @@
     cal.appendChild(el('div', 'nw-set-cal-desc', state.calibrated
       ? t('networth.settings.cal_desc_calibrated')
       : t('networth.settings.cal_desc_default')));
+    // Grouped by what it is for: the two things you do (calibrate, scan the tabs), then
+    // the other ways to set up, then what support asks for. Before: six buttons in one
+    // row, the everyday ones next to the support ones (reported: "aufräumen").
     const btns = el('div', 'nw-set-cal-btns');
-    const wzBtn = el('button', 'nw-set-btn', t('networth.wizard.start'));
-    wzBtn.title = t('networth.wizard.start_title');
-    wzBtn.onclick = () => startWizard();
-    btns.appendChild(wzBtn);
-    const tourBtn = el('button', 'nw-set-btn', t('networth.tour.start'));
-    tourBtn.title = t('networth.tour.start_title');
-    tourBtn.onclick = () => startTour();
-    btns.appendChild(tourBtn);
-    const supBtn = el('button', 'nw-set-btn nw-set-btn-ghost', t('networth.tour.support_start'));
-    supBtn.title = t('networth.tour.support_start_title');
-    supBtn.onclick = () => startTour(true);
-    btns.appendChild(supBtn);
-    const expBtn = el('button', 'nw-set-btn nw-set-btn-ghost', t('networth.tour.export'));
-    expBtn.title = t('networth.tour.export_title');
-    expBtn.onclick = () => { window.api.stashExportSettings().catch(() => {}); };
-    btns.appendChild(expBtn);
-    const calBtn = el('button', 'nw-set-btn', state.calibrated ? t('networth.settings.cal_button_recalibrate') : t('networth.settings.cal_button_calibrate'));
-    calBtn.onclick = () => { try { window.api.stashCalibrateStart(); } catch {} };
-    btns.appendChild(calBtn);
-    if (state.calibrated) {
-      const clr = el('button', 'nw-set-btn nw-set-btn-ghost', t('networth.settings.cal_reset_button'));
-      clr.title = t('networth.settings.cal_reset_title');
-      clr.onclick = () => { try { window.api.clearStashCalibration(); } catch {} state.calibrated = false; renderSettings(root); render(); };
-      btns.appendChild(clr);
-    }
+    const group = (label, list) => {
+      const row = el('div', 'nw-set-cal-row');
+      if (label) row.appendChild(el('span', 'nw-set-cal-rowlab', esc(label)));
+      for (const b of list) if (b) row.appendChild(b);
+      btns.appendChild(row);
+    };
+    const mk = (label, title, fn, ghost) => { const b = el('button', 'nw-set-btn' + (ghost ? ' nw-set-btn-ghost' : ''), esc(label)); if (title) b.title = title; b.onclick = fn; return b; };
+    group(null, [
+      mk(t('networth.settings.cal_auto'), t('networth.settings.cal_auto_title'), () => { try { window.api.stashCalibrateStart(); } catch {} }),
+      mk(t('networth.tour.start'), t('networth.tour.start_title'), () => startTour()),
+    ]);
+    group(t('networth.settings.cal_group_more'), [
+      mk(t('networth.wizard.start'), t('networth.wizard.start_title'), () => startWizard(), true),
+      mk(t('networth.settings.cal_manual'), t('networth.settings.cal_manual_title'), () => { try { window.api.stashCalibrateStart({ manual: true }); } catch {} }, true),
+      state.calibrated ? mk(t('networth.settings.cal_reset_button'), t('networth.settings.cal_reset_title'), () => { try { window.api.clearStashCalibration(); } catch {} state.calibrated = false; renderSettings(root); render(); }, true) : null,
+    ]);
+    group(t('networth.settings.cal_group_support'), [
+      mk(t('networth.tour.support_start'), t('networth.tour.support_start_title'), () => startTour(true), true),
+      mk(t('networth.tour.export'), t('networth.tour.export_title'), () => { window.api.stashExportSettings().catch(() => {}); }, true),
+    ]);
     cal.appendChild(btns);
     root.appendChild(cal);
   }
@@ -1188,7 +1194,11 @@
   // it should be (main.js tourCapture: a mismatch teaches that tab's fingerprint), kept
   // for the align tool, and saved (userData/tab-shots) so aligning works later without
   // scanning again. Tabs already scanned show their picture and can be redone.
-  const TOUR_TABS = () => Object.keys(TAB_LABEL);
+  // In the order the tabs are reached in game: the runes tab's five sub-tabs one after
+  // the other (ritual used to sit between Kalguur runes and soul cores - out of the runes
+  // tab and back in, reported), then the rest.
+  const TOUR_ORDER = ['currency', 'abyss', 'essence', 'runes', 'runes-kalguuran', 'soulcore', 'idol', 'ancient-augment', 'ritual', 'delirium', 'breach', 'expedition'];
+  const TOUR_TABS = () => TOUR_ORDER.filter((k) => TAB_LABEL[k]).concat(Object.keys(TAB_LABEL).filter((k) => !TOUR_ORDER.includes(k)));
   let tourHotkeyOn = false;
   // a reload with the dialog open must not leave the scan key stuck in tour mode
   try { if (window.api && window.api.stashTourHotkey) window.api.stashTourHotkey(false); } catch {}
@@ -1474,7 +1484,19 @@
     // must never be a surprise
     { const ch = window.NwSkipGroups && window.NwSkipGroups.chips(render); if (ch) wrap.appendChild(ch); }
 
-    if (state.notice) wrap.appendChild(el('div', 'nw-notice nw-' + state.notice.kind, esc(state.notice.msg)));
+    if (state.notice) {
+      const n = el('div', 'nw-notice nw-' + state.notice.kind, esc(state.notice.msg));
+      if (state.notice.actions) {
+        const row = el('div', 'nw-notice-actions');
+        for (const a of state.notice.actions) {
+          const btn = el('button', 'nw-set-btn' + (a.ghost ? ' nw-set-btn-ghost' : ''), esc(a.label));
+          btn.onclick = (e) => { e.stopPropagation(); state.notice = null; a.fn(); render(); };
+          row.appendChild(btn);
+        }
+        n.appendChild(row);
+      }
+      wrap.appendChild(n);
+    }
 
     const pending = state.busy && state.phase === 'detecting' ? state.pendingTab : null;
     if (!rows && !state.busy) {
@@ -1582,7 +1604,7 @@
       if (state.wizard && state.wizard.step === 1) state.wizard.step = 2; // calibrated - now scan
       if (res && res.scanning) { // saved; the test scan runs and reports like any scan
         const f = res.fit || {};
-        const how = f.cells && !f.error ? t('networth.calibrate.by_cells', { cells: f.cells, of: f.of }) : t('networth.calibrate.by_hand');
+        const how = f.cells && !f.error ? t(res.auto ? 'networth.calibrate.by_auto' : 'networth.calibrate.by_cells', { cells: f.cells, of: f.of }) : t('networth.calibrate.by_hand');
         state.calCheck = { how, small: smallMsg };
         state.notice = { kind: small || f.error ? 'warn' : 'ok', msg: how + ' ' + t('networth.calibrate.saved_scanning', { smallPanelWarning: smallMsg }) };
         render(); return;

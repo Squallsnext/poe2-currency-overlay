@@ -4289,6 +4289,37 @@ ipcMain.on('stash-calibrate-start', async (_e, opts) => {
         + `scale=${disp.scaleFactor} requested=${reqW}x${reqH} capture=${capW}x${capH}\n`;
       fs.appendFileSync(path.join(app.getPath('userData'), 'calibration-debug.log'), line);
     } catch {}
+    // Stash panel: look for the currency tab on this screenshot first (cell-calibrate.js
+    // search - the last calibration and the coloured border are tried first, then the
+    // whole screen). Found: saved at once, no window, the test read follows. Not found
+    // (another tab open, stash covered, very small UI): the window opens as before and
+    // says why; the box dragged there is refined from the cells on confirm if it can be.
+    let calNote = null;
+    if (calibTarget === 'stash' && !(opts && opts.manual)) {
+      try {
+        const CC = require('./renderer/stash/cell-calibrate.js');
+        const hints = [];
+        if (config.stashCalibration) hints.push(config.stashCalibration);
+        try {
+          const PF = require('./renderer/stash/panel-finder.js');
+          const found = PF.findPanel(shot.bitmap, capW, capH);
+          const box = found && PF.frameToContent(found);
+          if (box && PF.plausible(box, capW, capH)) hints.push(box);
+        } catch { /* no border - the search covers it */ }
+        const auto = CC.search(shot.bitmap, capW, capH, hints);
+        try { fs.appendFileSync(path.join(app.getPath('userData'), 'calibration-debug.log'), `${new Date().toISOString()} auto ${JSON.stringify(auto)}\n`); } catch {}
+        if (auto && auto.box) {
+          config.stashCalibration = auto.box;
+          saveConfig();
+          calibCap = null;
+          const calScale = auto.box.h / REF_BOX.h;
+          if (win && !win.isDestroyed()) win.webContents.send('stash-calibrated', { calScale, ok: true, scanning: true, auto: true, fit: { cells: auto.cells, of: auto.of, rms: auto.rms } });
+          captureAndBroadcast();
+          return;
+        }
+        calNote = 'calib.auto_not_found';
+      } catch (err) { console.error('auto calibration failed:', err.message); }
+    }
     // seed the box at the previous frame, else FRAME_BOX scaled to this capture
     let seed;
     if (CALIB_TARGETS[calibTarget]) {
@@ -4318,7 +4349,7 @@ ipcMain.on('stash-calibrate-start', async (_e, opts) => {
       setTimeout(() => {
         try {
           calibWin.webContents.send('calib-init', {
-            dataUrl, capW, capH, seedBox: seed, target: calibTarget,
+            dataUrl, capW, capH, seedBox: seed, target: calibTarget, note: calNote,
             lang: resolvedUiLang(), debug: !!config.stashShowOcrDebug,
             display: {
               id: disp.id,
