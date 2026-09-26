@@ -675,6 +675,18 @@ then what the model snapping did. And both compare SURE reads (>= 80 %) instead 
 reads: unsure "counts" are mostly item art in empty cells, which boxes on the right spot
 drop - counting every read called the better boxes worse (essence: 54 -> 46).
 
+**Read filters shipped per resolution** (`renderer/stash/slot-defaults.js`). The per-slot
+filters that make a count readable depend on how big the digits are drawn, and a 5K
+player's tuning wiped out 1080p digits. Now, where a slot has no filter of its own:
+- 4K/5K (panel read per cell, > 1.5x): the per-slot filters a player tuned on 5120x2880
+  for the currency and runes tabs (107 slots);
+- 1080p-sized panels (0.85-1.15x): that player's 1080p export - colour limit 5, specks
+  under 12 px for the whole currency tab.
+The player's own values always win, value by value; positions and matchScale are not
+part of it. The same merge runs in the reader, the OCR debug preview and teaching.
+Measured: with the player's 5K box positions and only the shipped filters, the 5K
+currency read is identical to their own full settings (38 of 38 records).
+
 ### 4.8 Setup-specific parts – already removed from this branch
 
 These existed in the player's own build and were **deliberately left out** here:

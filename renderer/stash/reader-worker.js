@@ -12,6 +12,7 @@ const DR = require('./digit-reader');
 const RP = require('./read-pipeline');
 const TD = require('./tab-detect');
 const PF = require('./panel-finder');
+const SD = require('./slot-defaults');
 const TAB_TEMPLATES = require('./tab-templates.json'); // { box (reference), tw, th, templates }
 const TABS = {
   currency: require('./currency-tab-map'),
@@ -51,7 +52,8 @@ const MIN_SCORE = 0.3; // below this the panel isn't a recognized stash tab
 // channel it is read from, the read, and the record the UI gets. Shared by the single
 // reader and the helper threads below, so both read a slot exactly alike.
 function readOneSlot(s, c) {
-  const ovSaved = c.tabOverrides && c.tabOverrides[s.apiId];
+  // the player's own settings for this slot over the ones shipped for this resolution
+  const ovSaved = SD.withDefaults(c.tabOverrides && c.tabOverrides[s.apiId], c.scale, c.tab, s.apiId);
   // global "high resolution" switch: matchScale 2 unless the slot chose its own
   const ov = c.hiRes && (!ovSaved || ovSaved.matchScale == null) ? Object.assign({}, ovSaved, { matchScale: 2 }) : ovSaved;
   let ch, pos;
@@ -117,7 +119,7 @@ parentPort.on('message', (msg) => {
   if (msg && msg.mode === 'slots') { // a helper thread: read these slots, send them back
     try {
       const map = TABS[msg.tab], refBox = TAB_TEMPLATES.box;
-      const c = { buf: Buffer.from(msg.shared), W: msg.W, H: msg.H, box: msg.box, refBox, map, scale: msg.box.h / refBox.h, hiRes: msg.hiRes, tabOverrides: msg.tabOverrides, perSlot: true, bankFor: makeBankFor(msg.learnedTemplates) };
+      const c = { tab: msg.tab, buf: Buffer.from(msg.shared), W: msg.W, H: msg.H, box: msg.box, refBox, map, scale: msg.box.h / refBox.h, hiRes: msg.hiRes, tabOverrides: msg.tabOverrides, perSlot: true, bankFor: makeBankFor(msg.learnedTemplates) };
       parentPort.postMessage({ reads: msg.idx.map((i) => readOneSlot(map.STATIC_SLOTS[i], c)) });
     } catch (err) { parentPort.postMessage({ error: String(err && err.message || err) }); }
     return;

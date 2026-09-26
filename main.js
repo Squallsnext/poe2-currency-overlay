@@ -2242,8 +2242,11 @@ const MAX_EXEMPLARS_PER_DIGIT = 30; // bounded so the file doesn't grow forever
 // this apiId, and where its slot sits in that map.
 // A slot's saved override with the global defaults folded in: the "high resolution"
 // switch (stashHiRes) sets matchScale 2 for every slot that hasn't chosen its own.
-function slotOverride(tab, apiId) {
-  const ov = (config.stashSlotOverrides && config.stashSlotOverrides[tab] && config.stashSlotOverrides[tab][apiId]) || null;
+// scale (panel height / reference): the shipped per-resolution filters go under the
+// player's own (slot-defaults.js) - the same merge the reader does
+function slotOverride(tab, apiId, scale) {
+  let ov = (config.stashSlotOverrides && config.stashSlotOverrides[tab] && config.stashSlotOverrides[tab][apiId]) || null;
+  if (scale) ov = require('./renderer/stash/slot-defaults.js').withDefaults(ov, scale, tab, apiId);
   if (config.stashHiRes && (!ov || ov.matchScale == null)) return Object.assign({}, ov, { matchScale: 2 });
   return ov;
 }
@@ -2271,7 +2274,7 @@ ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings } = {}) => {
     // template learned from a differently-processed crop never quite fits the real one
     // `settings` (from the OCR-debug panel's "learn" button): the panel's CURRENT slider
     // values, saved or not - so it learns from exactly the black/white image on screen
-    const saved = slotOverride(tab, apiId);
+    const saved = slotOverride(tab, apiId, cap.box && cap.box.h / require('./renderer/stash/tab-templates.json').box.h);
     const ov = settings ? Object.assign({}, saved, settings) : saved;
     const cut = RP.cropAroundSlot(Buffer.from(cap.bitmap), cap.W, cap.H, cap.box, refBox, slot, ov);
     const ch = RP.buildChannel(cut.buf, cut.W, cut.H, cut.box, refBox, RP.channelOpts(ov));
@@ -2363,7 +2366,7 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
     const RP = require('./renderer/stash/read-pipeline.js');
     const TT = require('./renderer/stash/tab-templates.json');
     const refBox = TT.box;
-    const ov = slotOverride(tab, apiId);
+    const ov = slotOverride(tab, apiId, cap.box && cap.box.h / refBox.h);
     // the values being PREVIEWED: an explicit slider value while dragging, else this
     // slot's saved value, else the default (floor: none, i.e. the adaptive sweep - the
     // same thing a live read does, so an untouched panel shows the live read's answer)
