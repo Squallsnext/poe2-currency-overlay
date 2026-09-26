@@ -2465,6 +2465,8 @@ button#cancel{background:#3a3a3a;color:#eee}
 .box.ok{border-color:#56e38a;background:rgba(86,227,138,.10)}
 #wrap.hide-ok .box.ok{display:none}
 .box.sel{outline:2px solid #fff;z-index:3}
+.box.marked{box-shadow:0 0 0 3px #6fd3ff;z-index:2}
+#lasso{position:absolute;border:1px dashed #6fd3ff;background:rgba(111,211,255,.08);pointer-events:none;display:none;z-index:5}
 .box .t{position:absolute;left:0;top:-22px;white-space:nowrap;font:700 16px Consolas,monospace;color:inherit;text-shadow:0 0 4px #000,0 0 4px #000}
 #toggleok,#togglegrid,#togglemoveall{display:flex;align-items:center;gap:5px;font-size:13px;color:#cfc3aa}
 #togglegrid input[type=number]{width:52px;background:#0b0b0b;color:#ddd;border:1px solid #555;border-radius:6px;padding:4px 6px;font:12px Consolas,monospace}
@@ -2485,11 +2487,13 @@ button#cancel{background:#3a3a3a;color:#eee}
   <button id="rowalign" title="Alle Kästchen rechts vom ausgewählten, die höchstens 10 px höher oder tiefer sitzen, auf dieselbe Höhe setzen (nur die Höhe, links/rechts bleibt). Taste R">Reihe angleichen →</button>
   <button id="colalign" title="Alle Kästchen unter dem ausgewählten, die höchstens 25 px links oder rechts davon sitzen, auf dieselbe Spalte setzen (nur links/rechts, die Höhe bleibt). Taste S">Spalte angleichen ↓</button>
   <button id="undo" title="Letztes Angleichen / Verschieben rückgängig machen. Strg+Z">Rückgängig</button>
+  <button id="snapframe" title="Erst EIN Kästchen genau ausrichten und auswählen. Dann setzt dies jedes andere Kästchen an dieselbe Stelle relativ zu seinem eigenen Zellrahmen (oben links) - kein Versatz, der sich von links nach rechts aufaddiert. Wirkt auf die markierten Kästchen, sonst auf alle. Taste F">Am Rahmen einrasten</button>
+  <button id="unmark" title="Markierung aufheben (Esc)">Markierung aufheben</button>
   <label id="togglemoveall" title="An: Ziehen oder Pfeiltasten verschieben ALLE Kästchen um dieselbe Strecke - ein Kästchen ausrichten, der Rest folgt. Taste A"><input id="moveall" type="checkbox"> Alle mitbewegen</label>
   <label id="togglegrid"><input id="showgrid" type="checkbox"> Gitter <input id="gridstep" type="number" min="2" step="1" title="Gitterabstand in Pixeln"> px</label>
-  <span id="hint">Nur unsichere/falsche Felder werden standardmäßig gezeigt. Ziehen = verschieben, Pfeiltasten = 1px, Shift+Pfeil = 5px. Breite/Höhe = Größe für ALLE Kästchen auf einmal (auch die ausgeblendeten guten). Reihe angleichen (R): erstes Kästchen der Reihe auswählen, alle rechts davon übernehmen die Höhe. Spalte angleichen (S): oberstes Kästchen der Spalte auswählen, alle darunter übernehmen die Position links/rechts. Alle mitbewegen (A): ein Kästchen ausrichten, alle anderen verschieben sich genauso mit. Strg+Z = rückgängig. Gitter: gestrichelte Linie = Mitte des ausgewählten Kästchens.</span>
+  <span id="hint">Nur unsichere/falsche Felder werden standardmäßig gezeigt. Ziehen = verschieben, Pfeiltasten = 1px, Shift+Pfeil = 5px. Breite/Höhe = Größe für ALLE Kästchen auf einmal (auch die ausgeblendeten guten). Reihe angleichen (R): erstes Kästchen der Reihe auswählen, alle rechts davon übernehmen die Höhe. Spalte angleichen (S): oberstes Kästchen der Spalte auswählen, alle darunter übernehmen die Position links/rechts. Alle mitbewegen (A): ein Kästchen ausrichten, alle anderen verschieben sich genauso mit. Markieren: Strg+Klick auf Kästchen oder Rahmen auf freier Fläche aufziehen - dann bewegen sich nur die markierten zusammen (Esc hebt auf). Am Rahmen einrasten (F): ein Kästchen genau setzen, die anderen übernehmen seine Lage im eigenen Zellrahmen. Strg+Z = rückgängig. Gitter: gestrichelte Linie = Mitte des ausgewählten Kästchens.</span>
 </div>
-<div id="wrap" class="hide-ok"><img id="panel" src="data:image/png;base64,${data.panelBase64}"><div id="grid"></div><div id="guide"></div></div>
+<div id="wrap" class="hide-ok"><img id="panel" src="data:image/png;base64,${data.panelBase64}"><div id="grid"></div><div id="guide"></div><div id="lasso"></div></div>
 <script>
 const REF_BOX = ${JSON.stringify(data.refBox)};
 const WIDTH = ${data.width};
@@ -2548,9 +2552,26 @@ const ROW_TOL = 10 * KY;
 // up one box and the rest follows. Hidden good boxes move too; they have the same offset.
 const moveAllEl = document.getElementById('moveall');
 function moveAll(){ return !!(moveAllEl && moveAllEl.checked); }
-function shiftAll(dx, dy, except){
+// Marked boxes (Ctrl+click / lasso): moving one of them moves all marked ones together -
+// "Alle mitbewegen" for a hand-picked group, e.g. one row whose offset differs.
+const marked = new Set();
+function setMarked(i, on){
+  if (on) marked.add(i); else marked.delete(i);
+  const el = document.querySelector('.box[data-i="' + i + '"]');
+  if (el) el.classList.toggle('marked', on);
+}
+function clearMarked(){ for (const i of [...marked]) setMarked(i, false); }
+// which other boxes follow a move of box i: all ("Alle mitbewegen"), else the marked group
+// if i belongs to it, else none
+function followers(i){
+  if (moveAll()) return null; // null = everyone
+  if (marked.has(i) && marked.size > 1) return marked;
+  return new Set();
+}
+function shiftAll(dx, dy, except, only){
   for (let i = 0; i < DATA.length; i++) {
     if (i === except) continue;
+    if (only && !only.has(i)) continue;
     DATA[i].x += dx; DATA[i].y += dy;
     const el = document.querySelector('.box[data-i="' + i + '"]');
     if (el) place(el, DATA[i]);
@@ -2623,6 +2644,7 @@ DATA.forEach((r, i) => {
   el.innerHTML = '<div class="t">' + r.label.replace(/[&<>]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch])) + '</div>';
   place(el, r);
   el.addEventListener('pointerdown', (ev) => {
+    if (ev.ctrlKey || ev.metaKey) { setMarked(i, !marked.has(i)); select(el); ev.preventDefault(); ev.stopPropagation(); return; }
     snapshot();
     select(el); el.setPointerCapture(ev.pointerId);
     drag = { i, sx: ev.clientX, sy: ev.clientY, x: r.x, y: r.y, lx: r.x, ly: r.y };
@@ -2632,7 +2654,7 @@ DATA.forEach((r, i) => {
     if (!drag || drag.i !== i) return;
     r.x = drag.x + (ev.clientX - drag.sx);
     r.y = drag.y + (ev.clientY - drag.sy);
-    if (moveAll()) { shiftAll(r.x - drag.lx, r.y - drag.ly, i); }
+    { const f = followers(i); if (f === null || f.size) shiftAll(r.x - drag.lx, r.y - drag.ly, i, f); }
     drag.lx = r.x; drag.ly = r.y;
     place(el, r); updateGuide();
   });
@@ -2645,6 +2667,8 @@ document.addEventListener('keydown', (ev) => {
   if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'z' || ev.key === 'Z')) { undo(); ev.preventDefault(); return; }
   if (ev.key === 'r' || ev.key === 'R') { alignRow(); ev.preventDefault(); return; }
   if (ev.key === 's' || ev.key === 'S') { alignCol(); ev.preventDefault(); return; }
+  if (ev.key === 'f' || ev.key === 'F') { snapToFrames(); ev.preventDefault(); return; }
+  if (ev.key === 'Escape') { clearMarked(); ev.preventDefault(); return; }
   if (ev.key === 'a' || ev.key === 'A') { if (moveAllEl) moveAllEl.checked = !moveAllEl.checked; ev.preventDefault(); return; }
   const i = +selected.dataset.i, r = DATA[i];
   const n = ev.shiftKey ? 5 : 1;
@@ -2656,7 +2680,7 @@ document.addEventListener('keydown', (ev) => {
   else return;
   if (!ev.repeat) snapshot(); // one undo step per key press, not per auto-repeat
   r.x += dx; r.y += dy;
-  if (moveAll()) shiftAll(dx, dy, i);
+  { const f = followers(i); if (f === null || f.size) shiftAll(dx, dy, i, f); }
   place(selected, r); updateGuide(); ev.preventDefault();
 });
 document.getElementById('copy').onclick = async () => {
@@ -2668,6 +2692,96 @@ document.getElementById('showok').addEventListener('change', (ev) => wrap.classL
 document.getElementById('rowalign').onclick = () => alignRow();
 document.getElementById('colalign').onclick = () => alignCol();
 document.getElementById('undo').onclick = () => undo();
+document.getElementById('unmark').onclick = () => clearMarked();
+document.getElementById('snapframe').onclick = () => snapToFrames();
+// Lasso: drag on an empty spot to mark every visible box whose centre is inside (Ctrl
+// keeps the current marking and adds to it).
+const lassoEl = document.getElementById('lasso');
+let lasso = null;
+wrap.addEventListener('pointerdown', (ev) => {
+  if (ev.target.closest && ev.target.closest('.box')) return;
+  const rc = wrap.getBoundingClientRect();
+  lasso = { x0: ev.clientX - rc.left, y0: ev.clientY - rc.top, add: ev.ctrlKey || ev.metaKey };
+  wrap.setPointerCapture(ev.pointerId);
+  Object.assign(lassoEl.style, { display: 'block', left: lasso.x0 + 'px', top: lasso.y0 + 'px', width: '0px', height: '0px' });
+  ev.preventDefault();
+});
+wrap.addEventListener('pointermove', (ev) => {
+  if (!lasso) return;
+  const rc = wrap.getBoundingClientRect();
+  const x = ev.clientX - rc.left, y = ev.clientY - rc.top;
+  lasso.x1 = x; lasso.y1 = y;
+  Object.assign(lassoEl.style, { left: Math.min(x, lasso.x0) + 'px', top: Math.min(y, lasso.y0) + 'px',
+    width: Math.abs(x - lasso.x0) + 'px', height: Math.abs(y - lasso.y0) + 'px' });
+});
+wrap.addEventListener('pointerup', () => {
+  if (!lasso) return;
+  lassoEl.style.display = 'none';
+  const { x0, y0 } = lasso, x1 = lasso.x1 == null ? x0 : lasso.x1, y1 = lasso.y1 == null ? y0 : lasso.y1;
+  const L = Math.min(x0, x1), R = Math.max(x0, x1), T = Math.min(y0, y1), B = Math.max(y0, y1);
+  if (!lasso.add) clearMarked();
+  if (R - L > 3 || B - T > 3) {
+    document.querySelectorAll('.box').forEach((el) => {
+      if (el.offsetParent === null) return; // hidden (good slots not shown)
+      const r = DATA[+el.dataset.i], cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+      if (cx >= L && cx <= R && cy >= T && cy <= B) setMarked(+el.dataset.i, true);
+    });
+  }
+  lasso = null;
+});
+
+// ---- "Am Rahmen einrasten": place every box at the SAME spot relative to its own cell
+// frame as the (hand-aligned) selected box. A shared offset drifts across a wide row -
+// cells are not spaced in whole pixels, so an offset right at the left edge is a few px
+// off at the right. Each cell's frame corner (top-left) is found in the captured panel:
+// the frame is a long straight edge, so the column/row with the strongest summed gradient
+// along a box-length run is the frame line, where icon art (short, curved edges) is not.
+let GRAY = null;
+function gray(){
+  if (GRAY) return GRAY;
+  const img = document.getElementById('panel');
+  const c = document.createElement('canvas'); c.width = WIDTH; c.height = HEIGHT;
+  const g = c.getContext('2d'); g.drawImage(img, 0, 0, WIDTH, HEIGHT);
+  const d = g.getImageData(0, 0, WIDTH, HEIGHT).data;
+  GRAY = new Float32Array(WIDTH * HEIGHT);
+  for (let i = 0, p = 0; i < GRAY.length; i++, p += 4) GRAY[i] = (d[p] + d[p + 1] + d[p + 2]) / 3;
+  return GRAY;
+}
+const px = (x, y) => GRAY[Math.min(HEIGHT - 1, Math.max(0, y | 0)) * WIDTH + Math.min(WIDTH - 1, Math.max(0, x | 0))];
+function colEdge(x, y0, len){ let s = 0; for (let y = y0; y < y0 + len; y++) s += Math.abs(px(x + 1, y) - px(x - 1, y)); return s; }
+function rowEdge(y, x0, len){ let s = 0; for (let x = x0; x < x0 + len; x++) s += Math.abs(px(x, y + 1) - px(x, y - 1)); return s; }
+// strongest vertical + horizontal frame line near (gx, gy), refined twice
+function findCorner(gx, gy, R, len){
+  let cx = Math.round(gx), cy = Math.round(gy);
+  for (let pass = 0; pass < 2; pass++) {
+    let best = -1, bx = cx;
+    for (let x = Math.round(gx - R); x <= Math.round(gx + R); x++) { const v = colEdge(x, cy, len); if (v > best) { best = v; bx = x; } }
+    cx = bx; best = -1; let by = cy;
+    for (let y = Math.round(gy - R); y <= Math.round(gy + R); y++) { const v = rowEdge(y, cx, len); if (v > best) { best = v; by = y; } }
+    cy = by;
+  }
+  return { x: cx, y: cy };
+}
+function snapToFrames(){
+  if (!selected) return;
+  gray();
+  snapshot();
+  const ai = +selected.dataset.i, a = DATA[ai];
+  const len = Math.round(Math.max(a.w, a.h));
+  // anchor: its frame corner is up/left of the number box
+  const ac = findCorner(a.x - a.h * 0.2, a.y - a.h * 0.2, a.h * 0.5, len);
+  const ox = a.x - ac.x, oy = a.y - ac.y;
+  const targets = marked.size ? [...marked] : DATA.map((_, i) => i);
+  for (const i of targets) {
+    if (i === ai) continue;
+    const r = DATA[i];
+    const c = findCorner(r.x - ox, r.y - oy, a.h * 0.35, len);
+    r.x = c.x + ox; r.y = c.y + oy;
+    const el = document.querySelector('.box[data-i="' + i + '"]');
+    if (el) place(el, r);
+  }
+  updateGuide();
+}
 // grid on/off and spacing are remembered for the next time the tool opens
 try { gridStep.value = localStorage.getItem('adjGridStep') || Math.max(4, Math.round(10 * KX)); } catch { gridStep.value = Math.max(4, Math.round(10 * KX)); }
 let gridOn = false; try { gridOn = localStorage.getItem('adjGridOn') === '1'; } catch {}

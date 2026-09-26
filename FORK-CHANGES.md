@@ -202,6 +202,15 @@ Only red/yellow boxes are shown by default ("also show good slots" reveals the r
 - **Move all (key A):** while on, dragging or nudging the selected box moves every box
   by the same offset – for a tab that is consistently off (calibration not quite hit):
   align one box and the rest follows. Checked in headless Chromium (keys, drag, undo).
+- **Snap to frame (key F):** align one box by hand and select it; every other box (or only
+  the marked ones) is placed at the same spot relative to its own cell frame. Each frame's
+  top-left corner is found in the captured panel as the strongest long straight
+  vertical/horizontal edge near the expected spot (icon art has short, curved edges). This
+  avoids a shared offset drifting across a wide row. Tested in headless Chromium on a real
+  5K capture of the currency tab's bottom rows: 13 boxes placed up to ±12 px off all
+  landed on their numbers, spaced 162/163 px, rows level.
+- **Marking:** Ctrl+click boxes or drag a lasso on an empty area; moving one marked box
+  moves the marked group only (Esc clears).
 - **Undo (Ctrl+Z)** for drags, nudges and both align actions (50 steps).
 - **Grid** toggle with adjustable spacing, plus a dashed guide line through the selected
   box's centre. Both settings are remembered.
