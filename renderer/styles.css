@@ -1929,3 +1929,14 @@ footer {
 .nw-card-tabfix { flex: 0 0 auto; background: transparent; border: 1px solid var(--bd-16); color: var(--tx-dim); border-radius: 5px; font-size: 11px; padding: 2px 7px; cursor: pointer; }
 .nw-card-tabfix:hover { color: var(--am-hi); border-color: var(--am-hi); }
 .nw-card-tabsel { flex: 0 0 auto; font-size: 12px; background: var(--s-card, #1b1b1b); color: inherit; border: 1px solid var(--am-hi); border-radius: 5px; padding: 2px 4px; }
+
+/* item tab price card: sources warning + own price (item-tab.js ownPriceRow) */
+.cur-warn { color: #e0a040; }
+.cur-own { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.cur-own-lbl { font-size: 12px; opacity: .8; }
+.cur-own-inp { width: 170px; padding: 3px 6px; font-size: 12px; background: var(--s-root); color: var(--tx-hi); border: 1px solid var(--am); border-radius: 4px; }
+.cur-own-btn { padding: 3px 8px; font-size: 12px; cursor: pointer; }
+/* Net Worth: the value is clickable (own price) */
+.nw-val-edit { cursor: pointer; }
+.nw-val-edit:hover { text-decoration: underline dotted; }
+.nw-price-edit { width: 78px; text-align: right; }

@@ -270,6 +270,7 @@ const DEFAULT_CONFIG = {
   stashUserTabSigs: {}, // Net Worth: extra tab-detection fingerprints the user taught via "wrong tab?" (tab -> [signature])
   stashShowReliability: false, // Net Worth: tint rows the shipped reliability table marks as often misread
   stashHiRes: false, // Net Worth: read counts at 2x resolution where the capture allows (4K/5K); per-slot setting wins
+  priceOverrides: {}, // apiId -> {ex, at}: the user's own price for an item, wins over every feed (see applyPriceRules)
   commandHotkeys: [], // Hotkeys settings: [{command:'/hideout', accelerator:'F8'}] - whitelist-only safe chat commands, one key = one manual command
   stashCalibration: null, // Net Worth: {x,y,w,h} panel box from one-time calibration; null = assume reference res
   stashSlotOverrides: {}, // per-tab, per-apiId {cx,cy,stripWidth,up,dn} from the in-app "align" tool; overrides the shipped map for slots a user's setup misreads
@@ -569,6 +570,7 @@ async function getCategoryItems(league, category, force = false) {
   let cx = null;
   try { cx = await getCxPairMapShared(league); } catch { /* exchange feed down - logs still help */ }
   sanitizeThinPrices(items, cx);
+  applyPriceRules(items);
   itemsCache.set(key, { at: Date.now(), items });
   return items;
 }
@@ -607,6 +609,7 @@ function sanitizeThinPrices(items, cx) {
       const ps = it.logs.map((l) => l.p).filter((p) => p > 0).sort((a, b) => a - b);
       if (ps.length >= 3) { ref = ps[Math.floor(ps.length / 2)]; src = 'median'; }
     }
+    it.priceRefs = priceRefs(it, cx);
     if (!(ref > 0)) continue;
     const ratio = it.price / ref;
     if (ratio > PRICE_OUTLIER || ratio < 1 / PRICE_OUTLIER) {
@@ -618,6 +621,60 @@ function sanitizeThinPrices(items, cx) {
   }
   return items;
 }
+// Every independent price this item has, in Ex, for the UI to show next to a price:
+// the feed's current price, the recent median (only while the market is thin right now,
+// same rule as above) and the exchange rate against Exalted (only with at least
+// CX_MIN_UNITS of the item traded). When they are more than PRICE_OUTLIER x apart the
+// item is marked priceUncertain - no single number for it can be trusted.
+//
+// Deliberately NOT used: the exchange rate via Chaos or Divine. Measured over all 635
+// items (Forbidden Rites, 2026-09): those detours sit far ABOVE the direct rate for
+// anything cheap, because nobody pays less than one whole Chaos/Divine - a 0.3 Ex item
+// bought with 1 Chaos "costs" 66 Ex that way. Counting them flagged 297 of 635 items.
+// Reported case: Greater Rebirth Rune at 19.7 (feed), 7.6 (vs Exalted), 318 (vs Chaos)
+// and 18 (vs Divine) - while it really sold at 4 for 1 Ex, which none of them show.
+//
+// Also deliberately NOT done: replacing an uncertain price by a flat 1 Ex. Even the
+// direct sources disagree >3x on 113 of 635 items, among them Kopec's Orb of Sacrifice
+// (193 feed vs 54 exchange) - 1 Ex would be far more wrong there than either source.
+// The fix for one item the user knows better is their own price (priceOverrides).
+function priceRefs(it, cx) {
+  const refs = [];
+  if (it.price > 0) refs.push({ src: 'feed', ex: it.price });
+  const last = it.logs && it.logs.length ? it.logs[it.logs.length - 1] : null;
+  const ps = (it.logs || []).map((l) => l.p).filter((p) => p > 0).sort((a, b) => a - b);
+  if (last && last.q < THIN_UNITS && ps.length >= 3) refs.push({ src: 'median', ex: ps[Math.floor(ps.length / 2)] });
+  if (cx) {
+    const e = cx[[it.apiId, 'exalted'].sort().join('|')];
+    const units = e ? e.exalted : 0; // crossed volumes: e.exalted = the item's traded units
+    const v = cxPairVal(cx, it.apiId, 'exalted');
+    if (v != null && units >= CX_MIN_UNITS) refs.push({ src: 'cx', ex: v, units });
+  }
+  return refs;
+}
+
+// The last word on a price, after sanitizeThinPrices: the user's own price
+// (config.priceOverrides) wins - they know what the item actually sells for. The feed's
+// price stays on the item as priceRaw.
+function applyPriceRules(items) {
+  const ov = config.priceOverrides || {};
+  for (const it of items) {
+    const exs = (it.priceRefs || []).map((r) => r.ex).filter((x) => x > 0);
+    it.priceUncertain = exs.length >= 2 && Math.max(...exs) / Math.min(...exs) > PRICE_OUTLIER;
+    const own = ov[it.apiId];
+    if (own && own.ex > 0) {
+      if (it.priceRaw == null) it.priceRaw = it.price;
+      it.price = own.ex; it.priceEstimated = true; it.priceSource = 'user';
+    }
+  }
+  return items;
+}
+// a changed rule/override must reach every cached price at once
+function invalidatePriceCaches() {
+  itemsCache.clear();
+  stashPriceCache = null;
+}
+
 // one exchange-map fetch shared by the parallel per-category loads
 const cxShared = new Map(); // league -> Promise
 function getCxPairMapShared(league) {
@@ -1511,6 +1568,8 @@ ipcMain.handle('cx-item-price', async (_e, { apiId, name, league } = {}) => {
     const ex = cxValueEx(map, id);
     if (ex == null) return null;
     const info = CX_CATALOG[id] || {};
+    const own = (config.priceOverrides || {})[id]; // the user's own price wins here too
+    if (own && own.ex > 0) return { apiId: id, price: own.ex, priceRaw: ex, priceSource: 'user', text: info.text || name || id, icon: info.icon || null, source: 'cx' };
     return { apiId: id, price: ex, text: info.text || name || id, icon: info.icon || null, source: 'cx' };
   } catch (err) {
     return { error: String(err && err.message || err) };
@@ -1618,7 +1677,7 @@ async function getStashPriceMap(force) {
   if (!force && stashPriceCache && Date.now() - stashPriceCache.at < 5 * 60_000) return stashPriceCache.map;
   const full = await fetchFullCatalog();
   const map = {};
-  for (const g of full.groups) for (const it of g.items) if (!map[it.apiId]) map[it.apiId] = { price: it.price, icon: it.icon, name: it.text, estimated: !!it.priceEstimated, priceRaw: it.priceRaw, priceSource: it.priceSource };
+  for (const g of full.groups) for (const it of g.items) if (!map[it.apiId]) map[it.apiId] = { price: it.price, icon: it.icon, name: it.text, estimated: !!it.priceEstimated, priceRaw: it.priceRaw, priceSource: it.priceSource, uncertain: !!it.priceUncertain, refs: it.priceRefs };
   // Fill CX-only items poe2scout doesn't carry, valued in Exalted via a direct or
   // one-hop (chaos/divine) pair from the same official feed the currency tab uses.
   const needed = Object.keys(CX_FALLBACK).filter((id) => !(map[id] && typeof map[id].price === 'number'));
@@ -1644,6 +1703,8 @@ async function getStashPriceMap(force) {
       for (const id of needed) {
         const px = valueEx(id);
         if (px != null) map[id] = { price: px, icon: CX_FALLBACK[id].icon || null, name: CX_FALLBACK[id].name };
+        const own = (config.priceOverrides || {})[id]; // the user's own price wins here too
+        if (map[id] && own && own.ex > 0) Object.assign(map[id], { price: own.ex, priceRaw: map[id].price, estimated: true, priceSource: 'user' });
       }
     } catch { /* CX optional; the item just stays unpriced (flagged, never guessed) */ }
   }
@@ -2951,8 +3012,12 @@ async function readStashFrame(shot, onDetected) {
       const info = prices[r.priceAs || r.apiId] || {};
       const name = info.name || r.apiId;
       const suffix = r.suffix || null;
-      // price replaced by the exchange rate / recent median (sanitizeThinPrices)
-      const est = info.estimated ? { raw: info.priceRaw, src: info.priceSource } : null;
+      // price replaced by the exchange rate / recent median (sanitizeThinPrices) or the
+      // user's own price, or sources that contradict each other (applyPriceRules)
+      const est = (info.estimated || info.uncertain)
+        ? { raw: info.priceRaw, src: info.estimated ? info.priceSource : null, uncertain: !!info.uncertain, refs: info.refs || null }
+        : null;
+      const priceId = r.priceAs || r.apiId; // the id the price (and a user price) belongs to
       const price = typeof info.price === 'number' ? info.price : null;
       const icon = info.icon || null;
       // slot = read order = stash reading order (top-to-bottom, left-to-right)
@@ -2960,12 +3025,12 @@ async function readStashFrame(shot, onDetected) {
         // empty / unread slot: a 0-count line the UI shows (editable) only when
         // "Show missing" is on. flags kept for the read-count summary.
         flags.push({ apiId: r.apiId, name });
-        lines.push({ apiId: r.apiId, name, suffix, icon, count: 0, price, est, valueEx: price != null ? 0 : null, slot: i, missing: true, conf: null });
+        lines.push({ apiId: r.apiId, priceId, name, suffix, icon, count: 0, price, est, valueEx: price != null ? 0 : null, slot: i, missing: true, conf: null });
         return;
       }
       const valueEx = price != null ? r.count * price : null;
       if (valueEx != null) total += valueEx;
-      lines.push({ apiId: r.apiId, name, suffix, icon, count: r.count, price, est, valueEx, slot: i, conf: typeof r.conf === 'number' ? r.conf : null, rel: r.rel || null });
+      lines.push({ apiId: r.apiId, priceId, name, suffix, icon, count: r.count, price, est, valueEx, slot: i, conf: typeof r.conf === 'number' ? r.conf : null, rel: r.rel || null });
     });
     lines.sort((a, b) => (b.valueEx || 0) - (a.valueEx || 0));
     return {
@@ -3039,6 +3104,15 @@ ipcMain.handle('set-stash-sort', (_e, on) => { config.stashSortLayout = !!on; sa
 ipcMain.handle('set-stash-show-missing', (_e, on) => { config.stashShowMissing = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-show-confidence', (_e, on) => { config.stashShowConfidence = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-show-ocr-debug', (_e, on) => { config.stashShowOcrDebug = !!on; saveConfig(); return true; });
+// The user's own price for one item (ex > 0), or null to drop it again.
+ipcMain.handle('set-price-override', (_e, { apiId, ex } = {}) => {
+  if (!apiId) return false;
+  config.priceOverrides = Object.assign({}, config.priceOverrides);
+  if (ex > 0) config.priceOverrides[apiId] = { ex: +ex, at: Date.now() };
+  else delete config.priceOverrides[apiId];
+  saveConfig(); invalidatePriceCaches();
+  return true;
+});
 ipcMain.handle('set-stash-show-reliability', (_e, on) => { config.stashShowReliability = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-hi-res', (_e, on) => { config.stashHiRes = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-banner-hidden', (_e, on) => { config.stashBannerHidden = !!on; saveConfig(); return true; });

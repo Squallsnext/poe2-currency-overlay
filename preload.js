@@ -61,6 +61,8 @@ contextBridge.exposeInMainWorld('api', {
   stashForgetDigits: (digits) => ipcRenderer.invoke('stash-forget-digits', { digits }),
   setStashShowOcrDebug: (on) => ipcRenderer.invoke('set-stash-show-ocr-debug', on),
   setStashShowReliability: (on) => ipcRenderer.invoke('set-stash-show-reliability', on),
+  // own price for one item in Ex (null/0 = drop it and use the feed again)
+  setPriceOverride: (apiId, ex) => ipcRenderer.invoke('set-price-override', { apiId, ex }),
   setStashHiRes: (on) => ipcRenderer.invoke('set-stash-hi-res', on),
   setStashDupTabs: (on) => ipcRenderer.invoke('set-stash-dup', on),
   setStashBannerHidden: (on) => ipcRenderer.invoke('set-stash-banner-hidden', on),

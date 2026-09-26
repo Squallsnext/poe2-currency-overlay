@@ -247,6 +247,24 @@ the extra Exalted cells, 4.7) appear in the tool automatically.
   Checked against live data (Forbidden Rites): core currency untouched (0 of 38 changed),
   34 of 142 runes and 23 of 82 essences corrected; Rebirth Rune 339 → 22 Ex.
 
+- **Own price per item + "sources disagree" warning** (`priceRefs` / `applyPriceRules`
+  in `main.js`, `config.priceOverrides`). Some prices cannot be fixed from the data at
+  all: Greater Rebirth Rune showed 19.7 Ex (poe2scout), 7.6 Ex (exchange vs Exalted,
+  70 units), 18 Ex (vs Divine) and 318 Ex (vs Chaos) – while it actually sold at 4 for
+  1 Ex. So the player can set their own price per unit: click the value of a Net Worth
+  line, or "Own price" on the item tab's price card (`0.25`, `0,25` or `1/4`; empty /
+  "Reset" = back to the feed). It wins everywhere (currency tab, price check, Net Worth,
+  exchange-only items), marked "✎". Every item also carries its independent sources
+  (poe2scout, recent median while thin, exchange vs Exalted with ≥5 units); when they are
+  more than 3× apart the value is marked "⚠" and the hover/card lists them.
+  Two things were measured and deliberately **not** done (live data, 635 items):
+  - Exchange rates via Chaos/Divine are not used as a source: nobody pays less than one
+    whole Chaos/Divine, so for anything cheap they sit far too high (a 0.3 Ex item bought
+    for 1 Chaos "costs" 66 Ex). Counting them flagged 297 of 635 items.
+  - An uncertain price is not replaced by a flat 1 Ex: even the direct sources disagree
+    >3× on 113 of 635 items, including e.g. Kopec's Orb of Sacrifice (193 feed vs 54
+    exchange), where 1 Ex would be far more wrong than either source.
+
 - **"Wrong tab?"** on every tab card: tab detection correlates the panel's edge structure
   against one baked fingerprint per tab, and on a setup unlike the baked one two tabs can
   swap (Kalguuran runes were detected as Ancient Augment at 5K). The player picks the right
@@ -330,6 +348,7 @@ These existed in the player's own build and were **deliberately left out** here:
 | `stashHiRes` | `false` | Global ×2 matching (4K/5K) |
 | `stashUserTabSigs` | `{}` | Extra tab-detection fingerprints from "Wrong tab?" |
 | `stashShowReliability` | `false` | "Often misread" row tints |
+| `priceOverrides` | `{}` | `apiId → { ex, at }`: the player's own price per unit |
 
 Learned templates (`userData/learned-digit-templates.json`) gained `byScale[ms]` for
 high-resolution templates; "Forget template" clears both.

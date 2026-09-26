@@ -540,9 +540,12 @@
       cnt.title = t('networth.line.edit_count_title');
       cnt.onclick = (e) => { e.stopPropagation(); startEdit(ln, cnt); };
       line.appendChild(cnt);
-      const valEl = el('div', 'nw-val', ln.price == null ? t('networth.line.no_price') : (ln.est ? '≈ ' : '') + fmtEx(lineVal(ln)));
-      // thin market: the feed's price was implausible and replaced (main.js sanitizeThinPrices)
-      if (ln.est) valEl.title = t(ln.est.src === 'cx' ? 'networth.line.price_est_cx' : 'networth.line.price_est_median', { raw: fmtEx(ln.est.raw) });
+      const valEl = el('div', 'nw-val nw-val-edit', ln.price == null ? t('networth.line.no_price') : priceMark(ln.est) + fmtEx(lineVal(ln)));
+      // why this price is not simply the feed's (main.js sanitizeThinPrices / applyPriceRules),
+      // plus every source it had, then how to set an own one
+      valEl.title = priceTitle(ln);
+      // click = set your own price per unit for this item (all tabs, item tab, currency tab)
+      valEl.onclick = (e) => { e.stopPropagation(); startPriceEdit(ln, valEl); };
       line.appendChild(valEl);
       const rb = el('button', 'nw-line-reset' + ((ln.userCount != null || ln.excluded) ? '' : ' nw-line-reset-off'), '↺');
       rb.title = t('networth.line.reset_title');
@@ -856,6 +859,64 @@
   }
 
   // click-to-edit a line's count; matching the original value clears the override
+  // ---- prices: markers, sources, the user's own price ----
+  // ✎ own price · ⚠ sources contradict each other · ≈ implausible feed price replaced
+  function priceMark(est) {
+    if (!est) return '';
+    if (est.src === 'user') return '✎ ';
+    if (est.uncertain) return '⚠ ';
+    return est.src ? '≈ ' : '';
+  }
+  const fmtUnit = (n) => (n >= 100 ? Math.round(n).toLocaleString('en-US') : n >= 10 ? n.toFixed(1) : n.toFixed(2)) + ' ' + t('networth.unit.ex_label');
+  function priceTitle(ln) {
+    const est = ln.est, out = [];
+    if (ln.price != null) out.push(t('networth.line.price_unit', { v: fmtUnit(ln.price) }));
+    if (est && est.src === 'user') out.push(t('networth.line.price_user'));
+    else if (est && est.src === 'cx') out.push(t('networth.line.price_est_cx', { raw: fmtUnit(est.raw) }));
+    else if (est && est.src === 'median') out.push(t('networth.line.price_est_median', { raw: fmtUnit(est.raw) }));
+    if (est && est.uncertain) out.push(t('networth.line.price_uncertain'));
+    if (est && est.refs && est.refs.length) {
+      out.push(t('networth.line.price_sources') + ' ' + est.refs.map((r) => t('networth.line.price_src_' + r.src) + ' ' + fmtUnit(r.ex)).join(' · '));
+    }
+    out.push(t('networth.line.price_edit_hint'));
+    return out.join('\n');
+  }
+  // own price per unit: typed in Ex ("0.25", "0,25" or "1/4"), empty = back to the feed.
+  // Applies at once to every line of that item in every tab; stored in the config, so the
+  // item tab, the currency tab and the next scan use it too.
+  function startPriceEdit(ln, valEl) {
+    const id = ln.priceId || ln.apiId;
+    const inp = el('input', 'nw-cnt-edit nw-price-edit');
+    inp.type = 'text'; inp.inputMode = 'decimal';
+    inp.placeholder = t('networth.line.price_edit_placeholder');
+    inp.value = ln.est && ln.est.src === 'user' && ln.price != null ? String(+ln.price.toFixed(4)) : '';
+    valEl.replaceWith(inp); inp.focus(); inp.select();
+    let done = false;
+    const commit = async () => {
+      if (done) return; done = true;
+      const txt = String(inp.value).trim().replace(',', '.');
+      const frac = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/.exec(txt);
+      const v = frac ? (+frac[1]) / (+frac[2]) : (txt === '' ? null : parseFloat(txt));
+      if (txt !== '' && !(v > 0 && Number.isFinite(v))) { render(); return; }
+      try { await window.api.setPriceOverride(id, v); } catch { render(); return; }
+      for (const r of state.rows) for (const l of (r.result.lines || [])) {
+        if ((l.priceId || l.apiId) !== id) continue;
+        if (v != null) {
+          // remember the feed's price once, so dropping the own price can restore it
+          if (!(l.est && l.est.src === 'user')) l.feedPrice = { price: l.price, est: l.est || null };
+          l.est = Object.assign({}, l.est || {}, { src: 'user', raw: l.feedPrice.price });
+          l.price = v;
+        } else if (l.est && l.est.src === 'user') {
+          const fp = l.feedPrice || { price: null, est: null };
+          l.price = fp.price; l.est = fp.est; delete l.feedPrice;
+        }
+      }
+      persistRows(); render();
+    };
+    inp.onblur = commit;
+    inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } else if (e.key === 'Escape') { done = true; render(); } };
+  }
+
   function startEdit(ln, cntEl) {
     const inp = el('input', 'nw-cnt-edit');
     inp.type = 'text'; inp.inputMode = 'numeric'; inp.value = String(effCount(ln));

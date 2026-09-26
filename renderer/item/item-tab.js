@@ -251,6 +251,37 @@
     wrap.appendChild(lbl);
     return wrap;
   }
+  // "Own price": ex per unit ("0.25", "0,25" or "1/4"); Reset drops it again. Stored in
+  // the config (main.js priceOverrides), so Net Worth and the currency tab use it too.
+  function ownPriceRow(r) {
+    const row = cel('div', 'cur-own');
+    row.appendChild(cel('span', 'cur-own-lbl', cesc(t('itemtab.currency.own_label'))));
+    const inp = cel('input', 'cur-own-inp');
+    inp.type = 'text'; inp.inputMode = 'decimal';
+    inp.placeholder = t('itemtab.currency.own_placeholder');
+    if (r.priceSource === 'user') inp.value = String(+r.price.toFixed(4));
+    row.appendChild(inp);
+    const apply = async (v) => {
+      await window.api.setPriceOverride(r.apiId, v);
+      ccatalog = null; // re-read the catalog: the new price is in it now
+      doCurrencyPrice();
+    };
+    const save = cel('button', 'cur-own-btn', cesc(t('itemtab.currency.own_save')));
+    save.onclick = () => {
+      const txt = String(inp.value).trim().replace(',', '.');
+      const frac = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/.exec(txt);
+      const v = frac ? (+frac[1]) / (+frac[2]) : parseFloat(txt);
+      if (v > 0 && Number.isFinite(v)) apply(v); else inp.focus();
+    };
+    inp.onkeydown = (e) => { if (e.key === 'Enter') save.onclick(); };
+    row.appendChild(save);
+    if (r.priceSource === 'user') {
+      const clr = cel('button', 'cur-own-btn', cesc(t('itemtab.currency.own_clear')));
+      clr.onclick = () => apply(null);
+      row.appendChild(clr);
+    }
+    return row;
+  }
   function renderCurrency(root) {
     root.innerHTML = '';
     // Same markup as the equipment header's back link (item-ui.js): the link rides its own
@@ -299,9 +330,19 @@
       }
       const spark = currencySpark(r.logs);
       if (spark) card.appendChild(spark);
-      card.appendChild(cel('div', 'cur-note', r.source === 'cx'
-        ? t('itemtab.currency.note_cx')
-        : t('itemtab.currency.note_scout')));
+      card.appendChild(cel('div', 'cur-note', r.priceSource === 'user'
+        ? cesc(t('itemtab.currency.note_user', { raw: r.priceRaw != null ? fmtNum(r.priceRaw) + ' ' + t('itemtab.currency.unit_ex') : '?' }))
+        : r.source === 'cx'
+          ? t('itemtab.currency.note_cx')
+          : t('itemtab.currency.note_scout')));
+      // the sources behind the number (main.js priceRefs), with a warning when they
+      // contradict each other - and the user's own price, which beats all of them
+      if (r.priceUncertain) card.appendChild(cel('div', 'cur-note cur-warn', cesc(t('itemtab.currency.uncertain'))));
+      if (r.priceRefs && r.priceRefs.length) {
+        const list = r.priceRefs.map((x) => t('networth.line.price_src_' + x.src) + ' ' + fmtNum(x.ex) + ' ' + t('itemtab.currency.unit_ex')).join(' · ');
+        card.appendChild(cel('div', 'cur-note', cesc(t('itemtab.currency.sources', { list }))));
+      }
+      if (r.apiId && window.api.setPriceOverride) card.appendChild(ownPriceRow(r));
     } else {
       card.appendChild(cel('div', 'cur-note', cesc(state.notice || t('itemtab.currency.no_price_found'))));
     }
