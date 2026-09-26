@@ -238,7 +238,9 @@
   // Returns [{ mask:{data,w,h}, x, area }] where mask is cropped to the bbox and
   // x is the component's min-x in strip coords.
   // S = cell scale relative to reference (matchScale): every size limit grows with it
-  function components(bin, S) {
+  // eight: also join diagonal neighbours - a thin diagonal stroke (the 7's, at 1080p)
+  // can touch only corner to corner and falls apart into pieces with 4-neighbours
+  function components(bin, S, eight) {
     S = S || 1;
     const { data, w, h } = bin;
     const lbl = new Int32Array(w * h);
@@ -260,6 +262,13 @@
         if (px < w - 1) { const q = p + 1; if (data[q] && !lbl[q]) { lbl[q] = n; stack.push(q); } }
         if (py > 0) { const q = p - w; if (data[q] && !lbl[q]) { lbl[q] = n; stack.push(q); } }
         if (py < h - 1) { const q = p + w; if (data[q] && !lbl[q]) { lbl[q] = n; stack.push(q); } }
+        if (eight) {
+          for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+            const nx = px + dx, ny = py + dy;
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+            const q = ny * w + nx; if (data[q] && !lbl[q]) { lbl[q] = n; stack.push(q); }
+          }
+        }
       }
       const bw = xMax - xMin + 1, bh = yMax - yMin + 1;
       // digit-sized: height 7-16, width 1-13, area>=5 (reference px, times S)

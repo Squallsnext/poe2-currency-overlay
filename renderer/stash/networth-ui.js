@@ -113,6 +113,8 @@
     try { window.api.stashCalibrateStart(); } catch {}
   }
 
+  const learnNote = {}; // last "learn from this image" result per slot, shown in its debug panel
+
   // ---------- test read right after a calibration ----------
   // The calibration says how it was measured (from the currency tab's cells, or the box
   // as dragged); the first scan after it says whether that worked: many unsure slots ->
@@ -879,7 +881,7 @@
             learnIn.onclick = (e) => e.stopPropagation();
             const learnBtn = el('button', 'nw-dbg-pin', t('networth.line.debug_learn_button'));
             learnBtn.title = t('networth.line.debug_learn_title');
-            const learnMsg = el('span', 'nw-dbg-floor-val');
+            const learnMsg = el('span', 'nw-dbg-floor-val', esc(learnNote[ln.apiId] || '')); // survives the re-render the learn triggers
             learnBtn.onclick = async (e) => {
               e.stopPropagation();
               const value = learnIn.value.replace(/[^0-9]/g, '');
@@ -896,12 +898,12 @@
               try { res = await window.api.stashTeachCount(ln.apiId, value, v); } catch { res = { ok: false }; }
               learnBtn.disabled = false;
               if (res && res.ok) {
-                learnMsg.textContent = t('networth.line.debug_learn_ok', { value });
+                learnMsg.textContent = learnNote[ln.apiId] = t('networth.line.debug_learn_ok', { value });
                 refreshPreview(); // the reader's answer with the newly learned digits
               } else if (res && res.reason === 'segment-mismatch') {
-                learnMsg.textContent = t('networth.line.debug_learn_parts', { found: res.found, want: res.want });
+                learnMsg.textContent = learnNote[ln.apiId] = t('networth.line.debug_learn_parts', { found: res.found, want: res.want });
               } else {
-                learnMsg.textContent = t('networth.line.debug_learn_failed');
+                learnMsg.textContent = learnNote[ln.apiId] = t('networth.line.debug_learn_failed') + (res && res.error ? ' (' + res.error + ')' : '');
               }
             };
             learnRow.appendChild(learnIn); learnRow.appendChild(learnBtn); learnRow.appendChild(learnMsg);

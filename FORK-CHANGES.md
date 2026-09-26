@@ -657,6 +657,15 @@ other tabs. If the calibration window has to open it says so, and cancelling it 
 "nothing changed". Before, the result appeared behind the open settings (reported: waited,
 not knowing it was done).
 
+**Learning a count that "cannot be learned"** (reported at 1080p: a clean 7 that would
+not go in). Teaching cuts one piece per digit from the black/white cell and refuses when
+the number of pieces differs from the digits typed. It now tries, in order: plain pieces;
+with diagonal neighbours joined (a thin stroke at 1080p touches only corner to corner and
+fell apart - `components(bin, S, eight)`); without pieces under 70 % of the tallest (a
+speck or item art beside the count). On the currency picture scaled to 1080p: 4 of 10
+counts could not be taught before, 1 after. The learn result now stays in the debug
+panel (it vanished with the re-render the learn itself triggers), with the error if any.
+
 ### 4.8 Setup-specific parts – already removed from this branch
 
 These existed in the player's own build and were **deliberately left out** here:
