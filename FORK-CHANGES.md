@@ -265,6 +265,24 @@ Only red/yellow boxes are shown by default ("also show good slots" reveals the r
   neighbour's frame), with a button to take the recommended value.
 - Letter shortcuts (F, H, R, S, A) work right after typing into a number field; Enter
   leaves the field.
+- **Second round of player feedback** (German, essence tab):
+  - nothing is preselected when the window opens (the preselected box was what the
+    arrows moved after marking a group with the lasso); after a lasso the marked group
+    moves with the arrows right away (its top-left box is selected), a plain click on
+    empty space clears marking and selection;
+  - models (★) no longer pile up: only a box moved ALONE becomes one (not a marked group,
+    not "alle mitbewegen"), F uses them and clears them, "★ aufheben" / V clears by hand -
+    before, every touched box stayed a model and clicking the dashed ones after a snap
+    made them models too, an endless loop;
+  - after a snap with dashed boxes, the next F (without marking) works on the dashed ones
+    only - what already sits is left alone, and a hand-set ornate model is not measured
+    against the plain frames;
+  - the jump plausibility check ignores boxes that do not move (on a half-aligned tab the
+    already-right half made the other half's correct jumps look odd);
+  - the step guide is the loud part now (bigger, in its own band, the current step lit),
+    the tools are calm; step 1 says to size for a 4-digit count with a few px to spare;
+  - the window stays in front of the overlay and remembers its size and position
+    (`adjustWinBounds`).
 - Tested headless: plain panel - uniformly shifted, each box randomly ±12 px, already
   right - all ≤1 px, nothing falsely flagged; ornate test panel - 10 snapped, 3 flagged
   "Sprung?", a second model fixes two more. **Not yet tested on a real essence tab.**

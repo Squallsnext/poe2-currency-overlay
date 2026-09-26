@@ -30,6 +30,7 @@
     <span class="grp"><span class="grp-lab">Auswahl</span>
       <label title="An: Ziehen oder Pfeiltasten verschieben ALLE Kästchen um dieselbe Strecke. Taste A"><input id="moveall" type="checkbox"> alle mitbewegen</label>
       <button id="unmark" class="ghostbtn" title="Markierung aufheben (Esc). Markieren: Strg+Klick oder Rahmen auf freier Fläche aufziehen">Markierung aufheben</button>
+      <button id="unleader" class="ghostbtn" title="Alle Vorbilder (★) aufheben (V). Nach „Am Rahmen einrasten“ passiert das von selbst.">★ aufheben</button>
     </span>
     <span class="grp"><span class="grp-lab">Ansicht</span>
       <label id="onlybad-lab" title="Standard: alle Kästchen sichtbar - ein Feld, das heute passt (einstellig), kann bei zweistelligen Zahlen danebenliegen. Wird gemerkt."><input id="onlybad" type="checkbox"> nur rote/gelbe</label>
@@ -59,7 +60,7 @@
   <h3>Farben</h3>
   <ul>
     <li><b class="c-ok">Grün</b> gut gelesen · <b class="c-warn">Gelb</b> unsicher · <b class="c-bad">Rot</b> vermutlich falsch · <b class="c-none">Grau</b> nichts gelesen (meist leerer Platz)</li>
-    <li><b>★</b> von Hand gesetzt – Vorbild fürs Einrasten · <b class="c-fail">orange gestrichelt</b> Einrasten war zu unsicher (Zahl darunter = nötige Sicherheit)</li>
+    <li><b>★</b> allein von Hand gesetzt – Vorbild fürs nächste Einrasten (danach wieder aufgehoben) · <b class="c-fail">orange gestrichelt</b> Einrasten war zu unsicher (Zahl darunter = nötige Sicherheit)</li>
   </ul>
   <h3>Der schnelle Weg</h3>
   <ul>
@@ -72,7 +73,7 @@
   <ul>
     <li>Ziehen = verschieben · Pfeiltasten 1 px · <kbd>Shift</kbd>+Pfeil 5 px</li>
     <li>Markieren: <kbd>Strg</kbd>+Klick oder Rahmen auf freier Fläche aufziehen – markierte bewegen sich zusammen; Einrasten wirkt dann nur auf sie · <kbd>Esc</kbd> hebt auf</li>
-    <li><kbd>A</kbd> alle mitbewegen · <kbd>R</kbd> Reihe angleichen (erstes Kästchen der Reihe auswählen) · <kbd>S</kbd> Spalte angleichen (oberstes auswählen) · <kbd>F</kbd> einrasten · <kbd>H</kbd> diese Hilfe</li>
+    <li><kbd>V</kbd> Vorbilder (★) aufheben – passiert nach F von selbst · <kbd>A</kbd> alle mitbewegen · <kbd>R</kbd> Reihe angleichen (erstes Kästchen der Reihe auswählen) · <kbd>S</kbd> Spalte angleichen (oberstes auswählen) · <kbd>F</kbd> einrasten · <kbd>H</kbd> diese Hilfe</li>
   </ul>
   <h3>Suchbereich und Sicherheit</h3>
   <ul>

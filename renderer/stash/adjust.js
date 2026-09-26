@@ -44,7 +44,12 @@ function loadSetting(k, dflt){
 function saveSetting(k, v){ try { localStorage.setItem(tabKey(k), v); } catch {} }
 
 // ---- hand-placed boxes = models ("Vorbilder") for snapping ----
-// Every box the player moved directly (not as a follower of a group move) is one. Frames
+// A box the player moved ALONE since the last snap is one (a box moved as part of a
+// marked group or "alle mitbewegen" is not - the group was moved, not a frame fitted).
+// Snapping uses them up: after F the models are cleared, so the next hand-placed box
+// starts a fresh set. Before, every touched box stayed a ★ for good, and clicking the
+// dashed ones after a snap made them models too - an endless loop ("man bekommt sie
+// nicht weg"). "★ aufheben" (V) clears them by hand. Frames
 // differ between tiers (a perfect essence's frame is gilded and ornate, a lesser one's
 // plain): compared with a single plain model, an ornate frame looked "unlike" it and
 // needed the certainty down at ~15 %. With several models each box is compared with the
@@ -57,6 +62,13 @@ function makeLeader(i){
   clearSnapFail(i);
   refreshSteps();
 }
+function clearLeaders(){
+  for (const i of leaders) { const el = boxEl(i); if (el) el.classList.remove('leader'); }
+  leaders.clear();
+  refreshSteps();
+}
+// moved alone = no followers (not "alle mitbewegen", not part of a marked group)
+function movedAlone(i){ const f = followers(i); return f !== null && !f.size; }
 
 // ---- grid overlay + a guide line through the selected box's centre ----
 const gridEl = $('grid'), guideEl = $('guide');
@@ -328,18 +340,24 @@ function arrowText(dx, dy){
 
 let snapRuns = 0;
 function snapToFrames(){
-  if (!selected && !leaders.size) return;
+  // no box set by hand since the last snap: the selected box is the model (the old "align
+  // one box, select it, press F")
+  if (!leaders.size && selected) makeLeader(+selected.dataset.i);
+  if (!leaders.size) { $('snapinfo').textContent = 'Erst ein Kästchen genau auf seine Zahl setzen – es wird Vorbild (★) – dann F.'; return; }
   gray();
   snapshot();
+  // after a snap with dashed boxes, the next F (no marking) works on those only: the rest
+  // already sits, and the new model (often an ornate frame set by hand) should not be
+  // measured against the plain ones
+  const pending = [...document.querySelectorAll('.box.snapfail')].map((el) => +el.dataset.i);
   clearAllSnapFail();
-  if (selected) makeLeader(+selected.dataset.i);
-  const size = DATA[+(selected ? selected.dataset.i : [...leaders][0])];
+  const size = DATA[[...leaders][0]];
   // run length ~ a cell (about three box heights), so a frame line is told from a digit
   const len = Math.round(3 * size.h);
   const R = Math.max(1, Math.round(+rangeEl.value || 10));
   const minShare = (+minEl.value || 0) / 100;
   const models = [...leaders].slice(-MAX_MODELS).map((i) => modelFor(i, len));
-  const targets = marked.size ? [...marked] : DATA.map((_, i) => i);
+  const targets = marked.size ? [...marked] : pending.length ? pending : DATA.map((_, i) => i);
   // pass 1: for every box the best proposal over all models
   const props = [];
   for (const i of targets) {
@@ -361,7 +379,9 @@ function snapToFrames(){
   // a test panel with painted-on ornate frames: three boxes snapped 8-26 px wrong while
   // their lines looked certain - only their odd jump gave them away. Such a box is not
   // moved but shown as unsure, with its jump next to the typical one.
-  const confident = props.filter((q) => q.need >= minShare);
+  // only boxes that actually jump: already-right boxes (jump 0) say nothing about the
+  // shift, and on a half-done tab they made the other half's correct jumps look odd
+  const confident = props.filter((q) => q.need >= minShare && Math.hypot(q.dx, q.dy) >= 0.5);
   const med = (arr) => { const a = arr.slice().sort((p, q) => p - q); return a.length ? a[Math.floor(a.length / 2)] : 0; };
   const mdx = med(confident.map((q) => q.dx)), mdy = med(confident.map((q) => q.dy));
   const tol = Math.max(6, size.h * 0.15);
@@ -399,13 +419,14 @@ function snapToFrames(){
   }
   snapRuns++;
   let txt = moved + ' eingerastet · ' + kept + ' saßen schon · ' + failed + ' unsicher (gestrichelt)';
-  txt += ' · Vorbilder: ' + models.length;
+  txt += ' · ' + models.length + ' Vorbild' + (models.length === 1 ? '' : 'er') + ' benutzt und aufgehoben';
   if (failed > odd) txt += ' — bei Sicherheit ≤ ' + pct(lowestNeed) + ' % würden die zu unsicheren einrasten';
   if (odd) txt += (failed > odd ? ';' : ' —') + ' ' + odd + '× „Sprung?“: springt anders als die übrigen';
   if (failed) txt += ' (Maus auf ein gestricheltes Kästchen: warum).';
   $('snapinfo').textContent = txt;
   $('forcesnap').hidden = !failed;
   $('forcesnap').textContent = 'Unsichere trotzdem einrasten (' + failed + ')';
+  clearLeaders(); // used up - the next hand-placed box starts a new set
   updateGuide(); refreshSteps();
 }
 // deliberately take the previewed spot for every unsure box
@@ -425,7 +446,7 @@ function forceSnap(){
 
 // ---- steps: what to do next, one short tip at a time ----
 const STEP_TIPS = {
-  1: 'Breite/Höhe so einstellen, dass die längste Zahl (auch zweistellig) ganz hineinpasst, aber wenig vom Item-Bild. Zu klein schneidet Ziffern ab, zu groß stören Bildkanten.',
+  1: 'Breite/Höhe: so klein wie möglich, aber eine 4-stellige Zahl (z. B. 9999) muss mit ein paar Pixeln Luft hineinpassen – Stapel wachsen, und GGGs Ziffern sind je nach Zahl ein paar Pixel höher, tiefer oder breiter. Zu klein schneidet Ziffern ab, zu groß holt Kanten des Item-Bilds ins Lesen.',
   2: 'Ein Kästchen genau auf seine Zahl ziehen (oder Pfeiltasten). Es wird Vorbild (★). Die Zeile unten zeigt, wie weit es verschoben wurde, und den passenden Suchbereich.',
   3: 'F drücken: alle anderen übernehmen die Lage des Vorbilds in ihrem eigenen Rahmen. Was schon passt, bleibt stehen.',
   4: 'Gestrichelte Kästchen waren zu unsicher – Maus darauf zeigt warum. Eins davon von Hand setzen und nochmal F, oder die Sicherheit senken, oder „trotzdem einrasten“.',
@@ -434,8 +455,8 @@ const STEP_TIPS = {
 let step1Ok = false;
 function currentStep(){
   if (!sizeTouched && !step1Ok) return 1;
-  if (!leaders.size) return 2;
-  if (!snapRuns) return 3;
+  if (!leaders.size && !snapRuns) return 2;
+  if (!snapRuns || leaders.size) return 3;
   if (document.querySelector('.box.snapfail')) return 4;
   return 5;
 }
@@ -495,7 +516,7 @@ function init(d){
       place(el, r); updateGuide(); updateMoveInfo();
     });
     el.addEventListener('pointerup', () => {
-      if (drag && drag.i === i && drag.moved) makeLeader(i);
+      if (drag && drag.i === i && drag.moved && movedAlone(i)) makeLeader(i);
       drag = null;
     });
     wrap.appendChild(el);
@@ -521,7 +542,8 @@ function init(d){
   let onlyBad = false; try { onlyBad = localStorage.getItem('adjOnlyBad') === '1'; } catch {}
   $('onlybad').checked = onlyBad; wrap.classList.toggle('hide-ok', onlyBad);
 
-  if (DATA.length) select(document.querySelector('.box:not(.ok):not(.none)') || document.querySelector('.box'));
+  // nothing preselected: a box picked for you meant the arrows moved THAT box after you
+  // had marked a group with the lasso
   refreshSteps();
 }
 
@@ -542,6 +564,7 @@ $('rowalign').onclick = () => alignRow();
 $('colalign').onclick = () => alignCol();
 $('undo').onclick = () => undo();
 $('unmark').onclick = () => clearMarked();
+$('unleader').onclick = () => clearLeaders();
 $('snapframe').onclick = () => snapToFrames();
 $('forcesnap').onclick = () => forceSnap();
 $('helpbtn').onclick = () => toggleHelp(true);
@@ -568,6 +591,7 @@ document.addEventListener('keydown', (ev) => {
   if (ev.key === 'f' || ev.key === 'F') { snapToFrames(); ev.preventDefault(); return; }
   if (ev.key === 'Escape') { clearMarked(); ev.preventDefault(); return; }
   if (ev.key === 'a' || ev.key === 'A') { if (moveAllEl) moveAllEl.checked = !moveAllEl.checked; ev.preventDefault(); return; }
+  if (ev.key === 'v' || ev.key === 'V') { clearLeaders(); ev.preventDefault(); return; }
   const i = +selected.dataset.i, r = DATA[i];
   const n = ev.shiftKey ? 5 : 1;
   let dx = 0, dy = 0;
@@ -579,7 +603,7 @@ document.addEventListener('keydown', (ev) => {
   if (!ev.repeat) snapshot(); // one undo step per key press, not per auto-repeat
   r.x += dx; r.y += dy;
   { const f = followers(i); if (f === null || f.size) shiftAll(dx, dy, i, f); }
-  place(selected, r); updateGuide(); updateMoveInfo(); makeLeader(i); ev.preventDefault();
+  place(selected, r); updateGuide(); updateMoveInfo(); if (movedAlone(i)) makeLeader(i); ev.preventDefault();
 });
 
 // Lasso: drag on an empty spot to mark every visible box whose centre is inside (Ctrl
@@ -618,6 +642,13 @@ wrap.addEventListener('pointerup', () => {
       if (cx >= L && cx <= R && cy >= T && cy <= B) setMarked(+el.dataset.i, true);
     });
   }
+  // the marked group is ready to move right away: its top-left box is selected (the
+  // arrows move it and, as a marked box, the whole group with it; R/S align from it).
+  // A plain click on empty space clears marking and selection.
+  if (marked.size) {
+    const first = [...marked].sort((a, b) => (DATA[a].y - DATA[b].y) || (DATA[a].x - DATA[b].x))[0];
+    select(boxEl(first));
+  } else select(null);
   lasso = null;
 });
 

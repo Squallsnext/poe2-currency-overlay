@@ -269,6 +269,7 @@ const DEFAULT_CONFIG = {
   stashShowOcrDebug: false, // Net Worth: show the exact crop the reader saw, per line
   stashUserTabSigs: {}, // Net Worth: extra tab-detection fingerprints the user taught via "wrong tab?" (tab -> [signature])
   stashShowReliability: false, // Net Worth: tint rows the shipped reliability table marks as often misread
+  adjustWinBounds: null, // align tool window: size/position from last time
   stashHiRes: false, // Net Worth: read counts at 2x resolution where the capture allows (4K/5K); per-slot setting wins
   stashSkipGroups: [], // Net Worth: the player's own lists of items left out of the total while switched on [{id,name,on,items:[apiId]}]
   priceOverrides: {}, // apiId -> {ex, at}: the user's own price for an item, wins over every feed (see applyPriceRules)
@@ -2528,11 +2529,19 @@ ipcMain.handle('stash-adjust-open', (_e, tab) => {
     const data = buildAdjustSlotData(tab, cap);
     if (!data || !data.rows.length) return { ok: false, reason: 'nothing-to-adjust' };
     closeAdjustWin();
+    // size/position from last time (a player who widened it wants it wide again)
+    const last = config.adjustWinBounds;
     adjustWin = new BrowserWindow({
-      width: Math.min(1500, data.width + 60), height: Math.min(1000, data.height + 140),
+      ...(last && last.width > 300 && last.height > 200 ? { x: last.x, y: last.y, width: last.width, height: last.height }
+        : { width: Math.min(1500, data.width + 60), height: Math.min(1000, data.height + 140) }),
       title: 'Zahlenfelder ausrichten', autoHideMenuBar: true,
       webPreferences: { preload: path.join(__dirname, 'renderer', 'stash', 'adjust-preload.js'), contextIsolation: true, nodeIntegration: false },
     });
+    // in front of the overlay (which pins itself at 'screen-saver'), or it opens behind it
+    adjustWin.setAlwaysOnTop(true, 'screen-saver');
+    const keepBounds = () => { try { if (adjustWin && !adjustWin.isDestroyed()) { config.adjustWinBounds = adjustWin.getBounds(); saveConfig(); } } catch {} };
+    adjustWin.on('resized', keepBounds);
+    adjustWin.on('moved', keepBounds);
     adjustWin.on('closed', () => { adjustWin = null; adjustData = null; });
     adjustData = Object.assign({ tab }, data);
     adjustWin.loadFile(path.join(__dirname, 'renderer', 'stash', 'adjust.html'));
