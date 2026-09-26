@@ -2527,6 +2527,10 @@ button#cancel{background:#3a3a3a;color:#eee}
 #wrap.hide-ok .box.ok{display:none}
 .box.sel{outline:2px solid #fff;z-index:3}
 .box.marked{box-shadow:0 0 0 3px #6fd3ff;z-index:2}
+.box.snapfail{border-style:dashed;border-color:#ff9f1c}
+#snapbox{display:flex;gap:6px;align-items:center;font-size:13px;color:#cfc3aa}
+#snapbox input{width:52px;background:#0b0b0b;color:#ddd;border:1px solid #555;border-radius:6px;padding:4px 6px;font:12px Consolas,monospace}
+#snapinfo{font-size:12px;color:#ffd166}
 #lasso{position:absolute;border:1px dashed #6fd3ff;background:rgba(111,211,255,.08);pointer-events:none;display:none;z-index:5}
 .box .t{position:absolute;left:0;top:-22px;white-space:nowrap;font:700 16px Consolas,monospace;color:inherit;text-shadow:0 0 4px #000,0 0 4px #000}
 #toggleok,#togglegrid,#togglemoveall{display:flex;align-items:center;gap:5px;font-size:13px;color:#cfc3aa}
@@ -2549,10 +2553,11 @@ button#cancel{background:#3a3a3a;color:#eee}
   <button id="colalign" title="Alle Kästchen unter dem ausgewählten, die höchstens 25 px links oder rechts davon sitzen, auf dieselbe Spalte setzen (nur links/rechts, die Höhe bleibt). Taste S">Spalte angleichen ↓</button>
   <button id="undo" title="Letztes Angleichen / Verschieben rückgängig machen. Strg+Z">Rückgängig</button>
   <button id="snapframe" title="Erst EIN Kästchen genau ausrichten und auswählen. Dann setzt dies jedes andere Kästchen an dieselbe Stelle relativ zu seinem eigenen Zellrahmen (oben links) - kein Versatz, der sich von links nach rechts aufaddiert. Wirkt auf die markierten Kästchen, sonst auf alle. Taste F">Am Rahmen einrasten</button>
+  <span id="snapbox"><label title="Wie weit (in Pixeln) ein Kästchen beim Einrasten höchstens springen darf. Kleiner = nur feine Korrektur, größer = findet auch weit verrutschte, kann aber eher danebengreifen.">Suchbereich <input id="snaprange" type="number" min="1" max="80" step="1"> px</label><label title="Wie deutlich die gefundene Rahmenlinie sein muss, im Vergleich zur Rahmenlinie am Vorreiter (0-100 %). Darunter bleibt das Kästchen stehen und wird gestrichelt umrandet - dann von Hand setzen. Höher = vorsichtiger.">Sicherheit <input id="snapmin" type="number" min="0" max="100" step="5"> %</label><span id="snapinfo"></span></span>
   <button id="unmark" title="Markierung aufheben (Esc)">Markierung aufheben</button>
   <label id="togglemoveall" title="An: Ziehen oder Pfeiltasten verschieben ALLE Kästchen um dieselbe Strecke - ein Kästchen ausrichten, der Rest folgt. Taste A"><input id="moveall" type="checkbox"> Alle mitbewegen</label>
   <label id="togglegrid"><input id="showgrid" type="checkbox"> Gitter <input id="gridstep" type="number" min="2" step="1" title="Gitterabstand in Pixeln"> px</label>
-  <span id="hint">Nur unsichere/falsche Felder werden standardmäßig gezeigt. Ziehen = verschieben, Pfeiltasten = 1px, Shift+Pfeil = 5px. Breite/Höhe = Größe für ALLE Kästchen auf einmal (auch die ausgeblendeten guten). Reihe angleichen (R): erstes Kästchen der Reihe auswählen, alle rechts davon übernehmen die Höhe. Spalte angleichen (S): oberstes Kästchen der Spalte auswählen, alle darunter übernehmen die Position links/rechts. Alle mitbewegen (A): ein Kästchen ausrichten, alle anderen verschieben sich genauso mit. Markieren: Strg+Klick auf Kästchen oder Rahmen auf freier Fläche aufziehen - dann bewegen sich nur die markierten zusammen (Esc hebt auf). Am Rahmen einrasten (F): ein Kästchen genau setzen, die anderen übernehmen seine Lage im eigenen Zellrahmen. Strg+Z = rückgängig. Gitter: gestrichelte Linie = Mitte des ausgewählten Kästchens.</span>
+  <span id="hint">Nur unsichere/falsche Felder werden standardmäßig gezeigt. Ziehen = verschieben, Pfeiltasten = 1px, Shift+Pfeil = 5px. Breite/Höhe = Größe für ALLE Kästchen auf einmal (auch die ausgeblendeten guten). Reihe angleichen (R): erstes Kästchen der Reihe auswählen, alle rechts davon übernehmen die Höhe. Spalte angleichen (S): oberstes Kästchen der Spalte auswählen, alle darunter übernehmen die Position links/rechts. Alle mitbewegen (A): ein Kästchen ausrichten, alle anderen verschieben sich genauso mit. Markieren: Strg+Klick auf Kästchen oder Rahmen auf freier Fläche aufziehen - dann bewegen sich nur die markierten zusammen (Esc hebt auf). Am Rahmen einrasten (F): ein Kästchen genau setzen und auswählen (weißer Rand) - es ist der Vorreiter; die markierten (sonst alle) übernehmen seine Lage im eigenen Zellrahmen. Kästchen, die schon passen, bleiben stehen; unsichere werden gestrichelt und nicht bewegt. Strg+Z = rückgängig. Gitter: gestrichelte Linie = Mitte des ausgewählten Kästchens.</span>
 </div>
 <div id="wrap" class="hide-ok"><img id="panel" src="data:image/png;base64,${data.panelBase64}"><div id="grid"></div><div id="guide"></div><div id="lasso"></div></div>
 <script>
@@ -2705,6 +2710,7 @@ DATA.forEach((r, i) => {
   el.innerHTML = '<div class="t">' + r.label.replace(/[&<>]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch])) + '</div>';
   place(el, r);
   el.addEventListener('pointerdown', (ev) => {
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     if (ev.ctrlKey || ev.metaKey) { setMarked(i, !marked.has(i)); select(el); ev.preventDefault(); ev.stopPropagation(); return; }
     snapshot();
     select(el); el.setPointerCapture(ev.pointerId);
@@ -2723,7 +2729,10 @@ DATA.forEach((r, i) => {
   wrap.appendChild(el);
 });
 document.addEventListener('keydown', (ev) => {
-  if (ev.target && ev.target.tagName === 'INPUT') return; // typing a size/grid value
+  // typing a size/grid/snap value - but NOT a checkbox: after clicking "Alle mitbewegen"
+  // or "Gitter" the focus stays on it, and returning here let the arrow keys scroll the
+  // window instead of moving the box
+  if (ev.target && ev.target.tagName === 'INPUT' && ev.target.type !== 'checkbox') return;
   if (!selected) return;
   if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'z' || ev.key === 'Z')) { undo(); ev.preventDefault(); return; }
   if (ev.key === 'r' || ev.key === 'R') { alignRow(); ev.preventDefault(); return; }
@@ -2760,6 +2769,9 @@ document.getElementById('snapframe').onclick = () => snapToFrames();
 const lassoEl = document.getElementById('lasso');
 let lasso = null;
 wrap.addEventListener('pointerdown', (ev) => {
+  // preventDefault below keeps the browser from moving focus, so a click on the picture
+  // no longer took it away from a size/grid field - arrows then went nowhere. Do it here.
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
   if (ev.target.closest && ev.target.closest('.box')) return;
   const rc = wrap.getBoundingClientRect();
   lasso = { x0: ev.clientX - rc.left, y0: ev.clientY - rc.top, add: ev.ctrlKey || ev.metaKey };
@@ -2792,11 +2804,25 @@ wrap.addEventListener('pointerup', () => {
 });
 
 // ---- "Am Rahmen einrasten": place every box at the SAME spot relative to its own cell
-// frame as the (hand-aligned) selected box. A shared offset drifts across a wide row -
-// cells are not spaced in whole pixels, so an offset right at the left edge is a few px
-// off at the right. Each cell's frame corner (top-left) is found in the captured panel:
-// the frame is a long straight edge, so the column/row with the strongest summed gradient
-// along a box-length run is the frame line, where icon art (short, curved edges) is not.
+// frame as the (hand-aligned) selected box - the LEADER. A shared offset drifts across a
+// wide row (cells are not spaced in whole pixels), so each box is fitted to its own cell.
+// Each cell's frame corner (top-left) is found in the captured panel: the frame is a long
+// straight edge, so the column/row with the strongest summed gradient along a box-length
+// run is the frame line, where icon art (short, curved edges) is not.
+//
+// Guards (reported: a second F pulled boxes away that already sat perfectly):
+//  - the cell's frame is a double line, and the NEIGHBOUR cell's frame runs ~15 px
+//    further out, nearly as strong (measured 7586 vs 6815) - within a wide search range
+//    the strongest line can be the wrong one (a range of 25 px moved perfectly placed
+//    boxes 31 px off). So of all lines at least KEEP (90 %) as strong as the strongest,
+//    the one NEAREST the box's predicted spot wins, per axis - a box that already sits
+//    right stays exactly where it is.
+//  - "Suchbereich": how far a box may jump at all.
+//  - "Sicherheit": a best line weaker than this share of the leader's own frame line is
+//    not trusted - the box stays and gets a dashed outline, to be set by hand.
+// (An edge-PROFILE match over the whole surroundings was tried as well: less exact on a
+// real 1456 px panel - two of 13 boxes landed a frame-line spacing off - so not used.)
+const KEEP = 0.9;
 let GRAY = null;
 function gray(){
   if (GRAY) return GRAY;
@@ -2809,38 +2835,94 @@ function gray(){
   return GRAY;
 }
 const px = (x, y) => GRAY[Math.min(HEIGHT - 1, Math.max(0, y | 0)) * WIDTH + Math.min(WIDTH - 1, Math.max(0, x | 0))];
-function colEdge(x, y0, len){ let s = 0; for (let y = y0; y < y0 + len; y++) s += Math.abs(px(x + 1, y) - px(x - 1, y)); return s; }
-function rowEdge(y, x0, len){ let s = 0; for (let x = x0; x < x0 + len; x++) s += Math.abs(px(x, y + 1) - px(x, y - 1)); return s; }
-// strongest vertical + horizontal frame line near (gx, gy), refined twice
-function findCorner(gx, gy, R, len){
-  let cx = Math.round(gx), cy = Math.round(gy);
-  for (let pass = 0; pass < 2; pass++) {
-    let best = -1, bx = cx;
-    for (let x = Math.round(gx - R); x <= Math.round(gx + R); x++) { const v = colEdge(x, cy, len); if (v > best) { best = v; bx = x; } }
-    cx = bx; best = -1; let by = cy;
-    for (let y = Math.round(gy - R); y <= Math.round(gy + R); y++) { const v = rowEdge(y, cx, len); if (v > best) { best = v; by = y; } }
-    cy = by;
-  }
-  return { x: cx, y: cy };
+// Line strength along a run, counted only where the line is there along (nearly) all of
+// it: the run is cut into SEGS pieces and the second-weakest piece counts, times SEGS.
+// A frame line runs the whole cell; a digit's straight stroke ("1") only part of it -
+// summed plainly, that "1" beat the frame line 6318 to 3985 and pulled its box 24 px right.
+const SEGS = 6;
+function lineStrength(len, at){
+  const seg = new Array(SEGS).fill(0);
+  for (let k = 0; k < len; k++) seg[Math.min(SEGS - 1, Math.floor(k * SEGS / len))] += at(k);
+  seg.sort((p, q) => p - q);
+  return seg[1] * SEGS;
 }
+function colEdge(x, y0, len){ return lineStrength(len, (k) => Math.abs(px(x + 1, y0 + k) - px(x - 1, y0 + k))); }
+function rowEdge(y, x0, len){ return lineStrength(len, (k) => Math.abs(px(x0 + k, y + 1) - px(x0 + k, y - 1))); }
+// strongest vertical + horizontal frame line near (gx, gy), refined twice. With keep: an
+// axis whose line at (gx, gy) itself is nearly as strong as the best stays unmoved.
+// signed edge pattern a few px around a line (which side is brighter, the double line):
+// the cell's OWN frame and the neighbour's frame ~15 px away are equally strong but not
+// alike - this is what tells them apart
+const PAT = 6;
+function colPat(x, y0, len){ const o = []; for (let d = -PAT; d <= PAT; d++) { let s = 0; for (let k = 0; k < len; k += 2) s += px(x + d + 1, y0 + k) - px(x + d - 1, y0 + k); o.push(s); } return o; }
+function rowPat(y, x0, len){ const o = []; for (let d = -PAT; d <= PAT; d++) { let s = 0; for (let k = 0; k < len; k += 2) s += px(x0 + k, y + d + 1) - px(x0 + k, y + d - 1); o.push(s); } return o; }
+function ncc(a, b){
+  const n = a.length; let ma = 0, mb = 0;
+  for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
+  ma /= n; mb /= n;
+  let sab = 0, saa = 0, sbb = 0;
+  for (let i = 0; i < n; i++) { const u = a[i] - ma, v = b[i] - mb; sab += u * v; saa += u * u; sbb += v * v; }
+  return saa > 0 && sbb > 0 ? sab / Math.sqrt(saa * sbb) : 0;
+}
+// strongest vertical + horizontal frame line near (gx, gy), refined twice. With "like"
+// (the leader's patterns): every clear line (a local peak at least half as strong as the
+// strongest) is a candidate, and the one whose pattern is most like the leader's wins -
+// ties (within 0.05) go to the one nearest the predicted spot, so a box that already sits
+// right stays exactly where it is.
+function findCorner(gx, gy, R, len, like){
+  const x0 = Math.round(gx), y0 = Math.round(gy);
+  const pick = (c0, edge, pat, ref) => {
+    const v = []; let best = -1, bi = 0;
+    for (let k = -R; k <= R; k++) { const e = edge(c0 + k); v.push(e); if (e > best) { best = e; bi = k; } }
+    if (!ref) return { c: c0 + bi, s: best };
+    let win = null, winSim = -2;
+    for (let k = -R; k <= R; k++) {
+      const e = v[k + R];
+      if (e < 0.5 * best) continue;
+      if (!((k === -R || e >= v[k + R - 1]) && (k === R || e >= v[k + R + 1]))) continue;
+      const sim = ncc(ref, pat(c0 + k));
+      if (win == null || sim > winSim + 0.05 || (sim > winSim - 0.05 && Math.abs(k) < Math.abs(win))) { win = k; winSim = Math.max(sim, winSim); }
+    }
+    return { c: c0 + win, s: v[win + R], sim: winSim };
+  };
+  let cx = x0, cy = y0, sx = 0, sy = 0, simX = 1, simY = 1;
+  for (let pass = 0; pass < 2; pass++) {
+    const a = pick(x0, (x) => colEdge(x, cy, len), (x) => colPat(x, cy, len), like && like.col); cx = a.c; sx = a.s; if (a.sim != null) simX = a.sim;
+    const b = pick(y0, (y) => rowEdge(y, cx, len), (y) => rowPat(y, cx, len), like && like.row); cy = b.c; sy = b.s; if (b.sim != null) simY = b.sim;
+  }
+  return { x: cx, y: cy, sx, sy, sim: Math.min(simX, simY) };
+}
+const snapRangeEl = document.getElementById('snaprange'), snapMinEl = document.getElementById('snapmin');
+const snapInfo = document.getElementById('snapinfo');
 function snapToFrames(){
   if (!selected) return;
   gray();
   snapshot();
+  document.querySelectorAll('.box.snapfail').forEach((el) => el.classList.remove('snapfail'));
   const ai = +selected.dataset.i, a = DATA[ai];
-  const len = Math.round(Math.max(a.w, a.h));
-  // anchor: its frame corner is up/left of the number box
-  const ac = findCorner(a.x - a.h * 0.2, a.y - a.h * 0.2, a.h * 0.5, len);
+  // run length ~ a cell (about three box heights), so a frame line is told from a digit
+  const len = Math.round(3 * a.h);
+  const R = Math.max(1, Math.round(+snapRangeEl.value || 10));
+  const minShare = (+snapMinEl.value || 0) / 100;
+  // leader: its frame corner is up/left of the number box
+  const ac = findCorner(a.x - a.h * 0.2, a.y - a.h * 0.2, Math.round(a.h * 0.5), len, null);
   const ox = a.x - ac.x, oy = a.y - ac.y;
+  const like = { col: colPat(ac.x, ac.y, len), row: rowPat(ac.y, ac.x, len) };
   const targets = marked.size ? [...marked] : DATA.map((_, i) => i);
+  let moved = 0, kept = 0, failed = 0;
   for (const i of targets) {
     if (i === ai) continue;
     const r = DATA[i];
-    const c = findCorner(r.x - ox, r.y - oy, a.h * 0.35, len);
-    r.x = c.x + ox; r.y = c.y + oy;
+    const c = findCorner(r.x - ox, r.y - oy, R, len, like);
     const el = document.querySelector('.box[data-i="' + i + '"]');
+    // not trusted: the line is much weaker than the leader's, or it does not look like it
+    if (c.sx < minShare * ac.sx || c.sy < minShare * ac.sy || c.sim < minShare) { failed++; if (el) el.classList.add('snapfail'); continue; }
+    const nx = c.x + ox, ny = c.y + oy;
+    if (Math.abs(nx - r.x) < 0.5 && Math.abs(ny - r.y) < 0.5) { kept++; continue; }
+    r.x = nx; r.y = ny; moved++;
     if (el) place(el, r);
   }
+  snapInfo.textContent = moved + ' eingerastet, ' + kept + ' saßen schon, ' + failed + ' unsicher (gestrichelt)';
   updateGuide();
 }
 // grid on/off and spacing are remembered for the next time the tool opens
@@ -2852,6 +2934,11 @@ document.getElementById('showgrid').addEventListener('change', (ev) => {
   try { localStorage.setItem('adjGridOn', ev.target.checked ? '1' : '0'); } catch {}
 });
 gridStep.addEventListener('input', () => { drawGrid(); try { localStorage.setItem('adjGridStep', gridStep.value); } catch {} });
+// snap settings: remembered; default search range ~ a third of a box height
+try { snapRangeEl.value = localStorage.getItem('adjSnapRange') || (DATA.length ? Math.max(4, Math.round(DATA[0].h * 0.35)) : 10); } catch { snapRangeEl.value = 10; }
+try { snapMinEl.value = localStorage.getItem('adjSnapMin') || 50; } catch { snapMinEl.value = 50; }
+snapRangeEl.addEventListener('input', () => { try { localStorage.setItem('adjSnapRange', snapRangeEl.value); } catch {} });
+snapMinEl.addEventListener('input', () => { try { localStorage.setItem('adjSnapMin', snapMinEl.value); } catch {} });
 if (DATA.length) select(document.querySelector('.box:not(.ok)') || document.querySelector('.box'));
 gwInput.value = DATA.length ? Math.round(DATA[0].w) : 0;
 ghInput.value = DATA.length ? Math.round(DATA[0].h) : 0;

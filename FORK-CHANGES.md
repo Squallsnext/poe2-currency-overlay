@@ -209,6 +209,27 @@ Only red/yellow boxes are shown by default ("also show good slots" reveals the r
   avoids a shared offset drifting across a wide row. Tested in headless Chromium on a real
   5K capture of the currency tab's bottom rows: 13 boxes placed up to ±12 px off all
   landed on their numbers, spaced 162/163 px, rows level.
+  Reported afterwards: a second F pulled boxes away that already sat perfectly, and the
+  arrow keys scrolled the window instead of moving the box. Reproduced and fixed:
+  - the search range grows with the box (at 5K ~35 px), and within it the strongest line
+    can be the wrong one: the neighbour cell's frame ~15 px (reference) further out is
+    nearly as strong as the cell's own (7586 vs 6815), and a digit "1" is a straight
+    stroke that beat the frame outright (6318 vs 3985). With a 25 px range the old
+    search moved perfectly placed boxes 31 px off. Now: a line only counts where it runs
+    along (nearly) all of a ~3-box-height run (second-weakest of 6 pieces), and of all
+    clear lines the one whose light/dark pattern is most like the leader's wins, ties
+    to the nearest - a box that already sits right stays exactly where it is.
+  - **Suchbereich** (px, how far a box may jump) and **Sicherheit** (%, how strong and
+    how alike the found line must be compared to the leader's) are adjustable and
+    remembered; a box below Sicherheit is not moved but outlined dashed. A status line
+    says how many boxes snapped / already sat / were unsure.
+  - arrow keys: after clicking a checkbox the focus stayed on it and the key handler
+    ignored every INPUT; a click into the picture no longer moved focus (the lasso
+    prevents the default). Now checkboxes don't block the keys and a click on the
+    picture or a box drops focus from any field.
+  Re-tested headless: all boxes ≤1 px at ranges 14/25/35 px, pressing F twice, from
+  exact and from shifted positions, and at 2.5× scale with boxes up to ±30 px off.
+  (An edge-profile match over the whole surroundings was tried too and was less exact.)
 - **Marking:** Ctrl+click boxes or drag a lasso on an empty area; moving one marked box
   moves the marked group only (Esc clears).
 - **Undo (Ctrl+Z)** for drags, nudges and both align actions (50 steps).
