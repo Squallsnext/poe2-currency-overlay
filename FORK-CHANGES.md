@@ -53,6 +53,14 @@ HID reports instead (`node-hid`, new dependency), in `gamepad.js`.
 - Default: Square = start reprice read.
 - Config: `gamepadBindings` (action → button index), `commandHotkeys[].gamepad`.
 
+- **Button combos** (e.g. **PS + L2** - PS is the one button the game does not use):
+  recording a binding collects every button pressed until all are released again (it
+  used to take the first press), so a combo is just pressing the buttons together. A
+  binding is one index or a sorted array; a combo fires when exactly its buttons are
+  held; a single-button binding does not fire while PS is held or while a combo
+  containing it is what is held ("PS + Square" does not also trigger "Square").
+  Old single-number bindings work unchanged. Tested with synthetic DualSense reports.
+
 ### Reprice with a controller
 
 - **Read** (Square): same as right-clicking – reads the price in the Set Item Price dialog

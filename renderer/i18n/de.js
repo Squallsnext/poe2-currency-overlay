@@ -1315,6 +1315,7 @@ window.I18N_CATALOGS.de = {
   "ui.settings.reprice.gamepad_placeholder": "klicken, dann eine Controller-Taste drücken",
   "ui.settings.reprice.gamepad_clear": "×",
   "ui.settings.reprice.gamepad_clear_tooltip": "Zuordnung entfernen",
+  "ui.settings.reprice.gamepad_combo_hint": "Taste oder Kombination drücken (z. B. PS + L2) – übernommen wird beim Loslassen.",
   "ui.settings.reprice.gamepad_recording": "Controller-Taste drücken…",
   "ui.settings.reprice.gamepad_button.cross": "Kreuz (X)",
   "ui.settings.reprice.gamepad_button.circle": "Kreis",

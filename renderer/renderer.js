@@ -2270,6 +2270,8 @@ async function initSettings() {
   // capture itself happens in main (gamepad.js sees raw HID reports, not the renderer),
   // so this just asks for the next press and waits.
   const gpButtonLabel = (btn) => {
+    // a combo ([6, 16]) reads "PS + L2" - the PS button (the modifier) first
+    if (Array.isArray(btn)) return btn.slice().sort((a, b) => (b === 16) - (a === 16) || a - b).map((b) => gpButtonLabel(b)).join(' + ');
     const bk = window.api.gamepadButtonKeys && window.api.gamepadButtonKeys[btn];
     if (!bk) return '';
     // built, not a literal - see i18n-verify.mjs's CALL regex, which only recognises a
@@ -2284,6 +2286,7 @@ async function initSettings() {
     input.addEventListener('focus', async () => {
       input.classList.add('recording');
       input.value = t('ui.settings.reprice.gamepad_recording');
+      input.title = t('ui.settings.reprice.gamepad_combo_hint');
       const btn = await window.api.captureGamepadButton();
       if (!input.classList.contains('recording')) return; // blurred/cancelled meanwhile
       input.classList.remove('recording');

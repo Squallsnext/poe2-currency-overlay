@@ -1166,16 +1166,31 @@ const GAMEPAD_ACTIONS = {
   repriceRead: () => reprice.startAttempt(),
 };
 let gamepadStarted = false;
+// A binding is one button index or a combo (sorted array, e.g. [6, 16] = L2 + PS).
+// A combo fires when its last button goes down and exactly its buttons are held.
+// A single button fires on its press - except while PS is held (PS is the modifier for
+// combos, the one button the game does not use) or when a combo containing it is what
+// is held right now: "PS + Square" must not also fire the plain Square binding.
+const GP_PS = 16;
+function gamepadBindingFires(bind, btn, held, allBindings) {
+  if (bind == null) return false;
+  if (Array.isArray(bind)) return bind.includes(btn) && bind.length === held.size && bind.every((b) => held.has(b));
+  if (bind !== btn) return false;
+  if (btn !== GP_PS && held && held.has(GP_PS)) return false;
+  const comboNow = (allBindings || []).some((b) => Array.isArray(b) && b.includes(btn) && b.length === held.size && b.every((x) => held.has(x)));
+  return !comboNow;
+}
 function startGamepadListener() {
   if (gamepadStarted) return;
   gamepadStarted = true;
-  gamepad.onButtonDown((btn) => {
+  gamepad.onButtonDown((btn, held) => {
     const binds = config.gamepadBindings || {};
+    const all = Object.values(binds).concat((config.commandHotkeys || []).map((r) => r && r.gamepad));
     for (const action in GAMEPAD_ACTIONS) {
-      if (binds[action] === btn) GAMEPAD_ACTIONS[action]();
+      if (gamepadBindingFires(binds[action], btn, held, all)) GAMEPAD_ACTIONS[action]();
     }
     for (const row of config.commandHotkeys || []) {
-      if (row && row.gamepad === btn && isAllowedCommand(row.command)) sendChatCommand(row.command);
+      if (row && gamepadBindingFires(row.gamepad, btn, held, all) && isAllowedCommand(row.command)) sendChatCommand(row.command);
     }
   });
   gamepad.start();
@@ -3503,9 +3518,20 @@ const GAMEPAD_ACTION_IDS = new Set([
   'overlay', 'closeOverlay', 'itemPin', 'itemTemp', 'stashCapture',
   'repriceToggle', 'repriceRead',
 ]);
+// one button 0..17, or a combo of 2-3 distinct ones (sorted)
+function cleanGamepadBinding(b) {
+  const ok = (v) => Number.isInteger(v) && v >= 0 && v <= 17;
+  if (ok(b)) return b;
+  if (Array.isArray(b)) {
+    const list = [...new Set(b.filter(ok))].sort((x, y) => x - y).slice(0, 3);
+    if (list.length === 1) return list[0];
+    if (list.length >= 2) return list;
+  }
+  return null;
+}
 ipcMain.handle('set-gamepad-binding', (_e, { action, button } = {}) => {
   if (!GAMEPAD_ACTION_IDS.has(action)) return false;
-  const clean = Number.isInteger(button) && button >= 0 && button <= 17 ? button : null;
+  const clean = cleanGamepadBinding(button);
   config.gamepadBindings = config.gamepadBindings || {};
   if (clean == null) delete config.gamepadBindings[action]; else config.gamepadBindings[action] = clean;
   saveConfig();
@@ -4442,7 +4468,7 @@ ipcMain.handle('set-command-hotkeys', (_e, rows) => {
     .map((r) => ({
       command: r.command.trim(),
       accelerator: typeof r.accelerator === 'string' ? r.accelerator : '',
-      gamepad: Number.isInteger(r.gamepad) && r.gamepad >= 0 && r.gamepad <= 17 ? r.gamepad : null,
+      gamepad: cleanGamepadBinding(r.gamepad),
     }));
   for (const r of config.commandHotkeys || []) {
     if (r && r.accelerator) { try { globalShortcut.unregister(r.accelerator); } catch {} }

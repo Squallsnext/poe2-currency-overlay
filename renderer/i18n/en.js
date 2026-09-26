@@ -1300,6 +1300,7 @@ window.I18N_CATALOGS.en = {
   "ui.settings.reprice.gamepad_placeholder": "click, then press a controller button",
   "ui.settings.reprice.gamepad_clear": "×",
   "ui.settings.reprice.gamepad_clear_tooltip": "Unbind",
+  "ui.settings.reprice.gamepad_combo_hint": "Press a button or a combo (e.g. PS + L2) - it is taken when you let go.",
   "ui.settings.reprice.gamepad_recording": "press a controller button…",
   "ui.settings.reprice.gamepad_button.cross": "Cross (X)",
   "ui.settings.reprice.gamepad_button.circle": "Circle",

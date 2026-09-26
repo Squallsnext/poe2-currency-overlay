@@ -79,7 +79,7 @@ function create(deps) {
   let prevBits = new Array(BUTTON_KEYS.length).fill(false);
   let retryTimer = null;
   const listeners = [];
-  let captureCb = null;
+  let capture = null; // { cb, seen: Set } while the settings capture is waiting
   let captureTimer = null;
 
   function findDevicePath(hid, profile) {
@@ -104,21 +104,26 @@ function create(deps) {
   function handleReport(buf) {
     const bits = decodeButtons(buf, activeProfile);
     if (!bits) return;
+    // bits is fully updated before any press fires, so a listener sees everything that
+    // is held at that moment (a combo "PS + L2" is: L2 goes down while PS is held)
+    const held = new Set();
+    for (let i = 0; i < bits.length; i++) if (bits[i]) held.add(i);
     for (let i = 0; i < bits.length; i++) {
-      if (bits[i] && !prevBits[i]) fireButtonDown(i);
+      if (bits[i] && !prevBits[i]) fireButtonDown(i, held);
     }
     prevBits = bits;
+    // a capture ends when every button is up again: what was pressed in between is the
+    // binding - one button, or a combo like PS + L2
+    if (capture && capture.seen.size && !held.size) {
+      const c = capture; capture = null; clearTimeout(captureTimer);
+      const list = [...c.seen].sort((a, b) => a - b);
+      c.cb(list.length === 1 ? list[0] : list.slice(0, 3));
+    }
   }
 
-  function fireButtonDown(i) {
-    if (captureCb) {
-      const cb = captureCb;
-      captureCb = null;
-      clearTimeout(captureTimer);
-      cb(i);
-      return;
-    }
-    for (const fn of listeners) { try { fn(i); } catch { /* one bad listener must not break the rest */ } }
+  function fireButtonDown(i, held) {
+    if (capture) { capture.seen.add(i); return; }
+    for (const fn of listeners) { try { fn(i, held); } catch { /* one bad listener must not break the rest */ } }
   }
 
   function tryConnect() {
@@ -155,13 +160,15 @@ function create(deps) {
 
   function onButtonDown(fn) { listeners.push(fn); }
 
-  // Resolves with the next button index pressed, or null if nothing arrives in time -
-  // used by the settings "click, then press a controller button" capture field.
+  // Settings "click, then press a controller button": collects every button pressed
+  // until all are released again, then answers with one index or a sorted combo
+  // ([16, 6] = PS + L2); null if nothing arrives in time. (It used to take the very
+  // first press, which made combos impossible.)
   function captureNext(cb, timeoutMs) {
-    captureCb = cb;
+    capture = { cb, seen: new Set() };
     clearTimeout(captureTimer);
     captureTimer = setTimeout(() => {
-      if (captureCb === cb) { captureCb = null; cb(null); }
+      if (capture && capture.cb === cb) { capture = null; cb(null); }
     }, timeoutMs || 8000);
   }
 
