@@ -7,8 +7,10 @@ player on a **German client at 5120×2880 (5K)** with a **DualSense** controller
 here is offered back upstream: take what is useful, leave what is setup-specific (marked
 below).
 
-- Branch with all changes: `claude/vibrant-hawking-by7wqx`
-- Base: `v3.0.7` (`483a7af`)
+- Branch: `de-controller-ocr` in [Squallsnext/poe2-currency-overlay](https://github.com/Squallsnext/poe2-currency-overlay),
+  on top of upstream `master` (`20ea30a`, v3.0.7 + changelog)
+- One commit per step, in the order the work was done, so single features can be
+  cherry-picked or reverted on their own (see "Where things live" at the end).
 
 ---
 
@@ -280,21 +282,18 @@ the extra Exalted cells, 4.7) appear in the tool automatically.
 tested: 1080p/1440p, 150 %/200 % Windows scaling at other resolutions, taskbar left/right
 or auto-hide, multi-monitor with the game on a secondary display.
 
-### 4.8 Setup-specific – probably not for upstream as-is
+### 4.8 Setup-specific parts – already removed from this branch
 
-- **Extra Exalted slots** `exalted-2..4` in the dynamic bottom rows of the currency tab
-  (row 1 cell 1, row 2 cells 1–2), priced as Exalted via a new `priceAs` slot field and shown
-  as "Exalted Orb #2" etc. This matches one player's habit of parking overflow Exalted there.
-  The `priceAs` / `suffix` mechanism itself is generic.
-- **Currency tab coordinates** (`currency-tab-map.js` STATIC_SLOTS) were recalibrated in
-  code for one player's *enlarged in-game UI text*. For upstream, keep the original
-  coordinates: with the align tool (4.5) each player now stores their own offsets in their
-  config, so the shipped defaults should stay the standard-UI ones.
-- Root-level dev scripts and scratch data from tuning (`analyze-*.js`, `sweep-*.js`,
-  `build-5k-digit-variant.js`, `scratch-*.json`, `debug-*.png`, `pnpm-*.yaml`) are not
-  meant to be merged.
+These existed in the player's own build and were **deliberately left out** here:
 
----
+- The currency tab coordinates recalibrated for an enlarged in-game UI text and three extra
+  Exalted cells in the bottom rows (last commits restore the shipped
+  `currency-tab-map.js`). Each player now aligns with the align tool instead; the generic
+  `priceAs` / `suffix` slot fields remain for maps that want duplicate slots.
+- Tuning scripts, scratch data and debug images from the 5K work (`analyze-*.js`,
+  `sweep-*.js`, `build-5k-digit-variant.js`, `test-5k-digit-variant.js`,
+  `extract-strip-digits.js`, `scratch-*.json`, `debug-*.png`) and a pnpm lockfile.
+  `package-lock.json` only gains the three packages `node-hid` needs.
 
 ## 5. New config keys
 
@@ -327,3 +326,29 @@ high-resolution templates; "Forget template" clears both.
   `scripts/test-stash-*.js`) were not run, because the fixture screenshots are not in the
   repo. Before merging reader changes upstream, please re-run them – especially for the
   cluster fix (4.1.3), which changes candidate selection in every regime.
+
+---
+
+## 7. Where things live (for maintaining or extending the fork)
+
+Each feature sits mostly in its own file; the shared files only get a hook.
+
+| Feature | Own files | Hooks in shared files |
+|---|---|---|
+| German client fixes | – | `renderer/item/item-tab.js` (base type / unique name), `renderer/vendor/ee2/data/de/client_strings.js` |
+| Controller input | `gamepad.js` (HID reading, button map in `CONTROLLER_PROFILES`) | `main.js`: `GAMEPAD_ACTIONS`, `startGamepadListener`, `capture-gamepad-button` / `set-gamepad-binding`; `renderer/renderer.js`: binding inputs; `renderer/index.html`: controller fields |
+| Reprice controller paste, 2-frame confirmation | – | `reprice.js`: `pasteIfReady`, `prevBase` in `attempt()` |
+| Stash read path (scan = preview = teach) | `renderer/stash/read-pipeline.js` | `renderer/stash/reader-worker.js` (scan), `main.js`: `stash-slot-debug-image`, `stash-teach-count` |
+| Reader filters (local cut, speck filter, contrast gate, saturation, ×2 scaling) | `renderer/stash/digit-reader.js` (`binarizeLocal`, `dropSmallBlobs`, `contrastGate`, `adjustRGBA`, scale factor `S`) | per-slot values: `stashSlotOverrides` via `main.js` `stash-slot-save-read-settings` |
+| Align tool | window built in `main.js` `buildAdjustWindowHtml` (self-contained HTML+JS), `renderer/stash/adjust-preload.js` | `stash-adjust-open` / `stash-adjust-save`, button in `networth-ui.js` `rowCard` |
+| OCR debug panel, setup wizard, "Wrong tab?", list persistence | `renderer/stash/networth-ui.js` (sections marked by comments: debug panel, `startWizard`/`wizardCard`, `persistRows`, tab fix) | `main.js`: `stash-correct-tab`, `stash-adjusted` event |
+| Tab detection with player fingerprints | – | `reader-worker.js` `detectTab`, config `stashUserTabSigs` |
+| Calibration window | `renderer/stash/calibrate.html` / `calibrate.js` (`calib.*` i18n keys) | `main.js` calibration window setup |
+| Texts | – | `renderer/i18n/en.js`, `de.js` (other languages fall back to English) |
+
+To add a controller: one entry in `CONTROLLER_PROFILES` (`gamepad.js`). To add a tab: a
+`*-tab-map.js` with `STATIC_SLOTS`, registered in `reader-worker.js` `TABS` and
+`main.js` `TAB_MAPS`. To add a reader filter: a function in `digit-reader.js`, a key in
+`read-pipeline.js` (`channelOpts` / `slotParams`), one slider spec in the debug panel's
+`specs` list in `networth-ui.js`, and the key in `stash-slot-save-read-settings`.
+
