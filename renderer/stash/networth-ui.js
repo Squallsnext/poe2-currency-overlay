@@ -41,7 +41,9 @@
   // would only add a near-identical copy to the exemplar pool (the learned template is
   // the median of up to 30, so copies drown out variety instead of adding it). A WRONG
   // read is always teachable, whatever its confidence.
-  const LEARN_BELOW = 0.75;
+  // 0.85 (was 0.75): reads between 75 and 85 % were right but not taught, and staying
+  // there often meant deleting templates to get a digit in (reported)
+  const LEARN_BELOW = 0.85;
   // OCR-debug settings section: closed by default, opened per slot (apiId) - only the
   // one being tuned. Kept across re-renders (so a save doesn't snap it shut), not across
   // restarts.
@@ -663,6 +665,15 @@
           const binImg = el('img', 'nw-dbg-img'); binImg.src = cached.binUrl; binImg.title = t('networth.line.debug_img_binarized');
           imgs.appendChild(rawImg); imgs.appendChild(filtImg); imgs.appendChild(binImg);
           dbg.appendChild(imgs);
+          // how to use the sliders - folded, opened once and remembered
+          {
+            const guide = el('details', 'nw-dbg-guide');
+            try { guide.open = localStorage.getItem('nwDbgGuide') === '1'; } catch {}
+            guide.addEventListener('toggle', () => { try { localStorage.setItem('nwDbgGuide', guide.open ? '1' : '0'); } catch {} });
+            guide.appendChild(el('summary', null, esc(t('networth.line.debug_guide_title'))));
+            guide.appendChild(el('div', 'nw-dbg-guide-body', t('networth.line.debug_guide')));
+            dbg.appendChild(guide);
+          }
 
           // Sliders tuned against ONE live preview that runs the live reader's exact path
           // (read-pipeline.js), so "würde lesen" is what the next scan reads with these

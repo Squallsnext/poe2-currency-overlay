@@ -707,6 +707,17 @@ currency read is identical to their own full settings (38 of 38 records).
   shipped filters, reads are identical to their own full settings (currency 38/38, ritual
   31/31, abyss 21/21).
 
+**Guides and small fixes after a full 1080p/1440p setup run** (reported):
+- OCR debug panel: a folded guide above the sliders (colour limit down, then specks /
+  brightness / contrast, floor / local threshold, save / apply to tab, teaching, forget
+  template). README: a short "setting it up" section. Align tool help: "the quickest way"
+  (mark all, clear models, G, R/S for drift, save).
+- Teaching a right-but-unsure read now works below **85 %** (was 75 %): reads between 75
+  and 85 % could not be taught, and getting a digit in often meant deleting templates.
+- Align tool: a slot whose override held only read filters (no position - "apply to
+  whole tab" on a slot never aligned) got NaN coordinates: a box stuck at the left edge
+  that could not be dragged, fixable only with "column". Now the map's spot is used.
+
 These existed in the player's own build and were **deliberately left out** here:
 
 - The currency tab coordinates recalibrated for an enlarged in-game UI text and three extra

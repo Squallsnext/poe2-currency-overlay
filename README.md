@@ -33,6 +33,30 @@ Windows, built with Electron. It reads public data only — no game memory hooks
 - Pick the mods you'd keep and the worst tier you'd accept; each is weighted by its real spawn chance.
 - It prices your item as it stands and with a hit, autofills consumable costs from live rates, and compares the routes (Preserved / Ancient / Altered) to a per-route EV and a plain verdict.
 
+## Net Worth (stash) – setting it up (fork)
+
+The quick way, with keyboard or controller UI, at 1080p, 1440p, 4K or 5K:
+
+1. **Calibrate** (Settings → Net Worth → *Calibrate*) with the **currency tab** open in
+   game. The app finds the stash on screen by itself from the currency tab's cells and
+   reads the tab as a test. If it cannot find it, a window opens to drag a rough box.
+2. **Scan the tabs** (*Scan tabs*, offered right after calibrating): open each tab in game
+   when asked and take its picture with the scan key. Each tab's boxes are placed onto its
+   cells automatically.
+3. **Align** only where a count is read wrong: mark all boxes (drag a frame around them),
+   clear the models (V), *place by rule* (G), fix a drifted row/column with R / S, save.
+4. **OCR debug** for slots that still read wrong (Settings → *Show OCR debug*, then
+   *Debug* on the tab and 🔍 on the row) – the panel has a folded guide:
+   - colour limit all the way down, then specks / brightness / contrast until only the
+     digits are left in the right-hand (black/white) picture;
+   - save; *Apply to whole tab* for slots with the same background;
+   - teach: ✓ on a right count under 85 %, or type the right number at *Learn from this
+     image* (each digit must be one piece in the black/white picture).
+
+Read filters tuned at 1080p, 1440p and 5K ship as defaults for those sizes; your own
+settings always win. *Reset calibration & tabs* starts over and writes a backup first.
+Details: [FORK-CHANGES.md](FORK-CHANGES.md).
+
 ## Install
 
 **Most people:** download the installer from the [website](https://poe2-vibetools.github.io/poe2-currency-overlay/) or the [releases page](https://github.com/POE2-VibeTools/poe2-currency-overlay/releases). Windows only. The build is unsigned, so if SmartScreen appears, choose **More info → Run anyway**.

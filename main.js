@@ -2535,7 +2535,10 @@ function buildAdjustSlotData(tab, cap, noImage) {
     // a bad slot's box reaching into its icon also needs to know where the good ones
     // already sit, or the same drag could push a currently-fine slot's box off the count.
     const ov = existing[s.apiId];
-    const sCx = ov ? ov.cx : s.cx, sCy = ov ? ov.cy : s.cy;
+    // an override can hold only read filters and no position ("apply to whole tab" on a
+    // slot never aligned) - then the map's spot, not NaN (reported: a box stuck at the left
+    // edge that could not be dragged)
+    const sCx = ov && ov.cx != null ? ov.cx : s.cx, sCy = ov && ov.cy != null ? ov.cy : s.cy;
     const strip = ov && ov.stripWidth != null ? ov.stripWidth : readP.stripWidth;
     const up = ov && ov.up != null ? ov.up : readP.up;
     const dn = ov && ov.dn != null ? ov.dn : readP.dn;

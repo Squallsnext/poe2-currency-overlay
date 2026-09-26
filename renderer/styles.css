@@ -2049,3 +2049,9 @@ footer {
 #buckets.hidden + #cur-fold-all, #networth-root.hidden + #nw-fold-all { display: none; }
 .nw-tour-last { width: 180px; border-radius: 4px; border: 1px solid var(--in-bd); margin: 2px 0 8px; opacity: .8; }
 .nw-tour-auto { color: var(--tx-gold2); line-height: 1.4; }
+
+/* debug panel: the folded "how to" above the sliders */
+.nw-dbg-guide { margin: 6px 0 8px; font-size: 11.5px; color: var(--tx-dim); }
+.nw-dbg-guide summary { cursor: pointer; color: var(--am); }
+.nw-dbg-guide-body { margin-top: 4px; line-height: 1.5; }
+.nw-dbg-guide-body ol { margin: 4px 0; padding-left: 18px; }
