@@ -691,6 +691,22 @@ currency read is identical to their own full settings (38 of 38 records).
 
 ### 4.8 Setup-specific parts – already removed from this branch
 
+**Tested on real 1080p and 1440p support pictures** (all 12 tabs each, from the player).
+- Calibration from the cells: the saved box found again to the pixel at both sizes
+  (0.2-0.3 s).
+- Rule placement: at 1080p the runes tab lost five cells - the tab map's lesser column
+  next to the gap between blocks is 22 px off, the per-cell range is ~10.5 reference px.
+  A wider range for every cell cost cells elsewhere (essence at 1440p 82 -> 79), so cells
+  not found get a second, wider search (16 reference px) whose find only counts if it is
+  no other cell's and sits in line with its row (`innerCorners`). Now every cell of every
+  tab is found at 1080p and 1440p, except slots where the map has no cell (ritual "Call of
+  the Shadows", Kalguur "Aldur's Legacy"); the 5K pictures and the calibration search give
+  the same results as before.
+- Read filters for 1440p-sized panels (1.15-1.5x, `slot-defaults.js` 'mid'): the player's
+  2560x1440 export (currency, runes, ritual, abyss). With their box positions and only the
+  shipped filters, reads are identical to their own full settings (currency 38/38, ritual
+  31/31, abyss 21/21).
+
 These existed in the player's own build and were **deliberately left out** here:
 
 - The currency tab coordinates recalibrated for an enlarged in-game UI text and three extra

@@ -21,6 +21,7 @@
   else root.FrameSnap = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   const SEGS = 6;
+  const K5_REF = 2.849; // innerCorners' scale 1 = a 5120x2880 capture: 2.849 px per reference px
   const PAT = 6;
 
   function ncc(a, b) {
@@ -168,15 +169,36 @@
         dx = shift(guesses.map((g) => bestAlong(Math.round(g.x), RB, (x) => innerColScore(x, Math.round(g.y + dy) + m, len, s))), 'x', dx);
         dy = shift(guesses.map((g) => bestAlong(Math.round(g.y), RB, (y) => innerRowScore(y, Math.round(g.x + dx) + m, len, s))), 'y', dy);
       }
-      return guesses.map((g) => {
+      const one = (g, range) => {
         const gx = Math.round(g.x + dx), gy = Math.round(g.y + dy);
         let x = gx, y = gy, a = null, b = null;
         for (let pass = 0; pass < 2; pass++) {
-          a = bestAlong(gx, R, (xx) => innerColScore(xx, y + m, len, s)); x = a.at;
-          b = bestAlong(gy, R, (yy) => innerRowScore(yy, x + m, len, s)); y = b.at;
+          a = bestAlong(gx, range, (xx) => innerColScore(xx, y + m, len, s)); x = a.at;
+          b = bestAlong(gy, range, (yy) => innerRowScore(yy, x + m, len, s)); y = b.at;
         }
         return { x, y, sx: a.s, sy: b.s, dx: x - g.x, dy: y - g.y, ok: a.s >= minScore && b.s >= minScore && !a.edge && !b.edge };
-      });
+      };
+      const out = guesses.map((g) => one(g, R));
+      // Second chance, wider, for cells not found: a tab map can have a whole column off
+      // by more than the normal range (runes at 1080p: the lesser column next to the gap
+      // between blocks, 22 px). A wider range for EVERY cell cost other tabs cells (essence
+      // at 1440p: 79 instead of 82), so only the missing ones get it, and a find counts
+      // only if it is not a cell already found and sits in line with its row's cells.
+      const R2 = Math.round(16 * s * (opts && opts.retryScale || 1) * K5_REF);
+      if (R2 > R) {
+        const near = (p, q) => Math.abs(p.x - q.x) < 20 * s && Math.abs(p.y - q.y) < 20 * s;
+        out.forEach((c, i) => {
+          if (c.ok) return;
+          const r = one(guesses[i], R2);
+          if (!r.ok) return;
+          if (out.some((o, j) => j !== i && o.ok && near(o, r))) return; // someone else's cell
+          const row = out.filter((o, j) => o.ok && j !== i && Math.abs(guesses[j].y - guesses[i].y) < 6 * s).map((o) => o.y);
+          if (row.length && Math.abs(r.y - med(row)) > 4 * s) return; // not in line with its row
+          r.retried = true;
+          out[i] = r;
+        });
+      }
+      return out;
     }
     return { findCorner, model, propose, innerCorners };
   }
