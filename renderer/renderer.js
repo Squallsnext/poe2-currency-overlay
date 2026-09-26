@@ -4043,6 +4043,15 @@ async function main() {
   });
 
   $('btn-refresh').addEventListener('click', () => { logAction('refresh (manual)'); refresh(true); });
+  // collapse / expand every bucket at once: all collapsed -> expand all, else collapse all
+  { const f = $('cur-fold-all'); if (f) f.addEventListener('click', () => {
+    const bs = (config && config.buckets) || [];
+    const collapse = bs.some((b) => !b.collapsed);
+    for (const b of bs) b.collapsed = collapse;
+    logAction(`buckets all ${collapse ? 'collapsed' : 'expanded'}`);
+    persistBuckets();
+    render();
+  }); }
   $('btn-hide').addEventListener('click', () => window.api.hide());
   // the nav rail is a SWITCHER, not a scroll-jump: it shows one section card at a
   // time (the content is short enough that scrolling to a section did nothing).

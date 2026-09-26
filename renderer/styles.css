@@ -2030,3 +2030,17 @@ footer {
 .nw-tour-btns { display: flex; flex-direction: column; gap: 4px; }
 .nw-tour-sumlist { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; }
 .nw-tour-sumrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; }
+.nw-tour-ask { color: var(--tx-hi); line-height: 1.45; }
+
+/* Net Worth card head: "wrong tab? / align / debug" stay faint until the card is hovered
+   (a debug that is ON stays visible) - they are tools, not the content */
+.nw-card-head .nw-card-tabfix, .nw-card-head .nw-card-adjust:not(.nw-card-adjust-on) { opacity: .18; transition: opacity .15s; }
+.nw-card-head:hover .nw-card-tabfix, .nw-card-head:hover .nw-card-adjust, .nw-card-head .nw-card-tabfix:focus, .nw-card-head .nw-card-adjust:focus { opacity: 1; }
+
+/* floating "collapse / expand all" for Currency and Net Worth - small, faint, bottom right;
+   shown only with its tab (it sits right after the tab's root) */
+.fold-all { position: fixed; right: 16px; bottom: 44px; z-index: 15; width: 26px; height: 26px; border-radius: 50%;
+  border: 1px solid var(--bd-16); background: color-mix(in srgb, var(--s-root) 85%, transparent); color: var(--tx-dim);
+  font-size: 13px; line-height: 1; cursor: pointer; opacity: .45; transition: opacity .15s; }
+.fold-all:hover { opacity: 1; color: var(--tx-hi); border-color: var(--am-hi); }
+#buckets.hidden + #cur-fold-all, #networth-root.hidden + #nw-fold-all { display: none; }

@@ -1230,15 +1230,22 @@
     const st = tr.status[tab];
     box.appendChild(el('div', 'nw-tour-step', t('networth.tour.step', { n: tr.i + 1, total: tabs.length, tab: esc(TAB_LABEL[tab]) })));
     if (tr.error) box.appendChild(el('div', 'nw-notice nw-error', esc(tr.error)));
-    if (st && st.state === 'ok') {
+    if (st && (st.state === 'ok' || st.state === 'ask')) {
       const shot = el('div', 'nw-tour-shot');
       if (st.thumb) { const im = document.createElement('img'); im.src = st.thumb; im.alt = ''; shot.appendChild(im); }
       const info = el('div', 'nw-tour-info');
-      info.appendChild(el('div', null, st.detected === tab
-        ? t('networth.tour.detected_ok', { tab: esc(TAB_LABEL[tab]) })
-        : t('networth.tour.detected_learned', { tab: esc(TAB_LABEL[tab]), other: esc(st.detected ? (TAB_LABEL[st.detected] || st.detected) : t('networth.tour.nothing')) })));
-      if (st.slotCount) info.appendChild(el('div', 'nw-dim', t('networth.tour.read', { read: st.readCount, total: st.slotCount })));
-      if (st.old) info.appendChild(el('div', 'nw-dim', t('networth.tour.from_before')));
+      const other = esc(st.detected ? (TAB_LABEL[st.detected] || st.detected) : t('networth.tour.nothing'));
+      if (st.state === 'ask') {
+        // the picture is not the tab asked for - say so plainly, let the player decide
+        info.appendChild(el('div', 'nw-tour-ask', t('networth.tour.ask', { tab: esc(TAB_LABEL[tab]), other })));
+      } else {
+        info.appendChild(el('div', null, st.learned
+          ? t('networth.tour.confirmed', { tab: esc(TAB_LABEL[tab]) })
+          : t('networth.tour.detected_ok', { tab: esc(TAB_LABEL[tab]) })));
+        // unread slots are mostly items the player does not have - not a reading problem
+        if (st.slotCount) info.appendChild(el('div', 'nw-dim', t('networth.tour.read', { read: st.readCount, empty: st.slotCount - st.readCount })));
+        if (st.old) info.appendChild(el('div', 'nw-dim', t('networth.tour.from_before')));
+      }
       shot.appendChild(info);
       box.appendChild(shot);
     }
@@ -1259,10 +1266,25 @@
           tr.error = code === 'game-window-not-found' ? t('networth.sample.capture_no_game')
             : code === 'game-window-black' ? t('networth.sample.capture_black')
               : t('networth.sample.capture_failed', { error: code });
-        } else tr.status[tab] = { state: 'ok', detected: r.detected, learned: r.learned, readCount: r.readCount, slotCount: r.slotCount, thumb: r.thumb };
+        } else if (r.ask) tr.status[tab] = { state: 'ask', detected: r.detected, thumb: r.thumb };
+        else tr.status[tab] = { state: 'ok', detected: r.detected, learned: r.learned, readCount: r.readCount, slotCount: r.slotCount, thumb: r.thumb };
         render();
       };
-      btns.appendChild(cap);
+      if (st && st.state === 'ask') {
+        cap.textContent = t('networth.tour.ask_retake');
+        btns.appendChild(cap);
+        const yes = el('button', 'nw-modal-opt', t('networth.tour.ask_confirm', { tab: esc(TAB_LABEL[tab]) }));
+        yes.title = t('networth.tour.ask_confirm_title');
+        yes.onclick = async () => {
+          tr.busy = true; render();
+          const r = await window.api.stashTourConfirm(tab).catch((e) => ({ ok: false, error: String(e) }));
+          tr.busy = false;
+          if (r && r.ok) tr.status[tab] = { state: 'ok', detected: r.detected, learned: true, readCount: r.readCount, slotCount: r.slotCount, thumb: r.thumb };
+          else tr.error = t('networth.sample.capture_failed', { error: (r && r.error) || '?' });
+          render();
+        };
+        btns.appendChild(yes);
+      } else btns.appendChild(cap);
       if (st && st.state === 'ok') {
         const al = el('button', 'nw-modal-opt', t('networth.row.adjust_label'));
         al.onclick = () => { window.api.stashAdjustOpen(tab).catch(() => {}); };
@@ -1468,5 +1490,11 @@
     });
   }
 
+  // collapse / expand every tab card at once: any open -> close all, else open all
+  { const f = document.getElementById('nw-fold-all'); if (f) f.addEventListener('click', () => {
+    const anyOpen = state.rows.some((r) => state.expanded[r.id]);
+    for (const r of state.rows) state.expanded[r.id] = !anyOpen;
+    render();
+  }); }
   window.NetWorth = { render, capture, renderSettings };
 })();

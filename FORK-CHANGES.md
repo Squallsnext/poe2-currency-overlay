@@ -406,9 +406,26 @@ is kept for the align tool right away and the panel (with a margin) is saved to
 `userData/tab-shots/<tab>.png` + `.json` (box, frame size, reads). The align tool falls
 back to that saved picture when a tab has no recent scan, so aligning works after a
 restart without scanning again. "Open picture folder" shows the files - meant as the
-source for frame templates (also for lower resolutions). Tested headless with stubbed
+source for frame templates (also for lower resolutions).
+Reworked after the first real run: a player with the wrong tab open got it learned as the
+asked-for tab. Now a picture that is not the tab asked for is **not** learned or saved -
+the player is asked plainly ("expected Essences, the picture shows Abyss - usually another
+tab is open") with "take it again" or "it IS Essences - remember it" (only that learns the
+fingerprint). A correctly recognised picture of a tab drops that tab's learned
+fingerprints that do not resemble it (normalised correlation < 0.8) - this removes a
+fingerprint learned by mistake, while real ones (a tab the baked template misses on this
+setup) resemble the player's own tab and stay. The read line now says what unread slots
+mostly are: "46 counts read · 36 slots without a number - mostly items you don't have
+(yet); aligning only needed where the game shows a number". Tested headless with stubbed
 captures (walk, skip, learned mismatch, align from the tour, summary); the capture
 itself needs the real game and is **not yet tested in game**.
+
+### 4.6c Quieter Net Worth cards, fold-all
+
+- "Wrong tab? / Align / Debug" on each tab card stay faint (18 %) until the card is
+  hovered; a debug that is on stays visible.
+- A small floating "⇕" (bottom right) on Currency and Net Worth collapses / expands
+  everything at once (Currency: saved with the buckets).
 
 ### 4.7 Calibration window (4K/5K, taskbar)
 

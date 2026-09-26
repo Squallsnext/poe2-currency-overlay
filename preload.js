@@ -105,6 +105,8 @@ contextBridge.exposeInMainWorld('api', {
   stashSampleCapture: () => ipcRenderer.invoke('stash-sample-capture'),
   // tab tour (Fächer scannen): one picture per tab, saved for aligning later
   stashTourCapture: (tab) => ipcRenderer.invoke('stash-tour-capture', tab),
+  stashTourConfirm: (tab) => ipcRenderer.invoke('stash-tour-confirm', tab),
+  stashTourDiscard: () => ipcRenderer.invoke('stash-tour-discard'),
   stashTourList: () => ipcRenderer.invoke('stash-tour-list'),
   stashTourOpenFolder: () => ipcRenderer.invoke('stash-tour-open-folder'),
   stashSampleDrop: (i) => ipcRenderer.invoke('stash-sample-drop', i),

@@ -3733,60 +3733,111 @@ async function captureStashSample() {
 // are there for building frame templates (e.g. for lower resolutions).
 const TOUR_DIR = () => path.join(app.getPath('userData'), 'tab-shots');
 const tourFile = (tab, ext) => path.join(TOUR_DIR(), `${tab}.${ext}`);
+// Taking the picture is separate from keeping it: when the tab the reader sees is not the
+// one asked for, nothing is learned or saved until the player says which it is. (The
+// first version learned right away - a player who simply had the wrong tab open taught
+// the app that Abyss looks like Essences.)
+let tourPending = null; // { expected, bitmap, W, H, res } awaiting "yes, it is that tab"
+async function tourGrab() {
+  const wasVisible = win && win.isVisible() && win.getOpacity() > 0;
+  await primeCapture();
+  const disp = screen.getPrimaryDisplay();
+  const capW = Math.round(disp.size.width * disp.scaleFactor);
+  const capH = Math.round(disp.size.height * disp.scaleFactor);
+  if (wasVisible) { win.setOpacity(0); if (process.platform !== 'win32') win.hide(); await new Promise((r) => setTimeout(r, 70)); }
+  const shot = await grabGameWindow(capW, capH);
+  syncOverlayState();
+  return shot;
+}
+function tourSig(bitmap, W, H, box) {
+  const TD = require('./renderer/stash/tab-detect.js');
+  const TT = require('./renderer/stash/tab-templates.json');
+  return TD.panelSignature(bitmap, W, H, box, TT.tw, TT.th);
+}
+// learned fingerprints of `tab` that do not look like this (confirmed) picture of it were
+// learned from something else - dropped. Real ones (a tab the baked template misses on
+// this setup) resemble the player's own tab and stay.
+function pruneTabSigs(tab, sig) {
+  const list = config.stashUserTabSigs && config.stashUserTabSigs[tab];
+  if (!list || !list.length) return 0;
+  const TD = require('./renderer/stash/tab-detect.js');
+  const keep = list.filter((t) => {
+    let ss = 0; for (const v of t) ss += v * v;
+    const n = Math.sqrt(ss) || 1;
+    return TD.ncc(sig, t.map((v) => v / n)) >= 0.8;
+  });
+  const dropped = list.length - keep.length;
+  if (dropped) { config.stashUserTabSigs[tab] = keep; saveConfig(); logToggle('stash-learn', `tab tour: dropped ${dropped} fingerprint(s) of ${tab} that did not look like it`); }
+  return dropped;
+}
+function tourKeep(expected, bitmap, W, H, res) {
+  const box = (res && res.box) || config.stashCalibration
+    || (() => { const k = W / 1920; return { x: REF_BOX.x * k, y: REF_BOX.y * k, w: REF_BOX.w * k, h: REF_BOX.h * k }; })();
+  const okRead = res && res.ok && !res.mismatch && res.tab === expected;
+  lastCaptureByTab.set(expected, { bitmap, W, H, box, res: okRead ? res : { reads: [] } });
+  // saved: the panel with a margin (its border is what detection and snapping key on)
+  const full = nativeImage.createFromBitmap(bitmap, { width: W, height: H });
+  const M = 14;
+  const crop = { x: Math.max(0, Math.round(box.x) - M), y: Math.max(0, Math.round(box.y) - M) };
+  crop.w = Math.min(Math.round(box.w) + M * 2, W - crop.x);
+  crop.h = Math.min(Math.round(box.h) + M * 2, H - crop.y);
+  const panel = full.crop({ x: crop.x, y: crop.y, width: crop.w, height: crop.h });
+  fs.mkdirSync(TOUR_DIR(), { recursive: true });
+  fs.writeFileSync(tourFile(expected, 'png'), panel.toPNG());
+  const reads = okRead ? (res.reads || []) : [];
+  const meta = {
+    tab: expected, at: Date.now(), frame: { w: W, h: H }, box, crop,
+    reads: reads.map((r) => ({ apiId: r.apiId, count: r.count, conf: r.conf })),
+    readCount: okRead ? res.readCount : 0, slotCount: okRead ? res.slotCount : 0,
+  };
+  fs.writeFileSync(tourFile(expected, 'json'), JSON.stringify(meta));
+  return { ok: true, tab: expected, readCount: meta.readCount, slotCount: meta.slotCount,
+    thumb: panel.resize({ width: Math.min(420, crop.w), quality: 'good' }).toDataURL() };
+}
 async function tourCapture(expected) {
   if (!TAB_MAPS[expected]) return { ok: false, error: 'unknown-tab' };
-  const wasVisible = win && win.isVisible() && win.getOpacity() > 0;
+  tourPending = null;
   try {
-    await primeCapture();
-    const disp = screen.getPrimaryDisplay();
-    const capW = Math.round(disp.size.width * disp.scaleFactor);
-    const capH = Math.round(disp.size.height * disp.scaleFactor);
-    if (wasVisible) { win.setOpacity(0); if (process.platform !== 'win32') win.hide(); await new Promise((r) => setTimeout(r, 70)); }
-    const shot = await grabGameWindow(capW, capH);
-    syncOverlayState();
+    const shot = await tourGrab();
     if (!shot) return { ok: false, error: 'game-window-not-found' };
     if (frameLooksBlank(shot.bitmap)) return { ok: false, error: 'game-window-black' };
     const bitmap = Buffer.from(shot.bitmap), W = shot.W, H = shot.H;
-    let res = await runReaderWorker(bitmap, W, H, null);
-    const detected = res && res.ok && !res.mismatch ? res.tab : null;
-    let learned = false;
-    if (res && res.ok && res.box && detected !== expected) {
-      // the player says which tab this is - remember its fingerprint, then read again
-      const TD = require('./renderer/stash/tab-detect.js');
-      const TT = require('./renderer/stash/tab-templates.json');
-      const sig = TD.panelSignature(bitmap, W, H, res.box, TT.tw, TT.th);
+    const res = await runReaderWorker(bitmap, W, H, null);
+    const detected = res && res.ok && !res.mismatch ? res.tab : (res && res.detectedTab) || null;
+    if (detected !== expected) {
+      // ask first - most likely the wrong tab is open in game
+      tourPending = { expected, bitmap, W, H, res };
+      const full = nativeImage.createFromBitmap(bitmap, { width: W, height: H });
+      const b = (res && res.box) || null;
+      const prev = b ? full.crop({ x: Math.max(0, Math.round(b.x)), y: Math.max(0, Math.round(b.y)), width: Math.min(Math.round(b.w), W - Math.max(0, Math.round(b.x))), height: Math.min(Math.round(b.h), H - Math.max(0, Math.round(b.y))) }) : full;
+      return { ok: true, ask: true, tab: expected, detected, thumb: prev.resize({ width: 420, quality: 'good' }).toDataURL() };
+    }
+    if (res.box) pruneTabSigs(expected, tourSig(bitmap, W, H, res.box));
+    return Object.assign(tourKeep(expected, bitmap, W, H, res), { detected });
+  } catch (e) {
+    syncOverlayState();
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+}
+// "yes, this IS that tab": learn its fingerprint (like "Wrong tab?"), read again, keep it
+async function tourConfirm(expected) {
+  const pd = tourPending;
+  if (!pd || pd.expected !== expected) return { ok: false, error: 'nothing-pending' };
+  tourPending = null;
+  try {
+    const box = pd.res && pd.res.box;
+    if (box) {
+      const sig = tourSig(pd.bitmap, pd.W, pd.H, box);
       config.stashUserTabSigs = config.stashUserTabSigs || {};
       const list = config.stashUserTabSigs[expected] || (config.stashUserTabSigs[expected] = []);
       list.push(Array.from(sig, (v) => Math.round(v * 10000)));
       if (list.length > 3) list.shift();
       saveConfig();
-      learned = true;
-      logToggle('stash-learn', `tab tour: ${detected || 'no tab'} -> ${expected}`);
-      res = await runReaderWorker(bitmap, W, H, null);
+      logToggle('stash-learn', `tab tour: confirmed ${expected} (read as ${pd.res && pd.res.tab || 'none'})`);
     }
-    const box = (res && res.box) || config.stashCalibration
-      || (() => { const k = W / 1920; return { x: REF_BOX.x * k, y: REF_BOX.y * k, w: REF_BOX.w * k, h: REF_BOX.h * k }; })();
-    const okRead = res && res.ok && !res.mismatch && res.tab === expected;
-    lastCaptureByTab.set(expected, { bitmap, W, H, box, res: okRead ? res : { reads: [] } });
-    // saved: the panel with a margin (its border is what detection and snapping key on)
-    const full = nativeImage.createFromBitmap(bitmap, { width: W, height: H });
-    const M = 14;
-    const crop = { x: Math.max(0, Math.round(box.x) - M), y: Math.max(0, Math.round(box.y) - M) };
-    crop.w = Math.min(Math.round(box.w) + M * 2, W - crop.x);
-    crop.h = Math.min(Math.round(box.h) + M * 2, H - crop.y);
-    const panel = full.crop({ x: crop.x, y: crop.y, width: crop.w, height: crop.h });
-    fs.mkdirSync(TOUR_DIR(), { recursive: true });
-    fs.writeFileSync(tourFile(expected, 'png'), panel.toPNG());
-    const meta = {
-      tab: expected, at: Date.now(), detected, learned, frame: { w: W, h: H }, box, crop,
-      reads: okRead ? (res.reads || []).map((r) => ({ apiId: r.apiId, count: r.count, conf: r.conf })) : [],
-      readCount: okRead ? res.readCount : 0, slotCount: okRead ? res.slotCount : 0,
-    };
-    fs.writeFileSync(tourFile(expected, 'json'), JSON.stringify(meta));
-    return { ok: true, tab: expected, detected, learned, readCount: meta.readCount, slotCount: meta.slotCount,
-      thumb: panel.resize({ width: Math.min(420, crop.w), quality: 'good' }).toDataURL() };
+    const res = await runReaderWorker(pd.bitmap, pd.W, pd.H, null);
+    return Object.assign(tourKeep(expected, pd.bitmap, pd.W, pd.H, res), { detected: expected, learned: true });
   } catch (e) {
-    syncOverlayState();
     return { ok: false, error: String((e && e.message) || e) };
   }
 }
@@ -3802,6 +3853,8 @@ function loadTourCapture(tab) {
   } catch { return null; }
 }
 ipcMain.handle('stash-tour-capture', async (_e, tab) => tourCapture(tab));
+ipcMain.handle('stash-tour-confirm', async (_e, tab) => tourConfirm(tab));
+ipcMain.handle('stash-tour-discard', async () => { tourPending = null; return true; });
 ipcMain.handle('stash-tour-list', async () => {
   const out = {};
   for (const tab of Object.keys(TAB_MAPS)) {
