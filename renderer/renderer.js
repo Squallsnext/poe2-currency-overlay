@@ -179,7 +179,12 @@ function positionTip(el) {
   const tw = tip.offsetWidth;
   const th = tip.offsetHeight;
   tip.style.left = Math.max(6, Math.min(window.innerWidth - tw - 6, r.left + r.width / 2 - tw / 2)) + 'px';
-  tip.style.top = (r.top - th - 8 > 4 ? r.top - th - 8 : r.bottom + 8) + 'px';
+  // above the cell if it fits, else below - and never past the window's bottom: a route
+  // with every acquisition way plus the rate editor can be taller than the space left
+  // (the tip scrolls inside, max-height in styles.css)
+  let top = r.top - th - 8 > 4 ? r.top - th - 8 : r.bottom + 8;
+  if (top + th > window.innerHeight - 4) top = Math.max(4, window.innerHeight - th - 4);
+  tip.style.top = top + 'px';
 }
 
 let lastTipSrcEl = null; // element the visible tooltip is anchored to
@@ -591,19 +596,25 @@ function liveInfo(aId, bId) {
 }
 
 
-// Cheapest way to acquire the base currency, paying with one of the majors.
-function bestAcquire(baseId) {
-  let best = null;
+// Every way to acquire the base currency, paying with one of the majors, cheapest first
+// (cost in Ex per base unit). feedCostEx prices the same way on the feed alone, so the
+// route can say whether your own rates changed which way is cheapest.
+function acquireOptions(baseId) {
+  const out = [];
   for (const m of MAJORS) {
     if (m === baseId) continue;
     const vBM = pairVal(baseId, m); // 1 base in m units
     const mInfo = catalog[m];
     if (!vBM || !mInfo || !(mInfo.price > 0)) continue;
     if (!pairIsCurrent(baseId, m)) continue; // acquisition quote must be executable at current prices
-    const costEx = vBM * mInfo.price;
-    if (!best || costEx < best.costEx) best = { m, vBM, costEx };
+    const feed = marketPairVal(baseId, m);
+    out.push({ m, vBM, costEx: vBM * mInfo.price, feedCostEx: feed > 0 ? feed * mInfo.price : null, manual: ovrRate(baseId, m) != null });
   }
-  return best;
+  return out.sort((p, q) => p.costEx - q.costEx);
+}
+// Cheapest way to acquire the base currency, paying with one of the majors.
+function bestAcquire(baseId) {
+  return acquireOptions(baseId)[0] || null;
 }
 
 // How much of this pair actually changed hands in the last hour. Volume is the
@@ -642,13 +653,14 @@ function arbTooltipHtml(baseId, itemId, direct, cross, gapPct) {
   const B = nameOf(baseId);
   const X = nameOf(itemId);
   const route = buildArbRoute(baseId, itemId, direct, cross);
-  const acq = bestAcquire(baseId);
-  lastArbCtx = { baseId, itemId, route, acq };
+  const acqOptions = acquireOptions(baseId);
+  const acq = acqOptions[0] || null;
+  lastArbCtx = { baseId, itemId, route, acq, acqOptions };
 
   const headText = route
     ? t('currency.arb.route_head', { sign: route.loopRoi >= 0 ? '+' : '', pct: route.loopRoi.toFixed(1) })
     : t('currency.arb.gap_head', { pct: gapPct.toFixed(1) });
-  const subText = t('currency.arb.sub', { item: X, direct: fmt(direct), cross: fmt(cross), baseAbbr: abbr(nameOf(baseId)) || '' });
+  const subText = t('currency.arb.sub', { item: X, direct: fmt(direct), cross: fmt(cross), baseAbbr: tierAbbr(baseId) }); // short form, or the full name where there is none (German names)
 
   let html =
     `<div class="tip-head tip-head-row"><span>${esc(headText)}</span><span class="tip-head-btns">` +
@@ -656,12 +668,39 @@ function arbTooltipHtml(baseId, itemId, direct, cross, gapPct) {
     `<button class="tip-detach" title="${t('currency.arb.pin_window_title')}">📌</button>` +
     `<button class="tip-copy" title="${t('currency.arb.copy_route_btn_title')}">${t('currency.arb.copy_route_btn')}</button></span></div>` +
     `<div class="tip-sub">${esc(subText)}</div>`;
+  // why the route exists, in one plain sentence - the numbers alone did not say it
+  if (route) {
+    const why = t(route.below ? 'currency.arb.why_below' : 'currency.arb.why_above',
+      { item: X, base: B, pct: gapPct.toFixed(1), middle: route.middle });
+    html += `<div class="tip-step tip-why"><span>?</span><span class="tip-dim2">${esc(why)}</span></div>`;
+  }
 
   const lines = [t('currency.arb.copy_prefix', { headline: headText }), subText.trim()];
   let n = 1;
   const acqLine = t('currency.arb.acquire_base', { base: B }) + (acq ? t('currency.arb.acquire_cheapest_suffix', { leg: legStr(nameOf(acq.m), B, 1 / acq.vBM) }) : '');
   html += `<div class="tip-step"><span>${n}.</span><span>${esc(acqLine)}</span></div>`;
   lines.push(`${n}. ${acqLine}`);
+  // every way to get the base, cheapest first, with its cost - and when your own rates
+  // are in play, whether they changed which way wins
+  if (acqOptions.length > 1) {
+    for (const o of acqOptions) {
+      const mark = o === acq ? '★ ' : o.manual ? '✎ ' : '';
+      const line = t('currency.arb.acquire_option', { mark, via: nameOf(o.m), leg: legStr(nameOf(o.m), B, 1 / o.vBM), cost: fmt(o.costEx), base: B });
+      html += `<div class="tip-step tip-acq"><span></span><span class="tip-dim2">${esc(line)}</span></div>`;
+    }
+    if (acqOptions.some((o) => o.manual)) {
+      // on the feed alone: which way was cheapest? (within 0.5 % counts as a tie - the
+      // chosen way was then already among the cheapest)
+      const byFeed = acqOptions.filter((o) => o.feedCostEx != null).sort((p, q) => p.feedCostEx - q.feedCostEx)[0];
+      const wasCheapest = !byFeed || byFeed.m === acq.m || (acq.feedCostEx != null && acq.feedCostEx <= byFeed.feedCostEx * 1.005);
+      const verdict = wasCheapest
+        ? t('currency.arb.acquire_verdict_same', { via: nameOf(acq.m) })
+        : t('currency.arb.acquire_verdict_changed', { via: nameOf(acq.m), old: nameOf(byFeed.m),
+          pct: ((1 - acq.costEx / acqOptions.find((o) => o.m === byFeed.m).costEx) * 100).toFixed(1) });
+      html += `<div class="tip-step tip-acq"><span></span><span class="tip-dim2"><b>${esc(verdict)}</b></span></div>`;
+      lines.push(verdict);
+    }
+  }
   n++;
 
   if (route) {
@@ -708,7 +747,7 @@ function arbTooltipHtml(baseId, itemId, direct, cross, gapPct) {
       if (lq && (!thin || lq.units < thin.lq.units)) thin = { pa: lp.have, pb: lp.want, lq };
     }
     if (thin) {
-      const legTxt = `${abbr(nameOf(thin.pa))}→${abbr(nameOf(thin.pb))}`;
+      const legTxt = `${tierAbbr(thin.pa)}→${tierAbbr(thin.pb)}`; // abbr() is English-only: empty in German
       const few = thin.lq.units < 50;
       const note = few
         ? t('currency.tip.leg_barely_trades')
@@ -757,7 +796,8 @@ function rateLegs(ctx) {
     legs.push({ a, b });
   };
   if (!ctx) return legs;
-  if (ctx.acq) addLeg(ctx.acq.m, ctx.baseId);
+  // every way to get the base, so each can carry your own rate
+  for (const o of ctx.acqOptions || (ctx.acq ? [ctx.acq] : [])) addLeg(o.m, ctx.baseId);
   for (const lp of (ctx.route && ctx.route.legPairs) || []) addLeg(lp.have, lp.want);
   if (!legs.length) addLeg(ctx.itemId, ctx.baseId);
   return legs;

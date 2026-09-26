@@ -432,6 +432,18 @@ These existed in the player's own build and were **deliberately left out** here:
   closed, rate editor always open. It only displays: the overlay renderer computes the
   content (it holds rates and routes) and main relays it; entries come back as actions.
   Focus and caret survive content updates while typing.
+- **German route texts rewritten** without "Cross", "Loop", "Slippage": "Tauschrunde:
+  +8,2 % Gewinn pro Runde", "im direkten Tausch … laut Marktwert …", plus a **"Warum:"**
+  sentence saying why the route exists (item cheaper/dearer on the direct pair than its
+  market value, back via which currency). English gets the same "Why" line.
+- **Every way to get the base currency**, cheapest first, with its cost in Ex per unit
+  (★ cheapest, ✎ uses your rate); each gets a line in the rate editor. With your own
+  rates in play, a verdict: "still the cheapest" or "now going via Divine is cheaper
+  than via Exalted (6.3 % less)" (feed costs within 0.5 % count as a tie).
+- Fixed on the way (German client): the route subline and the "thinnest leg" note showed
+  no currency names - `abbr()` only knows English names; the full name is used now.
+  The tooltip is capped at the window height and scrolls, since a route with every
+  acquisition way and the editor can be taller than the overlay.
 - Tested headless: an arbitrage row pinned, a click into a field keeps it open, Enter
   saves (config written, tooltip stays, "✓ saved" shown), "22,5:1" parsed, invalid input
   rejected with a message, ✕ clears, 📌 sends the route with the editor; the window page

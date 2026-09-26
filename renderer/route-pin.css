@@ -12,3 +12,4 @@ html, body { overflow: hidden; background: transparent; user-select: text; }
 #rp #spark-tip { position: static; max-width: none; width: auto; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
 #rp #spark-tip .tip-detach { display: none; }
 #rp #spark-tip .tip-fix { display: none; } /* the editor is always open here */
+#rp #spark-tip { max-height: none; overflow: visible; }

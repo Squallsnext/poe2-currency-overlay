@@ -1078,6 +1078,8 @@ footer {
   line-height: 1.45;
   color: var(--tx-body);
   pointer-events: auto; /* tooltip is always interactive - mouse onto it to click copy or select text */
+  max-height: calc(100vh - 8px); /* a long route + rate editor scrolls inside instead of leaving the window */
+  overflow-y: auto;
   user-select: text;
   box-shadow: 0 5px 16px color-mix(in srgb, var(--scrim) 65%, transparent);
   font-variant-numeric: tabular-nums;
