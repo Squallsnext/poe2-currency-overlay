@@ -1980,3 +1980,37 @@ footer {
 .nw-skip-chip { font-size: 11px; padding: 3px 9px; border-radius: 12px; border: 1px solid var(--in-bd); background: var(--in-bg); color: var(--tx-body); cursor: pointer; }
 .nw-skip-chip-on { border-color: var(--am); color: var(--am-hi); }
 .nw-skip-tag { font-size: 10.5px; color: var(--am-hi); margin-left: 6px; white-space: nowrap; }
+
+/* ---------- Recipes tab (recipes/recipes-tab.js) ---------- */
+#recipes-root { overflow-y: auto; }
+.rc-wrap { padding: 8px 10px 14px; font-size: 11.5px; color: var(--tx-body); user-select: text; }
+.rc-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+.rc-group { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--tx-dim); margin: 6px 0 2px; }
+.rc-row { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 4px; cursor: pointer; }
+.rc-row:hover { background: color-mix(in srgb, var(--am-2) 12%, transparent); }
+.rc-row.sel { background: color-mix(in srgb, var(--am-2) 22%, transparent); }
+.rc-row-name { flex: 1; }
+.rc-row-pct { font-variant-numeric: tabular-nums; font-weight: 600; }
+.rc-ic { width: 18px; height: 18px; object-fit: contain; display: inline-block; vertical-align: middle; }
+.rc-card { border: 1px solid color-mix(in srgb, var(--am-2) 40%, transparent); border-radius: 6px; padding: 8px 9px; background: color-mix(in srgb, var(--s-root) 60%, transparent); }
+.rc-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rc-card-title { font-weight: 600; font-size: 12.5px; color: var(--tx-gold2); }
+.rc-card-btns { display: inline-flex; gap: 4px; }
+.rc-formula { color: var(--tx-faint2); margin: 3px 0 6px; }
+.rc-basebar { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; color: var(--tx-dim); }
+.rc-base { font-size: 10px; padding: 1px 7px; border-radius: 3px; border: 1px solid color-mix(in srgb, var(--tx-dim) 45%, transparent); background: transparent; color: var(--tx-dim); cursor: pointer; }
+.rc-base.on { border-color: var(--tx-gold2); color: var(--tx-gold2); }
+.rc-table { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.rc-tr { display: grid; grid-template-columns: 58px 1.6fr 1.3fr 58px 1fr; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
+.rc-th { color: var(--tx-hint); font-size: 10px; }
+.rc-role { color: var(--tx-dim); font-size: 10px; }
+.rc-rounds-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0; }
+.rc-rounds-row input { width: 60px; margin-left: 4px; }
+.rc-sum { border-top: 1px solid color-mix(in srgb, var(--gold-deep) 30%, transparent); padding-top: 4px; }
+.rc-sum-row { display: flex; justify-content: space-between; gap: 8px; }
+.rc-sum-main { font-size: 12.5px; }
+.rc-verdict { margin-top: 4px; font-weight: 600; }
+.rc-note { margin-top: 4px; color: var(--tx-faint2); }
+.rc-dim { color: var(--tx-faint2); }
+.rc-wrap .up, .rc-card .up { color: var(--green-mid); }
+.rc-wrap .down, .rc-card .down { color: var(--red); }

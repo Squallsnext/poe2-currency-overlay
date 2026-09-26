@@ -97,6 +97,7 @@
             <label class="switch set-excl" data-i18n-title="ui.settings.dyslexic_font_tooltip" title="Render the whole app in OpenDyslexic, a typeface designed to be easier to read with dyslexia. Bundled with the app; off by default."><input type="checkbox" id="dyslexic-font" /><span class="sw-track"></span><span class="sw-lab" data-i18n="ui.settings.dyslexic_font_label">Dyslexia-friendly font</span></label>
             <label class="switch set-excl" data-i18n-title="ui.settings.show_regex_tab_tooltip" title="Show the Regex tab in the tab bar. Off hides it entirely until you turn it back on here."><input type="checkbox" id="show-regex-tab" /><span class="sw-track"></span><span class="sw-lab" data-i18n="ui.settings.show_regex_tab_label">Show Regex tab</span></label>
             <label class="switch set-excl" data-i18n-title="ui.settings.show_grandex_tab_tooltip" title="Show the Grand Expedition tab in the tab bar. Off hides it entirely until you turn it back on here."><input type="checkbox" id="show-grandex-tab" /><span class="sw-track"></span><span class="sw-lab" data-i18n="ui.settings.show_grandex_tab_label">Show Grand Expedition tab</span></label>
+            <label class="switch set-excl" data-i18n-title="ui.settings.show_recipes_tab_tooltip" title="Show the Recipes tab in the tab bar."><input type="checkbox" id="show-recipes-tab" /><span class="sw-track"></span><span class="sw-lab" data-i18n="ui.settings.show_recipes_tab_label">Show Recipes tab</span></label>
             <label class="switch set-excl" data-i18n-title="ui.settings.show_networth_tab_tooltip" title="Show the Net Worth tab in the tab bar. Off hides it entirely until you turn it back on here. The capture hotkey still works either way."><input type="checkbox" id="show-networth-tab" /><span class="sw-track"></span><span class="sw-lab" data-i18n="ui.settings.show_networth_tab_label">Show Net Worth tab</span></label>
             <label class="switch set-excl" data-i18n-title="ui.settings.show_desecrate_tab_tooltip" title="Show the Desecrate tab in the tab bar. Off hides it - it still appears when you open an item's redesecrate? button, then hides again when you leave it."><input type="checkbox" id="show-desecrate-tab" /><span class="sw-track"></span><span class="sw-lab" data-i18n="ui.settings.show_desecrate_tab_label">Show Desecrate tab</span></label>
           </section>
@@ -319,6 +320,7 @@
       <button id="tab-networth" class="tab" data-i18n="ui.tabs.networth_label" data-i18n-title="ui.tabs.networth_tooltip" title="Value your currency tabs: open a tab in game, click Capture, and it reads the counts and totals what they're worth.">Net Worth</button>
       <button id="tab-regex" class="tab" data-i18n="ui.tabs.regex_label" data-i18n-title="ui.tabs.regex_tooltip" title="Build stash-search regex for waystones and tablets, and keep your saved regexes one click from the clipboard.">Regex</button>
       <button id="tab-grandex" class="tab" data-i18n="ui.tabs.grandex_label" data-i18n-title="ui.tabs.grandex_tooltip" title="Plan your Grand Expedition: track rumors, identify islands, and prep the run.">Grand Expedition</button>
+      <button id="tab-recipes" class="tab" data-i18n="ui.tabs.recipes_label" data-i18n-title="ui.tabs.recipes_tooltip" title="Recipes: is it worth buying the parts, combining or splitting, and selling?">Recipes</button>
     </nav>
 
     <div id="status" class="hidden"></div>
@@ -338,6 +340,7 @@
     <main id="regex-root" class="hidden"></main>
 
     <main id="grandex-root" class="hidden"></main>
+    <main id="recipes-root" class="hidden"></main>
 
     <div id="support-bar">
       <span id="btn-bug" class="support-bug" role="button" tabindex="0" data-i18n-title="ui.support.bug_tooltip" title="Report a bug (attaches a short activity log)">
@@ -439,6 +442,7 @@
   <script src="i18n/i18n.js"></script>
   <script src="release-notes.js"></script>
   <script src="reprice-rules.js"></script>
+  <script src="recipes/recipes-data.js"></script>
   <script src="renderer.js"></script>
   <script src="tutorial.js"></script>
   <script src="item-tab.bundle.js"></script>
@@ -455,6 +459,7 @@
   <script src="regex/regex-tab.js"></script>
   <script src="grandex/grandex-data.js"></script>
   <script src="grandex/grandex-tab.js"></script>
+  <script src="recipes/recipes-tab.js"></script>
   <div id="resize-grip" title="Drag to resize"></div>
   <script src="item/bonded-rune-ids.js"></script>
   <script src="item/item-tab.js"></script>

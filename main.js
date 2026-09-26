@@ -286,6 +286,9 @@ const DEFAULT_CONFIG = {
   grandexHistory: [], // Grand Expedition tab: saved runs [{ts, rumors:[names], score, verdict}] newest first
   showRegexTab: true,     // App Settings: show the Regex tab in the tab bar
   showGrandExTab: true,   // App Settings: show the Grand Expedition tab in the tab bar
+  showRecipesTab: true,   // App Settings: show the Recipes tab (combine / vendor split profits)
+  recipeBases: {},        // Recipes tab: the currency each recipe is priced in, if not its default
+  recipeRounds: {},       // Recipes tab: how many rounds each recipe is planned for
   showNetWorthTab: true,  // App Settings: show the Net Worth tab in the tab bar (capture hotkey works regardless)
   showDesecrateTab: true, // App Settings: show the Desecrate tab (hidden, it still opens via redesecrate? and hides on leave)
   itemRanges: {},  // learned per-stat roll bounds from fetched listings (slider bounds)
@@ -300,7 +303,7 @@ const DEFAULT_CONFIG = {
   lastTab: 'currency',   // tab to reopen on (remembered across restarts): 'currency' | 'items' | 'desec' | 'networth' | 'regex' | 'grandex'
   // user's tab-bar order (drag to reorder). Unknown/missing keys fall back to
   // the built-in order, so adding a tab in a future version can't break it.
-  tabOrder: ['currency', 'items', 'desec', 'networth', 'regex', 'grandex'],
+  tabOrder: ['currency', 'items', 'desec', 'networth', 'regex', 'grandex', 'recipes'],
 
   // fresh installs start empty: the first-run tutorial builds the Exalted bucket
   // hands-on; skipping the tutorial seeds the standard bucket instead (renderer)
@@ -707,11 +710,14 @@ async function getPairMap(league, force = false) {
 }
 
 // Fetch prices for the categories the user's buckets reference.
+const RecipesData = require('./renderer/recipes/recipes-data.js');
 async function fetchPrices(force) {
   const league = await resolveLeague();
   // majors always needed for arb-route math; ritual (omens) + abyss (bones)
   // price the Desecrate tab's consumables
   const cats = new Set(['currency', 'ritual', 'abyss']);
+  // the Recipes tab prices its parts from the same feed (renderer/recipes/recipes-data.js)
+  for (const c of RecipesData.recipeCategories()) cats.add(c);
   for (const b of config.buckets) {
     cats.add(b.base.category);
     for (const it of b.items) cats.add(it.category);
@@ -747,6 +753,7 @@ async function fetchPrices(force) {
   // ship pairs among: bucket bases + items + the 4 majors (needed for arb-route legs)
   const pairs = {};
   const interest = new Set(['exalted', 'chaos', 'divine', 'annul']);
+  for (const id of RecipesData.recipeItemIds()) interest.add(id);
   for (const b of config.buckets) {
     interest.add(b.base.apiId);
     for (const it of b.items) interest.add(it.apiId);
@@ -4161,6 +4168,14 @@ ipcMain.handle('set-grandex-history', (_e, history) => {
   saveConfig();
   return true;
 });
+// Recipes tab: per-recipe pricing currency and planned rounds
+ipcMain.handle('set-recipe-prefs', (_e, { bases, rounds } = {}) => {
+  const clean = (o, ok) => { const out = {}; for (const [k, v] of Object.entries(o || {})) if (typeof k === 'string' && k.length < 80 && ok(v)) out[k] = v; return out; };
+  if (bases) config.recipeBases = clean(bases, (v) => typeof v === 'string' && /^[a-z-]+$/.test(v));
+  if (rounds) config.recipeRounds = clean(rounds, (v) => Number.isInteger(v) && v > 0 && v <= 100000);
+  saveConfig();
+  return true;
+});
 ipcMain.handle('set-tab-order', (_e, order) => {
   config.tabOrder = Array.isArray(order) ? order.filter((k) => typeof k === 'string') : [];
   saveConfig();
@@ -4170,6 +4185,7 @@ ipcMain.handle('set-tab-order', (_e, order) => {
 ipcMain.handle('set-tab-shown', (_e, which, shown) => {
   if (which === 'regex') config.showRegexTab = !!shown;
   else if (which === 'grandex') config.showGrandExTab = !!shown;
+  else if (which === 'recipes') config.showRecipesTab = !!shown;
   else if (which === 'networth') config.showNetWorthTab = !!shown;
   else if (which === 'desec') config.showDesecrateTab = !!shown;
   else return false;

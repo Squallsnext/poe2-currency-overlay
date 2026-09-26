@@ -589,14 +589,10 @@ function buildArbRoute(baseId, itemId, direct, cross) {
 // tiers cannot be combined up. That is why a Perfect costs so much: it is 3 Greater or
 // 9 normal. So when a Greater Chaos is cheaper than 3 Chaos on the exchange, buying it
 // and splitting it is profit. Splitting costs nothing (no gold), only the trades do.
-const TIER_FAMILIES = [
-  ['transmute', 'greater-orb-of-transmutation', 'perfect-orb-of-transmutation'],
-  ['aug', 'greater-orb-of-augmentation', 'perfect-orb-of-augmentation'],
-  ['regal', 'greater-regal-orb', 'perfect-regal-orb'],
-  ['exalted', 'greater-exalted-orb', 'perfect-exalted-orb'],
-  ['chaos', 'greater-chaos-orb', 'perfect-chaos-orb'],
-];
-const DISENCHANT_YIELD = 3;
+// the tier families live with the recipes (renderer/recipes/recipes-data.js), one list
+// for both the Recipes tab and these routes
+const TIER_FAMILIES = window.RecipesData.TIER_FAMILIES;
+const DISENCHANT_YIELD = window.RecipesData.DISENCHANT_YIELD;
 // what 1 unit of `id` splits into, one and two tiers down: [{ to, n }]
 function splitsOf(id) {
   for (const fam of TIER_FAMILIES) {
@@ -1007,6 +1003,7 @@ async function clearRateInput(a, b) {
 // is refreshed either way.
 function afterRateChange() {
   if (pinnedTipEl) { rebuildArbTip(); listStale = true; } else render();
+  if (window.Recipes) window.Recipes.render(); // the same rates price the recipes
   sendDetached();
 }
 // direct/cross/gap for a pair, the way its bucket row computes them
@@ -1064,8 +1061,10 @@ function openRateFix() {
 // trades in game, even when the overlay is closed - with the rate editor always open.
 // The window only displays: this renderer computes the content (it holds the rates) and
 // main relays it; clicks and entries there come back as actions (route-pin-action).
-let detached = null; // { baseId, itemId } shown in the route window
+let detached = null; // { baseId, itemId } or { recipe: id } shown in the route window
 function detachedPayload() {
+  // a recipe card (Recipes tab) renders itself - same editor markup, same actions
+  if (detached.recipe && window.Recipes) return window.Recipes.detachedPayload(detached.recipe);
   const keepCtx = lastArbCtx, keepCopy = lastArbCopyText; // the overlay's own tooltip state
   try {
     const inp = arbInputs(detached.baseId, detached.itemId);
@@ -1082,6 +1081,14 @@ function sendDetached() {
   if (!detached || !window.api.routePinUpdate) return;
   try { window.api.routePinUpdate(detachedPayload()); } catch { /* window gone */ }
 }
+// the Recipes tab pins a recipe card into the same window
+window.openRecipeDetached = (id) => {
+  if (!window.api.routePinOpen) return;
+  detached = { recipe: id };
+  window.api.routePinOpen();
+  sendDetached();
+};
+window.sendRecipeDetached = () => { if (detached && detached.recipe) sendDetached(); };
 function openDetached() {
   const ctx = lastArbCtx;
   if (!ctx || ctx.pairOnly || !window.api.routePinOpen) return;
@@ -1095,6 +1102,7 @@ if (window.api && window.api.onRoutePinAction) {
     if (!detached || !act) return;
     if (act.type === 'setRate') await applyRateInput(act.a, act.b, act.qa, act.qb);
     else if (act.type === 'clearRate') await clearRateInput(act.a, act.b);
+    else if (act.type === 'qty' && detached.recipe && window.Recipes) window.Recipes.setRounds(detached.recipe, act.value);
     else if (act.type === 'qty') { const n = parseInt(String(act.value).replace(/[^0-9]/g, ''), 10); arbQty = Number.isFinite(n) && n > 0 ? Math.min(n, 10000000) : 0; }
     sendDetached();
   });
@@ -1230,6 +1238,7 @@ function render() {
   listStale = false; // this render is the catch-up
   unpinTip(); // rebuilt DOM invalidates the pinned element
   sendDetached(); // new rates/prices: the pinned route window follows
+  if (window.Recipes) window.Recipes.render(); // same prices, the Recipes tab follows
   updateMeta();
 
   // Build the new content off-screen and swap it in atomically AFTER all icons
@@ -3435,8 +3444,8 @@ async function initSettings() {
     });
   };
   // a tab's own ✕ hides it too - keep the matching Settings switch in sync
-  const TAB_TOGGLE_ID = { regex: 'show-regex-tab', grandex: 'show-grandex-tab', networth: 'show-networth-tab', desec: 'show-desecrate-tab' };
-  const TAB_TOGGLE_CFG = { regex: 'showRegexTab', grandex: 'showGrandExTab', networth: 'showNetWorthTab', desec: 'showDesecrateTab' };
+  const TAB_TOGGLE_ID = { regex: 'show-regex-tab', grandex: 'show-grandex-tab', networth: 'show-networth-tab', desec: 'show-desecrate-tab', recipes: 'show-recipes-tab' };
+  const TAB_TOGGLE_CFG = { regex: 'showRegexTab', grandex: 'showGrandExTab', networth: 'showNetWorthTab', desec: 'showDesecrateTab', recipes: 'showRecipesTab' };
   window.setTabToggleChecked = (visKey, checked) => {
     const t = $(TAB_TOGGLE_ID[visKey]);
     if (t) t.checked = !!checked;
@@ -3470,6 +3479,7 @@ async function initSettings() {
   }
   wireTabToggle('show-regex-tab', 'showRegexTab', 'regex');
   wireTabToggle('show-grandex-tab', 'showGrandExTab', 'grandex');
+  wireTabToggle('show-recipes-tab', 'showRecipesTab', 'recipes');
   wireTabToggle('show-networth-tab', 'showNetWorthTab', 'networth');
   wireTabToggle('show-desecrate-tab', 'showDesecrateTab', 'desec');
 

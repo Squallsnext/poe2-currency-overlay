@@ -462,6 +462,32 @@ These existed in the player's own build and were **deliberately left out** here:
   renders it, keeps a half-typed value across an update and sends the rate back.
   **Not yet tested in the real Electron app/game** (window placement, focus, always-on-top).
 
+### 4.10 Recipes tab
+
+Is it worth buying the parts, combining (or splitting at a vendor) and selling?
+`renderer/recipes/recipes-data.js` (the recipes, shared by main and renderer) and
+`renderer/recipes/recipes-tab.js` (the tab). Hideable like the other optional tabs.
+
+- **Recipes:** combine - Origin Cradle + Origin Spark = Origin Core; split at a vendor -
+  Perfect → 3 Greater and Greater → 3 normal for transmutation, augmentation, regal,
+  exalted, chaos (the same tier list the currency arbitrage's vendor splits use; it moved
+  into recipes-data.js). A new idea is one more entry in `COMBINES`.
+- **Overview** sorted by profit per round, grouped; **card** per recipe: every part with
+  its rate against the recipe's currency (ex / chaos / div, switchable and remembered),
+  source mark (✎ your rate, ⚠ probably stale, ≈ from market values), traded volume per
+  hour, and the 7-day change from the feed ("↗ +12 % · near 7-day high" - a trend, not a
+  forecast). **Rounds** box: profit per round and in total, Ange's gold fee (per bought
+  part and per unit received on the sale), the thinnest step against what you need.
+- Rates are the Currency tab's: same overrides, same editor ("Kurs fixieren", two boxes
+  like the game), same 📌 window (the card with the editor always open; the rounds box
+  works there too). A rate set here applies everywhere and vice versa.
+- Main now also loads the `fragments` category and ships the pairs of every recipe item
+  (`fetchPrices`).
+- Checked against live data (Forbidden Rites): Core 5198 Ex vs Cradle 2014 + Spark 2696
+  = 4710 Ex, about +10 %. Tested headless with those numbers in divine: +1.00 div
+  (+10.5 %) per round, 10 rounds +10 div and 15k gold; own rate "1 Spark = 5 div" →
+  +15.4 %; split card and 📌 window render. **Not yet tested in the real app.**
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
@@ -475,6 +501,7 @@ These existed in the player's own build and were **deliberately left out** here:
 | `stashShowReliability` | `false` | "Often misread" row tints |
 | `stashSkipGroups` | `[]` | "Don't count" lists `[{ id, name, on, items }]` |
 | `arbVendorSplit` | `false` | Arbitrage also considers vendor splits (Greater → 3 normal) |
+| `showRecipesTab`, `recipeBases`, `recipeRounds` | `true`, `{}`, `{}` | Recipes tab visible; per-recipe currency and rounds |
 | `priceOverrides` | `{}` | `apiId → { ex, at }`: the player's own price per unit |
 
 Learned templates (`userData/learned-digit-templates.json`) gained `byScale[ms]` for
