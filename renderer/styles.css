@@ -1128,6 +1128,20 @@ footer {
   font-family: inherit;
 }
 .tip-fix-in.saved { border-color: color-mix(in srgb, var(--green-mid) 70%, transparent); color: var(--ok-tx2); }
+/* two boxes per leg ("22.5 A = 1 B"), so each is narrower than the old single box */
+.tip-fix-row .tip-fix-in { width: 48px; }
+.tip-fix-note span:last-child { line-height: 1.35; }
+.tip-fix-clear, .tip-detach {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--tx-dim) 45%, transparent);
+  color: var(--tx-dim);
+  font-size: 9px;
+  padding: 0 5px;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+}
+.tip-fix-clear:hover, .tip-detach:hover { color: var(--tx-hi); border-color: var(--tx-gold2); }
 /* output area inside a tooltip - now hosts the rate-fix editor */
 .tip-sec {
   margin-top: 6px;

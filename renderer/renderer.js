@@ -204,9 +204,12 @@ function unpinTip() {
   if (pinnedTipEl) pinnedTipEl._suppressHover = true;
   pinnedTipEl = null;
   pinReleasedAt = Date.now();
+  fixOpen = false;
   const tip = $('spark-tip');
   tip.classList.remove('pinned');
   tip.classList.add('hidden');
+  // a rate was saved while pinned: the list behind still shows the old one
+  if (listStale) { listStale = false; setTimeout(() => render(), 0); }
 }
 // tab switches release pins app-wide - called from setTab in item-tab.js
 window.unpinCurrencyTip = unpinTip;
@@ -650,6 +653,7 @@ function arbTooltipHtml(baseId, itemId, direct, cross, gapPct) {
   let html =
     `<div class="tip-head tip-head-row"><span>${esc(headText)}</span><span class="tip-head-btns">` +
     `<button class="tip-fix" title="${t('currency.arb.fix_rate_btn_title')}">${t('currency.arb.fix_rate_btn')}</button>` +
+    `<button class="tip-detach" title="${t('currency.arb.pin_window_title')}">📌</button>` +
     `<button class="tip-copy" title="${t('currency.arb.copy_route_btn_title')}">${t('currency.arb.copy_route_btn')}</button></span></div>` +
     `<div class="tip-sub">${esc(subText)}</div>`;
 
@@ -732,11 +736,18 @@ function arbTooltipHtml(baseId, itemId, direct, cross, gapPct) {
 // One-click correction straight from the route: the feed is hourly and can lag a
 // fast market, so typing the number you can actually see in game beats arguing
 // with the data. Writes the same manual override the Settings grid uses.
-function openRateFix() {
-  const tip = $('spark-tip');
-  if (!lastArbCtx || !tip) return;
-  const out = tip.querySelector('.tip-out');
-  if (!out) return;
+//
+// The editor asks the way the game shows a rate - "22.5 Perfect Exalted = 1 Chaos",
+// both sides >= 1, like the bucket row's inline editor - instead of "1 Chaos = [x]",
+// which had players reaching for a calculator for 1/22.5. Next to each leg: what was
+// saved (a tick after Enter), your rate's age, the feed's rate for comparison, and the
+// value the app computes from your entry. ✕ drops your rate again.
+let fixOpen = false;     // editor open in the overlay's route tooltip
+const fixFeedback = {};  // 'a>b' -> { kind: 'saved'|'cleared'|'invalid', at }
+let listStale = false;   // a rate changed while a tooltip was pinned: re-render the list on release
+
+// the pairs a route touches: acquiring the base, then every leg of the loop
+function rateLegs(ctx) {
   const legs = [];
   const seen = new Set();
   const addLeg = (a, b) => {
@@ -745,32 +756,185 @@ function openRateFix() {
     seen.add(k);
     legs.push({ a, b });
   };
-  if (lastArbCtx.acq) addLeg(lastArbCtx.acq.m, lastArbCtx.baseId);
-  for (const lp of (lastArbCtx.route && lastArbCtx.route.legPairs) || []) addLeg(lp.have, lp.want);
-  if (!legs.length) addLeg(lastArbCtx.itemId, lastArbCtx.baseId);
-
-  let h = `<div class="tip-sec"><div class="tip-sec-head">${t('currency.arb.fix_rate_header')}</div>`;
-  for (let i = 0; i < legs.length; i++) {
-    const { a, b } = legs[i];
-    const cur = pairVal(a, b);
-    h += `<div class="tip-step tip-fix-row"><span>·</span><span>1 ${esc(abbr(nameOf(a)) || nameOf(a))} = `
-      + `<input class="tip-fix-in" data-a="${esc(a)}" data-b="${esc(b)}" value="${cur > 0 ? fmt(cur) : ''}" `
-      + `placeholder="?" /> ${esc(abbr(nameOf(b)) || nameOf(b))}</span></div>`;
+  if (!ctx) return legs;
+  if (ctx.acq) addLeg(ctx.acq.m, ctx.baseId);
+  for (const lp of (ctx.route && ctx.route.legPairs) || []) addLeg(lp.have, lp.want);
+  if (!legs.length) addLeg(ctx.itemId, ctx.baseId);
+  return legs;
+}
+// Short currency label that keeps the tier: abbr() folds "Greater Chaos Orb" and "Chaos
+// Orb" both into "chaos", which made a leg read "chaos = chaos". Full (localised) names
+// carry the tier already and are left alone.
+function tierAbbr(id) {
+  const short = abbr(nameOf(id));
+  if (!short) return nameOf(id);
+  const m = /^(lesser|greater|perfect)-/.exec(id);
+  return m ? `${t('currency.tier.' + m[1])} ${short}` : short;
+}
+// game-style phrasing of "rate b per 1 a": both sides >= 1
+function gamePhrase(rate) {
+  if (!(rate > 0)) return null;
+  return rate >= 1 ? { qa: 1, qb: rate } : { qa: 1 / rate, qb: 1 };
+}
+const fmtIn = (v) => (v === '' || v == null ? '' : String(+(+v).toPrecision(5)));
+function phraseText(rate, A, B) {
+  const g = gamePhrase(rate);
+  return g ? `${fmt(g.qa)} ${A} = ${fmt(g.qb)} ${B}` : '?';
+}
+function fixSectionHtml(ctx) {
+  const legs = rateLegs(ctx);
+  let h = `<div class="tip-sec tip-fix-sec"><div class="tip-sec-head">${t('currency.arb.fix_rate_header')}</div>`;
+  for (const { a, b } of legs) {
+    const A = tierAbbr(a), B = tierAbbr(b);
+    const own = ovrRate(a, b);
+    const feed = marketPairVal(a, b);
+    const g = gamePhrase(own != null ? own : (feed != null ? feed : pairVal(a, b))) || { qa: '', qb: '' };
+    h += `<div class="tip-step tip-fix-row" data-a="${esc(a)}" data-b="${esc(b)}"><span>·</span><span>`
+      + `<input class="tip-fix-in" data-side="a" inputmode="decimal" value="${esc(fmtIn(g.qa))}" placeholder="?"> ${esc(A)} = `
+      + `<input class="tip-fix-in" data-side="b" inputmode="decimal" value="${esc(fmtIn(g.qb))}" placeholder="?"> ${esc(B)}`
+      + (own != null ? ` <button class="tip-fix-clear" title="${esc(t('currency.arb.fix_reset_title'))}">✕</button>` : '')
+      + `</span></div>`;
+    const fb = fixFeedback[`${a}>${b}`];
+    const notes = [];
+    if (fb && Date.now() - fb.at < 120000) {
+      notes.push(fb.kind === 'saved' ? `<b class="up">✓ ${esc(t('currency.arb.fix_saved'))}</b>`
+        : fb.kind === 'cleared' ? `<b>✓ ${esc(t('currency.arb.fix_cleared'))}</b>`
+          : `<b class="down">${esc(t('currency.arb.fix_invalid'))}</b>`);
+    }
+    if (own != null) notes.push(esc(t('currency.arb.fix_own', { age: ovrAgeStr(a, b), internal: `1 ${A} = ${fmt(own)} ${B}` })));
+    notes.push(esc(feed != null ? t('currency.arb.fix_feed', { rate: phraseText(feed, A, B) }) : t('currency.arb.fix_no_feed')));
+    h += `<div class="tip-step tip-fix-note"><span></span><span class="tip-dim2">${notes.join(' · ')}</span></div>`;
   }
   h += `<div class="tip-step"><span>·</span><span class="tip-dim2">${t('currency.arb.fix_rate_help')}</span></div></div>`;
-  out.innerHTML = h;
+  return h;
+}
+// one number from a field: "22,5", "22.5"; "" = empty
+function parseQty(raw) {
+  const s = String(raw == null ? '' : raw).trim().replace(',', '.');
+  if (s === '') return '';
+  const v = Number(s);
+  return isFinite(v) && v > 0 ? v : null;
+}
+// Save what the two fields of one leg say. "22,5:1" typed into either field is split
+// across both. Both empty = drop your rate. Returns the feedback kind.
+async function applyRateInput(a, b, qaRaw, qbRaw) {
+  const ratio = /^\s*(\d*[.,]?\d+)\s*[:/]\s*(\d*[.,]?\d+)\s*$/;
+  const m = ratio.exec(String(qaRaw || '')) || ratio.exec(String(qbRaw || ''));
+  if (m) { qaRaw = m[1]; qbRaw = m[2]; }
+  const qa = parseQty(qaRaw), qb = parseQty(qbRaw);
+  let kind;
+  if (qa === '' && qb === '') { await setOvrRate(a, b, null); kind = 'cleared'; }
+  else if (qa > 0 && qb > 0) { await setOvrRate(a, b, qb / qa); kind = 'saved'; }
+  else kind = 'invalid';
+  fixFeedback[`${a}>${b}`] = { kind, at: Date.now() };
+  logAction(`rate ${a}>${b} ${kind}`);
+  afterRateChange();
+  return kind;
+}
+async function clearRateInput(a, b) {
+  await setOvrRate(a, b, null);
+  fixFeedback[`${a}>${b}`] = { kind: 'cleared', at: Date.now() };
+  afterRateChange();
+}
+// A pinned tooltip stays up across a save: its own content is rebuilt from the new
+// rates, the list behind it only when the pin is released (re-rendering the list is what
+// used to throw the tooltip away the moment Enter was pressed). The pinned route window
+// is refreshed either way.
+function afterRateChange() {
+  if (pinnedTipEl) { rebuildArbTip(); listStale = true; } else render();
+  sendDetached();
+}
+// direct/cross/gap for a pair, the way its bucket row computes them
+function arbInputs(baseId, itemId) {
+  const it = catalog[itemId], base = catalog[baseId];
+  const cross = it && base && it.price > 0 && base.price > 0 ? it.price / base.price : null;
+  const ov = ovrRate(itemId, baseId);
+  const direct = ov != null ? ov : marketPairVal(itemId, baseId);
+  if (direct == null || cross == null) return null;
+  return { direct, cross, gap: (Math.max(direct, cross) / Math.min(direct, cross) - 1) * 100 };
+}
+function rebuildArbTip() {
+  const tip = $('spark-tip');
+  const ctx = lastArbCtx;
+  if (!tip || !ctx || ctx.pairOnly) return;
+  const inp = arbInputs(ctx.baseId, ctx.itemId);
+  if (!inp) return;
+  // keep the caret where it was
+  const f = document.activeElement && tip.contains(document.activeElement) ? document.activeElement : null;
+  const fRow = f && f.closest('.tip-fix-row');
+  const fKey = f && (f.classList.contains('tip-gold-qty') ? 'qty' : fRow ? `${fRow.dataset.a}>${fRow.dataset.b}>${f.dataset.side}` : null);
+  tip.innerHTML = arbTooltipHtml(ctx.baseId, ctx.itemId, inp.direct, inp.cross, inp.gap)
+    + (pinnedTipEl ? `<div class="tip-pin">${t('currency.tip.pinned_hint')}</div>` : '');
+  if (fixOpen) { const out = tip.querySelector('.tip-out'); if (out) out.innerHTML = fixSectionHtml(lastArbCtx); }
+  if (fKey) {
+    const el = fKey === 'qty' ? tip.querySelector('.tip-gold-qty')
+      : [...tip.querySelectorAll('.tip-fix-row')].map((r) => (`${r.dataset.a}>${r.dataset.b}` === fKey.split('>').slice(0, 2).join('>') ? r.querySelector(`[data-side="${fKey.split('>')[2]}"]`) : null)).find(Boolean);
+    if (el) el.focus();
+  }
+  const anchor = pinnedTipEl || lastTipSrcEl;
+  if (anchor && anchor.isConnected) positionTip(anchor);
+}
+function openRateFix() {
+  const tip = $('spark-tip');
+  if (!lastArbCtx || !tip) return;
+  const out = tip.querySelector('.tip-out');
+  if (!out) return;
+  fixOpen = true;
+  // typing needs the tooltip to stay: opening the editor pins it (a hover tooltip would
+  // vanish on the next mouse move or with the re-render after Enter)
+  if (!pinnedTipEl && lastTipSrcEl && lastTipSrcEl.isConnected) {
+    pinnedTipEl = lastTipSrcEl;
+    tip.classList.add('pinned');
+    if (!tip.querySelector('.tip-pin')) tip.insertAdjacentHTML('beforeend', `<div class="tip-pin">${t('currency.tip.pinned_hint')}</div>`);
+  }
+  out.innerHTML = fixSectionHtml(lastArbCtx);
   const first = out.querySelector('.tip-fix-in');
   if (first) { first.focus(); first.select(); }
-  for (const inp of out.querySelectorAll('.tip-fix-in')) {
-    inp.addEventListener('keydown', async (e) => {
-      e.stopPropagation();
-      if (e.key !== 'Enter') return;
-      await setOvrRate(inp.dataset.a, inp.dataset.b, parseRate(inp.value));
-      inp.classList.add('saved');
-      render();
-    });
+  const anchor = pinnedTipEl || lastTipSrcEl;
+  if (anchor && anchor.isConnected) positionTip(anchor);
+}
+
+// ---------- pinned route window (📌) ----------
+// A route pinned into its own small always-on-top window stays up while you work the
+// trades in game, even when the overlay is closed - with the rate editor always open.
+// The window only displays: this renderer computes the content (it holds the rates) and
+// main relays it; clicks and entries there come back as actions (route-pin-action).
+let detached = null; // { baseId, itemId } shown in the route window
+function detachedPayload() {
+  const keepCtx = lastArbCtx, keepCopy = lastArbCopyText; // the overlay's own tooltip state
+  try {
+    const inp = arbInputs(detached.baseId, detached.itemId);
+    const title = `${nameOf(detached.itemId)} ⇄ ${nameOf(detached.baseId)}`;
+    if (!inp) return { title, html: `<div class="tip-sub">${esc(t('currency.arb.pin_no_data'))}</div>`, copyText: '' };
+    const html = arbTooltipHtml(detached.baseId, detached.itemId, inp.direct, inp.cross, inp.gap)
+      .replace('<div class="tip-out"></div>', `<div class="tip-out">${fixSectionHtml(lastArbCtx)}</div>`);
+    return { title, html, copyText: lastArbCopyText };
+  } finally {
+    lastArbCtx = keepCtx; lastArbCopyText = keepCopy;
   }
 }
+function sendDetached() {
+  if (!detached || !window.api.routePinUpdate) return;
+  try { window.api.routePinUpdate(detachedPayload()); } catch { /* window gone */ }
+}
+function openDetached() {
+  const ctx = lastArbCtx;
+  if (!ctx || ctx.pairOnly || !window.api.routePinOpen) return;
+  detached = { baseId: ctx.baseId, itemId: ctx.itemId };
+  window.api.routePinOpen();
+  sendDetached();
+  unpinTip(); // the window takes over from the tooltip
+}
+if (window.api && window.api.onRoutePinAction) {
+  window.api.onRoutePinAction(async (act) => {
+    if (!detached || !act) return;
+    if (act.type === 'setRate') await applyRateInput(act.a, act.b, act.qa, act.qb);
+    else if (act.type === 'clearRate') await clearRateInput(act.a, act.b);
+    else if (act.type === 'qty') { const n = parseInt(String(act.value).replace(/[^0-9]/g, ''), 10); arbQty = Number.isFinite(n) && n > 0 ? Math.min(n, 10000000) : 0; }
+    sendDetached();
+  });
+}
+if (window.api && window.api.onRoutePinClosed) window.api.onRoutePinClosed(() => { detached = null; });
 
 let lastDataSig = '';
 async function refresh(force) {
@@ -898,7 +1062,9 @@ async function removeCurrencyPair(bucket, apiId) {
 }
 
 function render() {
+  listStale = false; // this render is the catch-up
   unpinTip(); // rebuilt DOM invalidates the pinned element
+  sendDetached(); // new rates/prices: the pinned route window follows
   updateMeta();
 
   // Build the new content off-screen and swap it in atomically AFTER all icons
@@ -3773,6 +3939,19 @@ async function main() {
     if (!pinnedTipEl) tipEl.classList.add('hidden');
   });
   tipEl.addEventListener('mousedown', (e) => e.stopPropagation());
+  // rate editor: Enter saves the leg (both of its fields), Esc leaves the field - neither
+  // reaches the document handler (Esc there hides the whole overlay)
+  tipEl.addEventListener('keydown', (e) => {
+    const inp = e.target.closest && e.target.closest('.tip-fix-in');
+    if (!inp) return;
+    e.stopPropagation();
+    if (e.key === 'Escape') { inp.blur(); return; }
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const row = inp.closest('.tip-fix-row');
+    const qa = row.querySelector('[data-side="a"]').value, qb = row.querySelector('[data-side="b"]').value;
+    applyRateInput(row.dataset.a, row.dataset.b, qa, qb);
+  });
   // Re-price the route as the size is typed. Rebuilding the whole tooltip would blow
   // away focus mid-keystroke, so only the two gold lines are patched in place.
   tipEl.addEventListener('input', (e) => {
@@ -3807,6 +3986,13 @@ async function main() {
       openRateFix();
       return;
     }
+    if (e.target.closest('.tip-detach')) { openDetached(); return; }
+    const clr = e.target.closest('.tip-fix-clear');
+    if (clr) { const row = clr.closest('.tip-fix-row'); clearRateInput(row.dataset.a, row.dataset.b); return; }
+    // Anything inside the rate editor - its fields, the space between them - is work
+    // on the pinned tooltip, never a request to release it. Clicking into a field used
+    // to close the tooltip you were typing into.
+    if (e.target.closest('.tip-fix-sec, input, button')) return;
     const src = e.target.closest('.tip-source');
     if (src && src.dataset.href) {
       window.api.openExternal(src.dataset.href); // view this pair's data on poe2scout

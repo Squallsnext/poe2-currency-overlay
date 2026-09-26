@@ -1,0 +1,14 @@
+/* Pinned route window (route-pin.html): the overlay's tooltip styles, laid out as a
+   small standalone card instead of a floating tip. */
+html, body { overflow: hidden; background: transparent; user-select: text; }
+#rp { margin: 4px; border-radius: 8px; overflow: hidden; background: var(--s-root);
+  border: 1px solid color-mix(in srgb, var(--tx-gold2) 70%, transparent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--scrim) 60%, transparent); }
+#rp-head { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 9px; font-size: 10.5px;
+  color: var(--tx-gold2); background: var(--s-band-peek); -webkit-app-region: drag; cursor: move; }
+#rp-title { flex: 1; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#rp-close { -webkit-app-region: no-drag; background: transparent; border: 0; color: var(--tx-dim); cursor: pointer; font-size: 12px; padding: 0 3px; }
+#rp-close:hover { color: var(--tx-hi); }
+#rp #spark-tip { position: static; max-width: none; width: auto; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+#rp #spark-tip .tip-detach { display: none; }
+#rp #spark-tip .tip-fix { display: none; } /* the editor is always open here */

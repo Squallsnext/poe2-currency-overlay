@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' https://web.poecdn.com data:; style-src 'self'; font-src 'self'" />
+  <title>Route</title>
+  <link rel="stylesheet" href="tokens.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="themes.css" />
+  <link rel="stylesheet" href="route-pin.css" />
+</head>
+<body>
+  <!-- Pinned route (📌 in a route tooltip): same content and styles as the overlay's
+       tooltip (#spark-tip), in its own always-on-top window. route-pin.js renders what
+       the overlay sends and hands every click/entry back to it. -->
+  <div id="rp">
+    <div id="rp-head"><span id="rp-title"></span><button id="rp-close" title="Schließen · Close">✕</button></div>
+    <div id="spark-tip" class="pinned detached"></div>
+  </div>
+  <script src="route-pin.js"></script>
+</body>
+</html>

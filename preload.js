@@ -140,6 +140,11 @@ contextBridge.exposeInMainWorld('api', {
   setGarbagePool: (ids) => ipcRenderer.invoke('set-garbage-pool', ids),
   setItemSearchOpts: (o) => ipcRenderer.invoke('set-item-search-opts', o),
   itemPeekShow: (payload) => ipcRenderer.send('item-peek-show', payload),
+  // pinned route window (📌 in a route tooltip): this renderer computes, main relays
+  routePinOpen: () => ipcRenderer.send('route-pin-open'),
+  routePinUpdate: (payload) => ipcRenderer.send('route-pin-update', payload),
+  onRoutePinAction: (cb) => ipcRenderer.on('route-pin-action', (_e, a) => cb(a)),
+  onRoutePinClosed: (cb) => ipcRenderer.on('route-pin-closed', () => cb()),
   itemPeekHide: () => ipcRenderer.send('item-peek-hide'),
   readClipboard: () => ipcRenderer.invoke('read-clipboard'),
   onItemCopied: (cb) => ipcRenderer.on('item-copied', (_e, text) => cb(text)),

@@ -4239,6 +4239,66 @@ ipcMain.on('peek-height', (_e, h) => {
     if (peekPendingShow) { peekWin.showInactive(); peekPendingShow = false; }
   } catch {}
 });
+// ---------- pinned route window ----------
+// A route tooltip's 📌 puts it into this small always-on-top window, which stays up
+// while the overlay is closed - you work the trades in game with your own rates in view.
+// It only displays: the overlay renderer computes the content and sends it here
+// (route-pin-update); its buttons and fields come back as actions for the overlay
+// (route-pin-action). Shown without taking focus; typing into it needs a click, like
+// any window.
+let routePinWin = null;
+let routePinLast = null; // last content, for a window that is still loading
+function sendRoutePin() {
+  if (!routePinWin || routePinWin.isDestroyed() || !routePinLast) return;
+  const alpha = Math.max(0.1, Math.min(1, (config && config.bgOpacity ? config.bgOpacity : 100) / 100));
+  const theme = (config && config.theme === 'industry') ? 'industry' : 'default';
+  const msg = Object.assign({}, routePinLast, { alpha, theme, dyslexic: !!(config && config.dyslexicFont) });
+  if (routePinWin.webContents.isLoading()) routePinWin.webContents.once('did-finish-load', () => { try { routePinWin.webContents.send('route-pin-content', msg); } catch {} });
+  else routePinWin.webContents.send('route-pin-content', msg);
+}
+ipcMain.on('route-pin-open', () => {
+  try {
+    if (!routePinWin || routePinWin.isDestroyed()) {
+      const b = win ? win.getBounds() : { x: 100, y: 100, width: 400, height: 400 };
+      const disp = screen.getDisplayMatching(b).workArea;
+      const W = 320;
+      const x = b.x + b.width + 10 + W <= disp.x + disp.width ? b.x + b.width + 10 : Math.max(disp.x, b.x - W - 10);
+      routePinWin = new BrowserWindow({
+        x, y: b.y, width: W, height: 300, show: false, frame: false, transparent: true,
+        resizable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false,
+        webPreferences: { preload: path.join(__dirname, 'renderer', 'route-pin-preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
+      });
+      // same level as the overlay, or it would hide behind the game / the overlay
+      routePinWin.setAlwaysOnTop(true, 'screen-saver');
+      routePinWin.on('closed', () => {
+        routePinWin = null; routePinLast = null;
+        try { if (win && !win.isDestroyed()) win.webContents.send('route-pin-closed'); } catch {}
+      });
+      routePinWin.loadFile(path.join(__dirname, 'renderer', 'route-pin.html'));
+      routePinWin.once('ready-to-show', () => { try { routePinWin.showInactive(); } catch {} });
+    } else routePinWin.showInactive();
+  } catch (err) { console.error('route pin window:', err && err.message); }
+});
+ipcMain.on('route-pin-update', (_e, payload) => {
+  routePinLast = { title: String(payload && payload.title || ''), html: String(payload && payload.html || ''), copyText: String(payload && payload.copyText || '') };
+  sendRoutePin();
+});
+ipcMain.on('route-pin-action', (_e, act) => {
+  if (!act || typeof act.type !== 'string') return;
+  if (act.type === 'close') { try { if (routePinWin && !routePinWin.isDestroyed()) routePinWin.close(); } catch {} return; }
+  if (act.type === 'height') {
+    try {
+      if (!routePinWin || routePinWin.isDestroyed()) return;
+      const b = routePinWin.getBounds();
+      routePinWin.setBounds({ x: b.x, y: b.y, width: b.width, height: Math.max(80, Math.min(900, Math.ceil(Number(act.value) || 80))) });
+    } catch {}
+    return;
+  }
+  // everything else (a rate, a reset, the route size) is the overlay's to handle
+  const clean = { type: act.type, a: String(act.a || ''), b: String(act.b || ''), qa: String(act.qa == null ? '' : act.qa), qb: String(act.qb == null ? '' : act.qb), value: String(act.value == null ? '' : act.value) };
+  try { if (win && !win.isDestroyed()) win.webContents.send('route-pin-action', clean); } catch {}
+});
+
 ipcMain.on('item-peek-hide', () => {
   peekPendingShow = false; // cancel a deferred reveal if the cursor left before it showed
   try { if (peekWin && !peekWin.isDestroyed()) peekWin.hide(); } catch {}

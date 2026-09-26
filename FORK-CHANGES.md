@@ -409,6 +409,32 @@ These existed in the player's own build and were **deliberately left out** here:
   `extract-strip-digits.js`, `scratch-*.json`, `debug-*.png`) and a pnpm lockfile.
   `package-lock.json` only gains the three packages `node-hid` needs.
 
+### 4.9 Currency tab: rate editor and pinned route window
+
+- **Pinned tooltip no longer closes under you.** Clicking into a field of "Kurs
+  fixieren" released the pinned tooltip (every click inside it counted as "click again
+  to release"), and saving re-rendered the list, which threw the tooltip away - so there
+  was no visible result either. Now clicks inside the editor never release it, and a
+  save rebuilds only the tooltip; the list behind catches up when the pin is released.
+- **Enter it the way the game shows it.** Each leg has two boxes, both sides ≥ 1 like the
+  game and the bucket row's editor ("22.5 A = 1 B"), or "22.5:1" in one box - no more
+  "1 Chaos = 0.0444". Labels keep the tier ("gr. chaos" instead of a second "chaos").
+- **Feedback per leg:** "✓ übernommen", your rate with its age and the value the app
+  computes from it, the feed's rate for comparison, or why an entry was not taken.
+  ✕ (or both boxes empty + Enter) deletes your rate. Rates were and are stored in the
+  config (`overrides.rates` + `ratesAt`) - they survive closing the overlay and restarts
+  (unchanged; confirmed from the code path, not a behaviour change).
+- **📌 pinned route window** (`renderer/route-pin.html/.css/.js`, `route-pin-preload.js`):
+  the route in its own small always-on-top window that stays up while the overlay is
+  closed, rate editor always open. It only displays: the overlay renderer computes the
+  content (it holds rates and routes) and main relays it; entries come back as actions.
+  Focus and caret survive content updates while typing.
+- Tested headless: an arbitrage row pinned, a click into a field keeps it open, Enter
+  saves (config written, tooltip stays, "✓ saved" shown), "22,5:1" parsed, invalid input
+  rejected with a message, ✕ clears, 📌 sends the route with the editor; the window page
+  renders it, keeps a half-typed value across an update and sends the rate back.
+  **Not yet tested in the real Electron app/game** (window placement, focus, always-on-top).
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
