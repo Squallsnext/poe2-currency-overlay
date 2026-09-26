@@ -334,6 +334,10 @@
     tourBtn.title = t('networth.tour.start_title');
     tourBtn.onclick = () => startTour();
     btns.appendChild(tourBtn);
+    const supBtn = el('button', 'nw-set-btn nw-set-btn-ghost', t('networth.tour.support_start'));
+    supBtn.title = t('networth.tour.support_start_title');
+    supBtn.onclick = () => startTour(true);
+    btns.appendChild(supBtn);
     const calBtn = el('button', 'nw-set-btn', state.calibrated ? t('networth.settings.cal_button_recalibrate') : t('networth.settings.cal_button_calibrate'));
     calBtn.onclick = () => { try { window.api.stashCalibrateStart(); } catch {} };
     btns.appendChild(calBtn);
@@ -1166,16 +1170,17 @@
   // for the align tool, and saved (userData/tab-shots) so aligning works later without
   // scanning again. Tabs already scanned show their picture and can be redone.
   const TOUR_TABS = () => Object.keys(TAB_LABEL);
-  async function startTour() {
+  async function startTour(support) {
     const settings = document.getElementById('settings');
     if (settings) settings.classList.add('hidden');
     const tabBtn = document.getElementById('tab-networth');
     if (tabBtn && !tabBtn.classList.contains('active')) tabBtn.click();
     let saved = {};
-    try { saved = (await window.api.stashTourList()) || {}; } catch {}
+    if (!support) { try { saved = (await window.api.stashTourList()) || {}; } catch {} }
     const status = {};
     for (const k of Object.keys(saved)) status[k] = Object.assign({ state: 'ok', old: true }, saved[k]);
-    state.tour = { i: 0, status, busy: false, error: null };
+    // support: picture only, next tab right after, "Done" opens the folder
+    state.tour = { i: 0, status, busy: false, error: null, support: !!support };
     render();
   }
   function tourNext() {
@@ -1189,7 +1194,7 @@
     const tabs = TOUR_TABS();
     const back = el('div', 'nw-modal-back');
     const box = el('div', 'nw-modal nw-tour');
-    box.appendChild(el('div', 'nw-modal-title', t('networth.tour.title')));
+    box.appendChild(el('div', 'nw-modal-title', t(tr.support ? 'networth.tour.support_title' : 'networth.tour.title')));
     // progress: every tab as a chip - done, skipped, current
     const chips = el('div', 'nw-tour-chips');
     tabs.forEach((tab, k) => {
@@ -1200,6 +1205,7 @@
       chips.appendChild(c);
     });
     box.appendChild(chips);
+    if (tr.support) return supportModalBody(back, box, tr, tabs);
     if (tr.i >= tabs.length) {
       // summary: what was scanned, a way to align each, where the pictures are
       const done = tabs.filter((tb) => tr.status[tb] && tr.status[tb].state === 'ok').length;
@@ -1306,6 +1312,56 @@
     box.appendChild(cancel);
     back.appendChild(box);
     back.onclick = null; // closes only via its buttons - a stray click must not lose the run
+    return back;
+  }
+
+  // the picture-only run: step line, one big button, skip, and "Done - open folder"
+  function supportModalBody(back, box, tr, tabs) {
+    const done = tabs.filter((tb) => tr.status[tb] && tr.status[tb].state === 'ok').length;
+    if (tr.i < tabs.length) {
+      const tab = tabs[tr.i];
+      box.appendChild(el('div', 'nw-tour-step', t('networth.tour.support_step', { n: tr.i + 1, total: tabs.length, tab: esc(TAB_LABEL[tab]) })));
+      if (tr.error) box.appendChild(el('div', 'nw-notice nw-error', esc(tr.error)));
+      const last = tr.lastThumb;
+      if (last) { const im = document.createElement('img'); im.className = 'nw-tour-last'; im.src = last; im.alt = ''; box.appendChild(im); }
+      const btns = el('div', 'nw-tour-btns');
+      if (tr.busy) {
+        const busy = el('div', 'nw-sample-busy');
+        busy.appendChild(el('span', 'nw-spin'));
+        busy.appendChild(el('span', 'nw-busy-lab', t('networth.tour.support_busy')));
+        btns.appendChild(busy);
+      } else {
+        const cap = el('button', 'nw-modal-opt nw-modal-new', t('networth.tour.support_capture', { tab: esc(TAB_LABEL[tab]) }));
+        cap.onclick = async () => {
+          tr.busy = true; tr.error = null; render();
+          const r = await window.api.stashSupportShot(tab).catch((e) => ({ ok: false, error: String(e) }));
+          tr.busy = false;
+          if (r && r.ok) { tr.status[tab] = { state: 'ok' }; tr.lastThumb = r.thumb; tr.i++; }
+          else {
+            const code = (r && r.error) || '?';
+            tr.error = code === 'game-window-not-found' ? t('networth.sample.capture_no_game')
+              : code === 'game-window-black' ? t('networth.sample.capture_black')
+                : t('networth.sample.capture_failed', { error: code });
+          }
+          render();
+        };
+        btns.appendChild(cap);
+        const sk = el('button', 'nw-modal-opt', t('networth.tour.skip'));
+        sk.onclick = () => { tr.status[tab] = { state: 'skip' }; tr.i++; tr.error = null; render(); };
+        btns.appendChild(sk);
+      }
+      box.appendChild(btns);
+    } else {
+      box.appendChild(el('div', 'nw-modal-sub', t('networth.tour.support_summary', { done, total: tabs.length })));
+    }
+    const fin = el('button', 'nw-modal-opt' + (tr.i >= tabs.length ? ' nw-modal-new' : ''), t('networth.tour.support_done', { n: done }));
+    fin.onclick = () => { window.api.stashSupportOpenFolder().catch(() => {}); state.tour = null; render(); };
+    box.appendChild(fin);
+    const cancel = el('button', 'nw-modal-cancel', t('networth.tour.close'));
+    cancel.onclick = () => { state.tour = null; render(); };
+    box.appendChild(cancel);
+    back.appendChild(box);
+    back.onclick = null;
     return back;
   }
 

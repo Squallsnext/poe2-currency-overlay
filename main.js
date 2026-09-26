@@ -3852,6 +3852,44 @@ function loadTourCapture(tab) {
     return { bitmap: img.toBitmap(), W: width, H: height, box, res: { reads: meta.reads || [] } };
   } catch { return null; }
 }
+// Support pictures: the quick version of the tour - only the picture, no reading, no
+// tab check, nothing learned. Click through every tab in a minute; "Done" opens the
+// folder (userData/tab-shots/support) to pass the pictures on. The panel is found by its
+// frame (panel-finder, fast - the slow part of a scan is reading the digits) and cut out
+// with a generous margin; without a frame found, the calibration / reference box is used.
+const SUPPORT_DIR = () => path.join(TOUR_DIR(), 'support');
+async function supportShot(tab) {
+  if (!TAB_MAPS[tab]) return { ok: false, error: 'unknown-tab' };
+  try {
+    const shot = await tourGrab();
+    if (!shot) return { ok: false, error: 'game-window-not-found' };
+    if (frameLooksBlank(shot.bitmap)) return { ok: false, error: 'game-window-black' };
+    const bitmap = Buffer.from(shot.bitmap), W = shot.W, H = shot.H;
+    let box = null, source = 'found';
+    try {
+      const PF = require('./renderer/stash/panel-finder.js');
+      const found = PF.findPanel(bitmap, W, H);
+      if (found) box = PF.frameToContent(found);
+    } catch { /* fall back below */ }
+    if (!box) {
+      source = config.stashCalibration ? 'calibration' : 'reference';
+      box = config.stashCalibration || (() => { const k = W / 1920; return { x: REF_BOX.x * k, y: REF_BOX.y * k, w: REF_BOX.w * k, h: REF_BOX.h * k }; })();
+    }
+    const M = Math.round(Math.max(24, box.h * 0.04));
+    const x = Math.max(0, Math.round(box.x) - M), y = Math.max(0, Math.round(box.y) - M);
+    const w = Math.min(Math.round(box.w) + M * 2, W - x), h = Math.min(Math.round(box.h) + M * 2, H - y);
+    const panel = nativeImage.createFromBitmap(bitmap, { width: W, height: H }).crop({ x, y, width: w, height: h });
+    fs.mkdirSync(SUPPORT_DIR(), { recursive: true });
+    fs.writeFileSync(path.join(SUPPORT_DIR(), `${tab}.png`), panel.toPNG());
+    fs.writeFileSync(path.join(SUPPORT_DIR(), `${tab}.json`), JSON.stringify({ tab, at: Date.now(), frame: { w: W, h: H }, box, crop: { x, y, w, h }, source, app: app.getVersion() }));
+    return { ok: true, tab, thumb: panel.resize({ width: Math.min(300, w), quality: 'good' }).toDataURL() };
+  } catch (e) {
+    syncOverlayState();
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+}
+ipcMain.handle('stash-support-shot', async (_e, tab) => supportShot(tab));
+ipcMain.handle('stash-support-open-folder', async () => { fs.mkdirSync(SUPPORT_DIR(), { recursive: true }); return shell.openPath(SUPPORT_DIR()); });
 ipcMain.handle('stash-tour-capture', async (_e, tab) => tourCapture(tab));
 ipcMain.handle('stash-tour-confirm', async (_e, tab) => tourConfirm(tab));
 ipcMain.handle('stash-tour-discard', async () => { tourPending = null; return true; });

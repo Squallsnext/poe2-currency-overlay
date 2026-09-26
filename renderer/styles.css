@@ -2044,3 +2044,4 @@ footer {
   font-size: 13px; line-height: 1; cursor: pointer; opacity: .45; transition: opacity .15s; }
 .fold-all:hover { opacity: 1; color: var(--tx-hi); border-color: var(--am-hi); }
 #buckets.hidden + #cur-fold-all, #networth-root.hidden + #nw-fold-all { display: none; }
+.nw-tour-last { width: 180px; border-radius: 4px; border: 1px solid var(--in-bd); margin: 2px 0 8px; opacity: .8; }

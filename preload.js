@@ -109,6 +109,9 @@ contextBridge.exposeInMainWorld('api', {
   stashTourDiscard: () => ipcRenderer.invoke('stash-tour-discard'),
   stashTourList: () => ipcRenderer.invoke('stash-tour-list'),
   stashTourOpenFolder: () => ipcRenderer.invoke('stash-tour-open-folder'),
+  // quick picture-only run for support (no reading)
+  stashSupportShot: (tab) => ipcRenderer.invoke('stash-support-shot', tab),
+  stashSupportOpenFolder: () => ipcRenderer.invoke('stash-support-open-folder'),
   stashSampleDrop: (i) => ipcRenderer.invoke('stash-sample-drop', i),
   stashSampleScope: (i, scope) => ipcRenderer.invoke('stash-sample-scope', i, scope),
   stashSamplePreview: (i) => ipcRenderer.invoke('stash-sample-preview', i),

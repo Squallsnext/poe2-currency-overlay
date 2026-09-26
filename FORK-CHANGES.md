@@ -420,6 +420,13 @@ mostly are: "46 counts read · 36 slots without a number - mostly items you don'
 captures (walk, skip, learned mismatch, align from the tour, summary); the capture
 itself needs the real game and is **not yet tested in game**.
 
+**Support pictures** ("Fach-Bilder für Support", next to "Fächer scannen"): the quick
+version - picture only, no reading, no tab check, nothing learned. The panel is found by
+its frame (panel-finder, fast; calibration / reference box as fallback), cut out with a
+margin and saved to `userData/tab-shots/support/<tab>.png` (+ `.json`: frame size, box,
+how it was found). After each picture it moves straight to the next tab; "Done - open
+folder" closes the run and opens the folder. Tested headless with a stubbed capture.
+
 ### 4.6c Quieter Net Worth cards, fold-all
 
 - "Wrong tab? / Align / Debug" on each tab card stay faint (18 %) until the card is
