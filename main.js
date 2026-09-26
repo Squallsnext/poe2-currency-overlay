@@ -2680,7 +2680,7 @@ async function readStashFrame(shot, onDetected) {
     const { bitmap, W, H } = shot;
 
     const t0 = Date.now();
-    const res = await runReaderWorker(bitmap, W, H, onDetected);
+    let res = await runReaderWorker(bitmap, W, H, onDetected);
     const t1 = Date.now();
     writeStashDebug(shot, res);
     logToggle('stash-perf', `ocr ${t1 - t0}ms  debug-write ${Date.now() - t1}ms`
@@ -2697,6 +2697,14 @@ async function readStashFrame(shot, onDetected) {
     // stash-teach-count below) or an "align" session (see stash-adjust-open) can
     // re-extract the exact glyphs / rebuild the exact boxes the reader saw
     lastCaptureByTab.set(res.tab, { bitmap, W, H, box: res.box, res });
+    // first scan of this tab on this setup: boxes onto the cells (rule), kept if not worse
+    {
+      const placed = await autoPlaceNewTab(res.tab, { bitmap, W, H, box: res.box, res }, res);
+      if (placed) {
+        res = Object.assign(placed.res, { autoPlaced: placed.moved });
+        lastCaptureByTab.set(res.tab, { bitmap, W, H, box: res.box, res });
+      }
+    }
 
     let prices = {};
     try { prices = await getStashPriceMap(); } catch (err) { /* prices optional; counts still shown */ }
@@ -3847,7 +3855,81 @@ function tourKeep(expected, bitmap, W, H, res) {
 // the counts read before not less sure). A box on an empty slot cannot be checked by a
 // number; it moves only if its frame was found clearly (and not "odd").
 const AUTO_MODEL_CONF = 0.9;
+// Boxes by the fixed rule (as the align tool's "Nach Regel", G): each cell's inner frame
+// corner + 5/6 px, 125x55 px at 5K, scaled. No model needed, so it also places a tab
+// where nothing was read yet - reported at 1080p: the essence tab's shipped boxes sat
+// half on the frame, and model snapping had no confident read to start from.
+// Returns { deltas, ok, total } (deltas only for cells whose corner was found clearly).
+const RULE_5K = 2.849; // capture px per reference px at 5120x2880 (1658 / 582)
+const RULE_REF = { l: 5 / RULE_5K, t: 6 / RULE_5K, w: 125 / RULE_5K, h: 55 / RULE_5K };
+function ruleProposal(tab, cap) {
+  const data = buildAdjustSlotData(tab, cap, true);
+  if (!data || !data.rows.length) return null;
+  const FS = require('./renderer/stash/frame-snap.js');
+  const kx = data.width / data.refBox.w, ky = data.height / data.refBox.h;
+  const L = RULE_REF.l * kx, T = RULE_REF.t * ky, Wb = RULE_REF.w * kx, Hb = RULE_REF.h * ky;
+  const snap = FS.create(FS.grayFromRGBA(cap.bitmap, cap.W, data.x, data.y, data.width, data.height), data.width, data.height);
+  const guesses = data.rows.map((r) => ({ x: r.x + r.w / 2 - L - Wb / 2, y: r.y + r.h / 2 - T - Hb / 2 }));
+  const found = snap.innerCorners(guesses, { scale: kx / RULE_5K });
+  const deltas = {};
+  let ok = 0;
+  found.forEach((c, i) => {
+    if (!c.ok) return;
+    ok++;
+    deltas[data.rows[i].apiId] = {
+      cx: +(data.refBox.x + (c.x + L + Wb / 2) / kx).toFixed(2), cy: +(data.refBox.y + (c.y + T + Hb / 2) / ky).toFixed(2),
+      stripWidth: +(RULE_REF.w / 2).toFixed(2), up: +(RULE_REF.h / 2).toFixed(2), dn: +(RULE_REF.h / 2).toFixed(2),
+    };
+  });
+  return { deltas, ok, total: data.rows.length };
+}
+// Read the same frame again with these positions (not saved yet); keep them only if the
+// read is not worse: at least as many counts, the counts read before not less sure.
+async function trialDeltas(tab, cap, res, deltas) {
+  const saved = config.stashSlotOverrides;
+  const trial = JSON.parse(JSON.stringify(saved || {}));
+  trial[tab] = trial[tab] || {};
+  for (const [id, d] of Object.entries(deltas)) trial[tab][id] = Object.assign({}, trial[tab][id], d);
+  // the worker is handed the overrides synchronously when it starts - restore right
+  // away, so a config save during the read can never write the trial positions
+  config.stashSlotOverrides = trial;
+  let pending;
+  try { pending = runReaderWorker(cap.bitmap, cap.W, cap.H, null, cap.calBox ? { calBox: cap.calBox } : undefined); } finally { config.stashSlotOverrides = saved; }
+  const res2 = await pending;
+  if (!res2 || !res2.ok || res2.mismatch || res2.tab !== tab) return { kept: false, readAfter: null };
+  const before = new Map((res.reads || []).map((r) => [r.apiId, r]));
+  const after = new Map((res2.reads || []).map((r) => [r.apiId, r]));
+  let confBefore = 0, confAfter = 0, n = 0;
+  for (const [id, r] of before) {
+    if (r.count == null || !after.get(id)) continue;
+    confBefore += r.conf || 0; confAfter += after.get(id).conf || 0; n++;
+  }
+  const notWorse = res2.readCount >= res.readCount && (!n || confAfter / n >= confBefore / n - 0.02);
+  if (notWorse) mergeSlotOverrides(tab, deltas);
+  return { kept: notWorse, readAfter: res2.readCount, res: notWorse ? res2 : null };
+}
+// a tab scanned for the first time (no own positions yet): put its boxes on the cells
+async function autoPlaceNewTab(tab, cap, res) {
+  const own = config.stashSlotOverrides && config.stashSlotOverrides[tab];
+  if (own && Object.values(own).some((o) => o && o.cx != null)) return null;
+  try {
+    const rp = ruleProposal(tab, cap);
+    if (!rp || rp.ok < rp.total * 0.5) return null;
+    const t = await trialDeltas(tab, cap, res, rp.deltas);
+    logToggle('stash-learn', `auto-place ${tab}: ${rp.ok}/${rp.total} cells, reads ${res.readCount} -> ${t.readAfter} ${t.kept ? 'kept' : 'discarded'}`);
+    return t.kept ? { res: t.res, moved: rp.ok } : null;
+  } catch (e) { logToggle('stash-learn', `auto-place ${tab} failed: ${e && e.message}`); return null; }
+}
 async function tourAutoSnap(tab, cap, res) {
+  // the rule first (needs no confident read); the model snapping below if it did not help
+  try {
+    const rp = ruleProposal(tab, cap);
+    if (rp && rp.ok >= rp.total * 0.5) {
+      const t = await trialDeltas(tab, cap, res, rp.deltas);
+      logToggle('stash-learn', `tab tour rule ${tab}: ${rp.ok}/${rp.total} cells, reads ${res.readCount} -> ${t.readAfter} ${t.kept ? 'kept' : 'discarded'}`);
+      if (t.kept) return { models: 0, rule: true, moved: rp.ok, unsure: rp.total - rp.ok, kept: true, readBefore: res.readCount || 0, readAfter: t.readAfter, res: t.res };
+    }
+  } catch (e) { logToggle('stash-learn', `tab tour rule failed: ${e && e.message}`); }
   const out = { models: 0, moved: 0, unsure: 0, kept: false, readBefore: res.readCount || 0, readAfter: null };
   try {
     const data = buildAdjustSlotData(tab, cap, true);
@@ -4042,6 +4124,24 @@ ipcMain.handle('stash-export-settings', async () => {
     } catch { /* optional */ }
     await shell.openPath(SUPPORT_DIR());
     return { ok: true };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+// "Kalibrierung & Fächer zurücksetzen": start the setup over (asked for after a 1080p test
+// left boxes and filters from 5K in place). A backup of everything goes to the support
+// folder first (einstellungen-sicherung-<time>.json, same shape as the export).
+ipcMain.handle('stash-reset-setup', async () => {
+  try {
+    fs.mkdirSync(SUPPORT_DIR(), { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const file = path.join(SUPPORT_DIR(), `einstellungen-sicherung-${stamp}.json`);
+    fs.writeFileSync(file, JSON.stringify({ app: app.getVersion(), at: new Date().toISOString(), stashCalibration: config.stashCalibration || null, stashHiRes: !!config.stashHiRes, stashSlotOverrides: config.stashSlotOverrides || {}, stashUserTabSigs: config.stashUserTabSigs || {} }, null, 1));
+    config.stashCalibration = null;
+    config.stashSlotOverrides = {};
+    config.stashUserTabSigs = {};
+    saveConfig();
+    lastCaptureByTab.clear();
+    logToggle('stash', 'setup reset, backup ' + file);
+    return { ok: true, backup: path.basename(file) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 ipcMain.handle('stash-support-open-folder', async () => { fs.mkdirSync(SUPPORT_DIR(), { recursive: true }); return shell.openPath(SUPPORT_DIR()); });

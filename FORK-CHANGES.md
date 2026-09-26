@@ -634,6 +634,22 @@ takes long). Measured on the player's 5K currency tab with their per-slot filter
   without per-slot filters 2.0 -> 1.2 s. If a helper fails, the slots are read on the
   one thread as before.
 
+**Boxes onto the cells automatically.** Reported at 1080p: tabs other than currency
+still had the shipped boxes, half on the cell frame. Now the first scan of a tab without
+own positions (normal scan or the tab tour) places its boxes by the fixed rule
+(`ruleProposal` in main.js - the align tool's "Nach Regel" logic: inner frame corner +
+5/6 px, 125x55 at 5K, scaled), reads the frame again and keeps them only if the read is
+not worse (`trialDeltas`, shared with the tour's model snapping, which stays as the
+fallback). The notice says so ("Essenzen: Kästchen automatisch an die Zellen gesetzt").
+Tested on the essence picture at 5K and scaled to 1080p: 82 of 82 cells found, reads
+43 -> 45 of 82 at 1080p (a scaled picture is blurrier than the game's own 1080p text, so
+the values there say little). **Not yet tested in game.**
+
+**"Kalibrierung & Fächer zurücksetzen"** (settings, other ways): calibration, all box
+positions and per-slot filters, and the learned tab fingerprints back to the start - two
+clicks, and a backup of all of it goes to the support folder first
+(`einstellungen-sicherung-<time>.json`).
+
 ### 4.8 Setup-specific parts – already removed from this branch
 
 These existed in the player's own build and were **deliberately left out** here:

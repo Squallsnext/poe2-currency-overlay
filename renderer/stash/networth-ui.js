@@ -367,6 +367,24 @@
       mk(t('networth.wizard.start'), t('networth.wizard.start_title'), () => startWizard(), true),
       mk(t('networth.settings.cal_manual'), t('networth.settings.cal_manual_title'), () => { try { window.api.stashCalibrateStart({ manual: true }); } catch {} }, true),
       state.calibrated ? mk(t('networth.settings.cal_reset_button'), t('networth.settings.cal_reset_title'), () => { try { window.api.clearStashCalibration(); } catch {} state.calibrated = false; renderSettings(root); render(); }, true) : null,
+      (() => {
+        // everything back to the start: two clicks (the first one asks), backup first
+        const b = mk(t('networth.settings.reset_all'), t('networth.settings.reset_all_title'), null, true);
+        let armed = null;
+        b.onclick = async () => {
+          if (!armed) {
+            b.textContent = t('networth.settings.reset_all_confirm');
+            armed = setTimeout(() => { armed = null; b.textContent = t('networth.settings.reset_all'); }, 5000);
+            return;
+          }
+          clearTimeout(armed); armed = null;
+          const r = await window.api.stashResetSetup().catch(() => null);
+          state.calibrated = false;
+          state.notice = r && r.ok ? { kind: 'ok', msg: t('networth.settings.reset_all_done', { file: r.backup }) } : { kind: 'err', msg: t('networth.settings.reset_all_failed') };
+          renderSettings(root); render();
+        };
+        return b;
+      })(),
     ]);
     group(t('networth.settings.cal_group_support'), [
       mk(t('networth.tour.support_start'), t('networth.tour.support_start_title'), () => startTour(true), true),
@@ -1591,6 +1609,8 @@
       wizardOnScan(res);
       applyResult(res);
       calCheckResult(res);
+      // first scan of a tab: its boxes were put onto the cells (main.js autoPlaceNewTab)
+      if (res && res.autoPlaced && !state.notice) { state.notice = { kind: 'ok', msg: t('networth.notice.auto_placed', { tab: TAB_LABEL[res.tab] || res.tab, n: res.autoPlaced }) }; render(); }
     });
     if (window.api.onStashQueued) window.api.onStashQueued((info) => {
       state.queued = (info && info.depth) || 0;
