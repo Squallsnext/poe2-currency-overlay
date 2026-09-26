@@ -1,0 +1,66 @@
+/* Align tool ("Zahlenfelder ausrichten") - see adjust.js */
+html, body { margin: 0; background: #111; color: #eee; font-family: system-ui, Segoe UI, Arial, sans-serif; }
+
+/* ---- toolbar: grouped controls, then the step line, then the status line ---- */
+#bar { position: sticky; top: 0; z-index: 10; background: #181818; border-bottom: 1px solid #444; padding: 8px 10px 6px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row + .row { margin-top: 6px; }
+.grp { display: flex; gap: 6px; align-items: center; padding: 3px 8px; border: 1px solid #333; border-radius: 8px; font-size: 13px; color: #cfc3aa; }
+.grp-lab { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: #8d8471; margin-right: 2px; }
+button { background: #d99a42; color: #17120b; border: 0; border-radius: 6px; padding: 6px 10px; font-weight: 700; cursor: pointer; font-size: 13px; }
+button:disabled { opacity: .45; cursor: default; }
+button#save { background: #56e38a; }
+button#cancel, button.ghostbtn { background: #3a3a3a; color: #eee; }
+input[type=number] { width: 54px; background: #0b0b0b; color: #ddd; border: 1px solid #555; border-radius: 6px; padding: 4px 6px; font: 12px Consolas, monospace; }
+label { display: flex; align-items: center; gap: 4px; }
+#onlybad-lab { font-weight: 700; color: #ffd166; }
+
+/* steps: the current one lit, done ones ticked; its tip underneath */
+#steps { font-size: 12.5px; }
+.step { border: 1px solid #444; border-radius: 14px; padding: 3px 10px; color: #9b927e; cursor: pointer; background: #141414; }
+.step.done { color: #56e38a; border-color: #2f6b45; }
+.step.cur { color: #17120b; background: #ffd166; border-color: #ffd166; font-weight: 700; }
+#tipline { font-size: 12.5px; color: #e8dcc0; flex: 1 1 400px; }
+#tipline button { padding: 2px 8px; font-size: 12px; margin-left: 6px; }
+
+#status { font-size: 12.5px; min-height: 22px; }
+#snapinfo { color: #ffd166; }
+#moveinfo { color: #9fd8ff; }
+#moveinfo button, #status button { padding: 2px 8px; font-size: 12px; margin-left: 4px; }
+
+/* ---- the picture and the boxes ---- */
+#wrap { position: relative; margin: 12px; }
+#panel { position: absolute; inset: 0; }
+.box { position: absolute; box-sizing: border-box; border: 2px solid #ff5f6d; background: rgba(255, 95, 109, .10); cursor: move; }
+.box.warn { border-color: #ffd166; background: rgba(255, 209, 102, .10); }
+.box.ok { border-color: #56e38a; background: rgba(86, 227, 138, .10); }
+/* nothing read at all: usually an empty slot - grey, so it doesn't look like an error */
+.box.none { border-color: #8a8a8a; background: rgba(160, 160, 160, .08); }
+#wrap.hide-ok .box.ok { display: none; }
+.box.sel { outline: 2px solid #fff; z-index: 3; }
+.box.marked { box-shadow: 0 0 0 3px #6fd3ff; z-index: 2; }
+/* hand-placed = a model ("Vorbild") for snapping */
+.box.leader::after { content: '★'; position: absolute; right: 2px; top: 0; font-size: 13px; color: #fff; text-shadow: 0 0 3px #000; }
+.box.snapfail { border-style: dashed; border-color: #ff9f1c; }
+.box .t { position: absolute; left: 0; top: -22px; white-space: nowrap; font: 700 16px Consolas, monospace; color: inherit; text-shadow: 0 0 4px #000, 0 0 4px #000; }
+.box .need { position: absolute; left: 0; bottom: -20px; white-space: nowrap; font: 700 13px Consolas, monospace; color: #ff9f1c; text-shadow: 0 0 3px #000, 0 0 3px #000; display: none; }
+.box.snapfail .need { display: block; }
+/* where snapping WOULD have put an unsure box */
+.ghost { position: absolute; box-sizing: border-box; border: 1px dashed #ff9f1c; pointer-events: none; z-index: 1; }
+.ghost span { position: absolute; left: 100%; top: 0; margin-left: 3px; white-space: nowrap; font: 700 12px Consolas, monospace; color: #ff9f1c; text-shadow: 0 0 3px #000; }
+#lasso { position: absolute; border: 1px dashed #6fd3ff; background: rgba(111, 211, 255, .08); pointer-events: none; display: none; z-index: 5; }
+#grid { position: absolute; inset: 0; pointer-events: none; display: none; z-index: 2; }
+#wrap.show-grid #grid { display: block; }
+#guide { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed #6fd3ff; pointer-events: none; display: none; z-index: 4; }
+#wrap.show-grid #guide { display: block; }
+
+/* ---- help popup ---- */
+#help { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); z-index: 20; display: none; align-items: flex-start; justify-content: center; overflow: auto; }
+#help.open { display: flex; }
+#help .card { background: #1b1b1b; border: 1px solid #555; border-radius: 10px; margin: 40px 16px; padding: 16px 20px; max-width: 760px; font-size: 13.5px; line-height: 1.5; color: #e8dcc0; }
+#help h2 { margin: 0 0 8px; font-size: 17px; color: #fff; }
+#help h3 { margin: 14px 0 4px; font-size: 14px; color: #ffd166; }
+#help ul { margin: 0; padding-left: 20px; }
+#help kbd { background: #333; border: 1px solid #555; border-radius: 4px; padding: 0 5px; font: 12px Consolas, monospace; }
+#help .foot { margin-top: 14px; display: flex; gap: 8px; justify-content: flex-end; }
+.c-ok { color: #56e38a; } .c-warn { color: #ffd166; } .c-bad { color: #ff5f6d; } .c-none { color: #aaa; } .c-fail { color: #ff9f1c; }

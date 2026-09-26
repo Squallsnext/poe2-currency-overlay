@@ -232,6 +232,37 @@ Only red/yellow boxes are shown by default ("also show good slots" reveals the r
   (An edge-profile match over the whole surroundings was tried too and was less exact.)
 - **Marking:** Ctrl+click boxes or drag a lasso on an empty area; moving one marked box
   moves the marked group only (Esc clears).
+- **Own page, tidier bar, steps and help** (`renderer/stash/adjust.html/.css/.js`; was
+  a template string inside `main.js`). Controls are grouped (Size · Snap · Align ·
+  Selection · View); a step line (1 size → 2 set a model → 3 snap → 4 check dashed) lights
+  the current step with a one-line tip; the full explanation moved into a help popup
+  (`? Hilfe` / H). "Copy deltas" (a developer tool) sits in the help. Slots where
+  nothing was read are grey ("leer?") instead of red - usually an empty slot, not an
+  error.
+- **Several models for snapping.** Every box moved by hand becomes a model (★); each
+  box is compared with the model it resembles most. Reported: on the essence tab the
+  gilded frames of higher tiers looked "unlike" a plain model and only snapped with the
+  certainty at ~15 %. Now: set one gilded box by hand, press F again.
+- **Unsure boxes explain themselves.** The dashed box shows the certainty it would have
+  needed (e.g. "12 %"), its tooltip says which measure failed (vertical line, horizontal
+  line, frame looks different), a thin preview shows where it would go with an arrow
+  (e.g. "→14 ↓3"), the status line says at which certainty all would snap, and
+  "Unsichere trotzdem einrasten" takes the previews on purpose (Ctrl+Z undoes).
+  Snap range and certainty are remembered per tab.
+- **Plausibility ("Sprung?").** When the boxes' jumps are alike (the whole tab shifted),
+  a box jumping clearly differently is held back: on a test panel with painted-on ornate
+  frames, three boxes snapped 8-26 px wrong while their lines looked certain. The check
+  only runs when the other jumps really are uniform - with boxes each off by a different
+  amount it held back 8 of 13 correct snaps, so there it stays off.
+- **Move readout.** Moving the selected box shows how far ("x −13 · y +9 px") and
+  whether the snap range fits (a bit more than that move; much more risks the
+  neighbour's frame), with a button to take the recommended value.
+- Letter shortcuts (F, H, R, S, A) work right after typing into a number field; Enter
+  leaves the field.
+- Tested headless: plain panel - uniformly shifted, each box randomly ±12 px, already
+  right - all ≤1 px, nothing falsely flagged; ornate test panel - 10 snapped, 3 flagged
+  "Sprung?", a second model fixes two more. **Not yet tested on a real essence tab.**
+
 - **All boxes shown by default** (was: only red/yellow, with a "show good ones too"
   tick box). Players ticked it every single time: a box that reads a one-digit count
   fine can sit off once the count has two digits. "Only red/yellow" is now an

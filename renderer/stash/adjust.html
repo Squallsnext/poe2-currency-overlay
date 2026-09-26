@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'">
+<title>Zahlenfelder ausrichten</title>
+<link rel="stylesheet" href="adjust.css">
+</head>
+<body>
+<!-- Align tool: layout here, logic in adjust.js, data (capture + boxes) from main via
+     adjust-preload.js. Short labels in the bar; the full explanation lives in the help
+     popup ("? Hilfe" / H) and in the title tooltips. -->
+<div id="bar">
+  <div class="row">
+    <button id="save">Speichern &amp; übernehmen</button>
+    <button id="cancel">Abbrechen</button>
+    <span class="grp"><span class="grp-lab">Größe</span>
+      <label title="Breite aller Kästchen auf einmal (auch der ausgeblendeten)">B <input id="gw" type="number" step="1"></label>
+      <label title="Höhe aller Kästchen auf einmal">H <input id="gh" type="number" step="1"></label>
+    </span>
+    <span class="grp"><span class="grp-lab">Einrasten</span>
+      <button id="snapframe" title="Jedes Kästchen an dieselbe Stelle in seinem Zellrahmen setzen wie die von Hand gesetzten (★). Wirkt auf die markierten, sonst auf alle. Taste F">Am Rahmen einrasten</button>
+      <label title="Wie weit ein Kästchen beim Einrasten höchstens springen darf (px). Etwas größer als die Verschiebung, die du am ersten Kästchen gebraucht hast - zu groß, und es kann an der Nachbarzelle einrasten. Wird pro Tab gemerkt.">Suchbereich <input id="snaprange" type="number" min="1" max="120" step="1"> px</label>
+      <label title="Wie sicher die Rahmenerkennung sein muss (0-100 %). Darunter bleibt ein Kästchen stehen, wird gestrichelt und zeigt, welcher Wert nötig wäre. Wird pro Tab gemerkt.">Sicherheit <input id="snapmin" type="number" min="0" max="100" step="5"> %</label>
+    </span>
+    <span class="grp"><span class="grp-lab">Angleichen</span>
+      <button id="rowalign" title="Alle Kästchen rechts vom ausgewählten, die höchstens 10 px höher/tiefer sitzen, auf dieselbe Höhe. Taste R">Reihe →</button>
+      <button id="colalign" title="Alle Kästchen unter dem ausgewählten, die höchstens 25 px links/rechts sitzen, in dieselbe Spalte. Taste S">Spalte ↓</button>
+    </span>
+    <span class="grp"><span class="grp-lab">Auswahl</span>
+      <label title="An: Ziehen oder Pfeiltasten verschieben ALLE Kästchen um dieselbe Strecke. Taste A"><input id="moveall" type="checkbox"> alle mitbewegen</label>
+      <button id="unmark" class="ghostbtn" title="Markierung aufheben (Esc). Markieren: Strg+Klick oder Rahmen auf freier Fläche aufziehen">Markierung aufheben</button>
+    </span>
+    <span class="grp"><span class="grp-lab">Ansicht</span>
+      <label id="onlybad-lab" title="Standard: alle Kästchen sichtbar - ein Feld, das heute passt (einstellig), kann bei zweistelligen Zahlen danebenliegen. Wird gemerkt."><input id="onlybad" type="checkbox"> nur rote/gelbe</label>
+      <label title="Gitter; gestrichelte Linie = Mitte des ausgewählten Kästchens"><input id="showgrid" type="checkbox"> Gitter <input id="gridstep" type="number" min="2" step="1" title="Gitterabstand in Pixeln"> px</label>
+    </span>
+    <button id="undo" class="ghostbtn" title="Rückgängig (Strg+Z)">↶ Rückgängig</button>
+    <button id="helpbtn" class="ghostbtn" title="Ausführliche Hilfe (H)">? Hilfe</button>
+  </div>
+  <div class="row" id="steps">
+    <span class="step" data-step="1">1 · Größe</span>
+    <span class="step" data-step="2">2 · Vorbild setzen</span>
+    <span class="step" data-step="3">3 · Einrasten (F)</span>
+    <span class="step" data-step="4">4 · Gestrichelte prüfen</span>
+    <span id="tipline"></span>
+  </div>
+  <div class="row" id="status">
+    <span id="snapinfo"></span>
+    <button id="forcesnap" title="Die unsicheren Kästchen trotzdem dorthin setzen, wo die Erkennung sie hinsetzen würde (gestrichelte Vorschau). Strg+Z macht es rückgängig." hidden>Unsichere trotzdem einrasten</button>
+    <span id="moveinfo"></span>
+  </div>
+</div>
+<div id="wrap"><img id="panel" alt=""><div id="grid"></div><div id="guide"></div><div id="lasso"></div></div>
+
+<div id="help"><div class="card">
+  <h2>Zahlenfelder ausrichten – Hilfe</h2>
+  <p>Jedes Kästchen ist die Stelle, an der das Programm die Anzahl eines Items liest. Sitzt es nicht genau auf der Zahl, wird falsch oder gar nicht gelesen.</p>
+  <h3>Farben</h3>
+  <ul>
+    <li><b class="c-ok">Grün</b> gut gelesen · <b class="c-warn">Gelb</b> unsicher · <b class="c-bad">Rot</b> vermutlich falsch · <b class="c-none">Grau</b> nichts gelesen (meist leerer Platz)</li>
+    <li><b>★</b> von Hand gesetzt – Vorbild fürs Einrasten · <b class="c-fail">orange gestrichelt</b> Einrasten war zu unsicher (Zahl darunter = nötige Sicherheit)</li>
+  </ul>
+  <h3>Der schnelle Weg</h3>
+  <ul>
+    <li><b>1 · Größe:</b> Breite/Höhe so, dass die längste Zahl (auch zweistellig) ganz hineinpasst, aber möglichst wenig vom Item-Bild. Zu klein: Ziffern werden abgeschnitten. Zu groß: Kanten des Bildes stören das Lesen.</li>
+    <li><b>2 · Vorbild:</b> Ein Kästchen genau auf die Zahl ziehen. Die Statuszeile zeigt, wie weit du es verschoben hast, und schlägt einen Suchbereich vor.</li>
+    <li><b>3 · Einrasten (<kbd>F</kbd>):</b> Alle anderen Kästchen übernehmen die Lage des Vorbilds in ihrem eigenen Zellrahmen. Was schon passt, bleibt stehen.</li>
+    <li><b>4 · Gestrichelte:</b> Die Erkennung war zu unsicher – oft, weil der Rahmen anders aussieht (verzierter Rahmen höherer Stufen). Die dünne Vorschau zeigt, wo es hinspringen würde. Entweder <b>eins davon von Hand setzen und nochmal F</b> – es wird Vorbild für alle gleichen Rahmen –, die Sicherheit auf den angezeigten Wert senken, oder „Unsichere trotzdem einrasten“. <kbd>Strg</kbd>+<kbd>Z</kbd> macht alles rückgängig.</li>
+  </ul>
+  <h3>Maus &amp; Tasten</h3>
+  <ul>
+    <li>Ziehen = verschieben · Pfeiltasten 1 px · <kbd>Shift</kbd>+Pfeil 5 px</li>
+    <li>Markieren: <kbd>Strg</kbd>+Klick oder Rahmen auf freier Fläche aufziehen – markierte bewegen sich zusammen; Einrasten wirkt dann nur auf sie · <kbd>Esc</kbd> hebt auf</li>
+    <li><kbd>A</kbd> alle mitbewegen · <kbd>R</kbd> Reihe angleichen (erstes Kästchen der Reihe auswählen) · <kbd>S</kbd> Spalte angleichen (oberstes auswählen) · <kbd>F</kbd> einrasten · <kbd>H</kbd> diese Hilfe</li>
+  </ul>
+  <h3>Suchbereich und Sicherheit</h3>
+  <ul>
+    <li><b>Suchbereich</b>: wie weit ein Kästchen höchstens springt. Etwas mehr als die Verschiebung am Vorbild. Zu groß: Der Rahmen der Nachbarzelle liegt nur ein Stück weiter und ist fast gleich deutlich.</li>
+    <li><b>Sicherheit</b>: Die Rahmenlinien müssen so deutlich sein und der Rahmen so ähnlich aussehen wie beim ähnlichsten Vorbild. Niedriger = mutiger, höher = vorsichtiger. Beide Werte merkt sich das Programm pro Tab.</li>
+  </ul>
+  <div class="foot">
+    <button id="copy" class="ghostbtn" title="Für Entwickler: die Kästchen-Positionen als JSON in die Zwischenablage">Deltas kopieren</button>
+    <button id="helpclose">Schließen</button>
+  </div>
+</div></div>
+<script src="adjust.js"></script>
+</body>
+</html>
