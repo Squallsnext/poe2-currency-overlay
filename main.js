@@ -2765,14 +2765,20 @@ function pumpReads() {
   }
 }
 
+// While the tab tour dialog is open, the scan key / controller button takes the tour's
+// picture instead of a Net Worth scan - so a controller player never has to click into
+// the overlay (which took them out of the stash every time; reported: three tries per tab).
+let tourHotkey = false;
+ipcMain.on('stash-tour-hotkey', (_e, on) => { tourHotkey = !!on; });
 function captureAndBroadcast() {
+  if (tourHotkey) { sendToUI('stash-tour-shoot'); return; }
   pendingGrabs.push(++captureSeq);
   sendToUI('stash-capturing');
   sendToUI('stash-queued', { depth: queueDepth() });
   pumpGrabs();
 }
 
-ipcMain.on('stash-capture-start', () => captureAndBroadcast());
+ipcMain.on('stash-capture-start', () => { if (tourHotkey) { sendToUI('stash-tour-shoot'); return; } captureAndBroadcast(); });
 ipcMain.handle('set-stash-dup', (_e, on) => { config.stashDupTabs = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-sort', (_e, on) => { config.stashSortLayout = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-show-missing', (_e, on) => { config.stashShowMissing = !!on; saveConfig(); return true; });

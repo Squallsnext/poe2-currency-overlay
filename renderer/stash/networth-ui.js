@@ -1174,6 +1174,16 @@
   // for the align tool, and saved (userData/tab-shots) so aligning works later without
   // scanning again. Tabs already scanned show their picture and can be redone.
   const TOUR_TABS = () => Object.keys(TAB_LABEL);
+  let tourHotkeyOn = false;
+  // a reload with the dialog open must not leave the scan key stuck in tour mode
+  try { if (window.api && window.api.stashTourHotkey) window.api.stashTourHotkey(false); } catch {}
+  // the scan key / controller button while the tour is open: press the dialog's
+  // "take picture" button (whichever mode, whichever tab is current)
+  if (window.api && window.api.onStashTourShoot) window.api.onStashTourShoot(() => {
+    if (!state.tour || state.tour.busy) return;
+    const b = document.querySelector('.nw-tour [data-shoot]');
+    if (b) b.click();
+  });
   async function startTour(support) {
     const settings = document.getElementById('settings');
     if (settings) settings.classList.add('hidden');
@@ -1275,7 +1285,8 @@
       busy.appendChild(el('span', 'nw-busy-lab', t('networth.tour.capturing')));
       box.appendChild(busy);
     } else {
-      const cap = el('button', 'nw-modal-opt nw-modal-new', st && st.state === 'ok' ? t('networth.tour.recapture') : t('networth.tour.capture'));
+      const cap = el('button', 'nw-modal-opt nw-modal-new', (st && st.state === 'ok' ? t('networth.tour.recapture') : t('networth.tour.capture')) + ` (${esc(state.hotkey)})`);
+      cap.dataset.shoot = '1';
       cap.onclick = async () => {
         tr.busy = true; tr.error = null; render();
         const r = await window.api.stashTourCapture(tab).catch((e) => ({ ok: false, error: String(e) }));
@@ -1346,7 +1357,8 @@
         busy.appendChild(el('span', 'nw-busy-lab', t('networth.tour.support_busy')));
         btns.appendChild(busy);
       } else {
-        const cap = el('button', 'nw-modal-opt nw-modal-new', t('networth.tour.support_capture', { tab: esc(TAB_LABEL[tab]) }));
+        const cap = el('button', 'nw-modal-opt nw-modal-new', t('networth.tour.support_capture', { tab: esc(TAB_LABEL[tab]), hotkey: esc(state.hotkey) }));
+        cap.dataset.shoot = '1';
         cap.onclick = async () => {
           tr.busy = true; tr.error = null; render();
           const r = await window.api.stashSupportShot(tab).catch((e) => ({ ok: false, error: String(e) }));
@@ -1510,6 +1522,8 @@
     if (state.modal) root.appendChild(modalEl());
     if (state.sample) root.appendChild(sampleModalEl());
     if (state.tour) root.appendChild(tourModalEl());
+    // tell main whether the scan key should take tour pictures
+    if (!!state.tour !== tourHotkeyOn) { tourHotkeyOn = !!state.tour; try { window.api.stashTourHotkey(tourHotkeyOn); } catch {} }
     root.scrollTop = scrollTop;
     persistRows();
   }

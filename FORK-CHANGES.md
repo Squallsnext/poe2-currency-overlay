@@ -437,6 +437,13 @@ The dialog says which was used. The full tour does the same: a tab whose frame i
 found is read again at the panel position of an earlier tab (`runReaderWorker` got an
 optional `calBox`).
 
+**Scan key takes the tour picture.** Reported with a controller: clicking the dialog's
+button took the player out of the stash every time - three tries per tab. While the tour
+dialog is open, the stash scan key (F7) and its controller button press the dialog's
+"take picture" button instead of starting a Net Worth scan (`captureAndBroadcast` checks
+a flag the dialog sets; reset on reload), so the player stays in the game. German tab
+label fixed: "Uralte Augmentation" (was "Uralte Aufwertungen").
+
 **Automatic snapping in the full tour** (`tourAutoSnap`): after reading, the boxes read
 with high confidence (≥ 0.9, up to 12) are models, every other box is snapped to its own
 cell frame (`renderer/stash/frame-snap.js`, the align tool's logic moved into a shared

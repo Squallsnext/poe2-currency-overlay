@@ -113,6 +113,9 @@ contextBridge.exposeInMainWorld('api', {
   stashSupportShot: (tab) => ipcRenderer.invoke('stash-support-shot', tab),
   stashSupportOpenFolder: () => ipcRenderer.invoke('stash-support-open-folder'),
   stashExportSettings: () => ipcRenderer.invoke('stash-export-settings'),
+  // tour open: the scan key / controller button takes the tour picture
+  stashTourHotkey: (on) => ipcRenderer.send('stash-tour-hotkey', on),
+  onStashTourShoot: (cb) => ipcRenderer.on('stash-tour-shoot', () => cb()),
   stashSampleDrop: (i) => ipcRenderer.invoke('stash-sample-drop', i),
   stashSampleScope: (i, scope) => ipcRenderer.invoke('stash-sample-scope', i, scope),
   stashSamplePreview: (i) => ipcRenderer.invoke('stash-sample-preview', i),
