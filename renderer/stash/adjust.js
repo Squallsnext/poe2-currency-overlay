@@ -232,81 +232,15 @@ function setGlobalSize(w, h){
 //    plus a preview of where it would have gone.
 // (An edge-PROFILE match over the whole surroundings was tried as well: less exact on a
 // real 1456 px panel - two of 13 boxes landed a frame-line spacing off - so not used.)
-let GRAY = null;
-function gray(){
-  if (GRAY) return GRAY;
+// the finding itself lives in frame-snap.js (shared with the tab tour in main.js)
+let SNAP = null;
+function snapper(){
+  if (SNAP) return SNAP;
   const img = $('panel');
   const c = document.createElement('canvas'); c.width = WIDTH; c.height = HEIGHT;
   const g = c.getContext('2d'); g.drawImage(img, 0, 0, WIDTH, HEIGHT);
-  const d = g.getImageData(0, 0, WIDTH, HEIGHT).data;
-  GRAY = new Float32Array(WIDTH * HEIGHT);
-  for (let i = 0, p = 0; i < GRAY.length; i++, p += 4) GRAY[i] = (d[p] + d[p + 1] + d[p + 2]) / 3;
-  return GRAY;
-}
-const px = (x, y) => GRAY[Math.min(HEIGHT - 1, Math.max(0, y | 0)) * WIDTH + Math.min(WIDTH - 1, Math.max(0, x | 0))];
-// Line strength along a run, counted only where the line is there along (nearly) all of
-// it: the run is cut into SEGS pieces and the second-weakest piece counts, times SEGS.
-// A frame line runs the whole cell; a digit's straight stroke ("1") only part of it -
-// summed plainly, that "1" beat the frame line 6318 to 3985 and pulled its box 24 px right.
-const SEGS = 6;
-function lineStrength(len, at){
-  const seg = new Array(SEGS).fill(0);
-  for (let k = 0; k < len; k++) seg[Math.min(SEGS - 1, Math.floor(k * SEGS / len))] += at(k);
-  seg.sort((p, q) => p - q);
-  return seg[1] * SEGS;
-}
-function colEdge(x, y0, len){ return lineStrength(len, (k) => Math.abs(px(x + 1, y0 + k) - px(x - 1, y0 + k))); }
-function rowEdge(y, x0, len){ return lineStrength(len, (k) => Math.abs(px(x0 + k, y + 1) - px(x0 + k, y - 1))); }
-// signed edge pattern a few px around a line (which side is brighter, the double line):
-// the cell's OWN frame and the neighbour's frame ~15 px away are equally strong but not
-// alike - this is what tells them apart
-const PAT = 6;
-function colPat(x, y0, len){ const o = []; for (let d = -PAT; d <= PAT; d++) { let s = 0; for (let k = 0; k < len; k += 2) s += px(x + d + 1, y0 + k) - px(x + d - 1, y0 + k); o.push(s); } return o; }
-function rowPat(y, x0, len){ const o = []; for (let d = -PAT; d <= PAT; d++) { let s = 0; for (let k = 0; k < len; k += 2) s += px(x0 + k, y + d + 1) - px(x0 + k, y + d - 1); o.push(s); } return o; }
-function ncc(a, b){
-  const n = a.length; let ma = 0, mb = 0;
-  for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
-  ma /= n; mb /= n;
-  let sab = 0, saa = 0, sbb = 0;
-  for (let i = 0; i < n; i++) { const u = a[i] - ma, v = b[i] - mb; sab += u * v; saa += u * u; sbb += v * v; }
-  return saa > 0 && sbb > 0 ? sab / Math.sqrt(saa * sbb) : 0;
-}
-// strongest vertical + horizontal frame line near (gx, gy), refined twice. With "like"
-// (a model's patterns and line strengths): every clear line - a local peak at least half
-// as strong as the MODEL's frame line, not half the strongest line around: a gilded
-// ornament three times the frame's strength would otherwise push the real frame line out
-// of the running - is a candidate, and the one whose pattern is most like the model's
-// wins; ties (within 0.05) go to the one nearest the predicted spot.
-function findCorner(gx, gy, R, len, like){
-  const x0 = Math.round(gx), y0 = Math.round(gy);
-  const pick = (c0, edge, pat, ref, refS) => {
-    const v = []; let best = -1, bi = 0;
-    for (let k = -R; k <= R; k++) { const e = edge(c0 + k); v.push(e); if (e > best) { best = e; bi = k; } }
-    if (!ref) return { c: c0 + bi, s: best };
-    const floor = 0.5 * Math.min(best, refS > 0 ? refS : best);
-    let win = null, winSim = -2;
-    for (let k = -R; k <= R; k++) {
-      const e = v[k + R];
-      if (e < floor) continue;
-      if (!((k === -R || e >= v[k + R - 1]) && (k === R || e >= v[k + R + 1]))) continue;
-      const sim = ncc(ref, pat(c0 + k));
-      if (win == null || sim > winSim + 0.05 || (sim > winSim - 0.05 && Math.abs(k) < Math.abs(win))) { win = k; winSim = Math.max(sim, winSim); }
-    }
-    if (win == null) { win = bi; winSim = 0; }
-    return { c: c0 + win, s: v[win + R], sim: winSim };
-  };
-  let cx = x0, cy = y0, sx = 0, sy = 0, simX = 1, simY = 1;
-  for (let pass = 0; pass < 2; pass++) {
-    const a = pick(x0, (x) => colEdge(x, cy, len), (x) => colPat(x, cy, len), like && like.col, like && like.sx); cx = a.c; sx = a.s; if (a.sim != null) simX = a.sim;
-    const b = pick(y0, (y) => rowEdge(y, cx, len), (y) => rowPat(y, cx, len), like && like.row, like && like.sy); cy = b.c; sy = b.s; if (b.sim != null) simY = b.sim;
-  }
-  return { x: cx, y: cy, sx, sy, simX, simY };
-}
-// a model: its frame corner (up/left of the number box), offset and patterns
-function modelFor(i, len){
-  const a = DATA[i];
-  const c = findCorner(a.x - a.h * 0.2, a.y - a.h * 0.2, Math.round(a.h * 0.5), len, null);
-  return { i, ox: a.x - c.x, oy: a.y - c.y, sx: c.sx, sy: c.sy, like: { col: colPat(c.x, c.y, len), row: rowPat(c.y, c.x, len), sx: c.sx, sy: c.sy } };
+  SNAP = window.FrameSnap.create(window.FrameSnap.grayFromRGBA(g.getImageData(0, 0, WIDTH, HEIGHT).data, WIDTH, 0, 0, WIDTH, HEIGHT), WIDTH, HEIGHT);
+  return SNAP;
 }
 const MAX_MODELS = 8;
 
@@ -344,57 +278,19 @@ function snapToFrames(){
   // one box, select it, press F")
   if (!leaders.size && selected) makeLeader(+selected.dataset.i);
   if (!leaders.size) { $('snapinfo').textContent = 'Erst ein Kästchen genau auf seine Zahl setzen – es wird Vorbild (★) – dann F.'; return; }
-  gray();
   snapshot();
   // after a snap with dashed boxes, the next F (no marking) works on those only: the rest
   // already sits, and the new model (often an ornate frame set by hand) should not be
   // measured against the plain ones
   const pending = [...document.querySelectorAll('.box.snapfail')].map((el) => +el.dataset.i);
   clearAllSnapFail();
-  const size = DATA[[...leaders][0]];
-  // run length ~ a cell (about three box heights), so a frame line is told from a digit
-  const len = Math.round(3 * size.h);
   const R = Math.max(1, Math.round(+rangeEl.value || 10));
   const minShare = (+minEl.value || 0) / 100;
-  const models = [...leaders].slice(-MAX_MODELS).map((i) => modelFor(i, len));
-  const targets = marked.size ? [...marked] : pending.length ? pending : DATA.map((_, i) => i);
-  // pass 1: for every box the best proposal over all models
-  const props = [];
-  for (const i of targets) {
-    if (leaders.has(i)) continue; // hand-placed boxes are never moved by snapping
-    const r = DATA[i];
-    let best = null;
-    for (const m of models) {
-      const c = findCorner(r.x - m.ox, r.y - m.oy, R, len, m.like);
-      const qx = m.sx > 0 ? c.sx / m.sx : 0, qy = m.sy > 0 ? c.sy / m.sy : 0, qs = Math.min(c.simX, c.simY);
-      const need = Math.min(qx, qy, qs);
-      const why = need === qs ? 'sim' : need === qx ? 'x' : 'y';
-      if (!best || need > best.need) best = { need, why, x: c.x + m.ox, y: c.y + m.oy };
-    }
-    if (best) props.push(Object.assign(best, { i, dx: best.x - r.x, dy: best.y - r.y }));
-  }
-  // pass 2: plausibility. A tab is shifted as a whole (calibration slightly off, a
-  // different UI scale), so the boxes' jumps are alike; a box jumping clearly differently
-  // latched onto something else - a gilded ornament, an item's straight edge. Measured on
-  // a test panel with painted-on ornate frames: three boxes snapped 8-26 px wrong while
-  // their lines looked certain - only their odd jump gave them away. Such a box is not
-  // moved but shown as unsure, with its jump next to the typical one.
-  // only boxes that actually jump: already-right boxes (jump 0) say nothing about the
-  // shift, and on a half-done tab they made the other half's correct jumps look odd
-  const confident = props.filter((q) => q.need >= minShare && Math.hypot(q.dx, q.dy) >= 0.5);
-  const med = (arr) => { const a = arr.slice().sort((p, q) => p - q); return a.length ? a[Math.floor(a.length / 2)] : 0; };
-  const mdx = med(confident.map((q) => q.dx)), mdy = med(confident.map((q) => q.dy));
-  const tol = Math.max(6, size.h * 0.15);
-  // ...but only when the jumps really ARE alike. Boxes placed by hand one by one are each
-  // off by a different amount, their jumps differ legitimately - checked there, 8 of 13
-  // correct snaps were held back. Spread = median distance of a jump from the median jump.
-  const spread = med(confident.map((q) => Math.hypot(q.dx - mdx, q.dy - mdy)));
-  const uniform = confident.length >= 3 && spread <= tol / 2;
-  for (const q of props) {
-    if (uniform && q.need >= minShare && Math.hypot(q.dx - mdx, q.dy - mdy) > tol) {
-      q.odd = { mdx, mdy }; q.why = 'odd';
-    }
-  }
+  const modelIdx = [...leaders].slice(-MAX_MODELS);
+  const models = modelIdx.map((i) => DATA[i]);
+  const targets = (marked.size ? [...marked] : pending.length ? pending : DATA.map((_, i) => i))
+    .filter((i) => !leaders.has(i)); // hand-placed boxes are never moved by snapping
+  const props = snapper().propose(DATA, models, targets, { range: R, minShare });
   let moved = 0, kept = 0, failed = 0, lowestNeed = 1, odd = 0;
   for (const q of props) {
     const i = q.i, r = DATA[i], el = boxEl(i);

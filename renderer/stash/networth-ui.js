@@ -338,6 +338,10 @@
     supBtn.title = t('networth.tour.support_start_title');
     supBtn.onclick = () => startTour(true);
     btns.appendChild(supBtn);
+    const expBtn = el('button', 'nw-set-btn nw-set-btn-ghost', t('networth.tour.export'));
+    expBtn.title = t('networth.tour.export_title');
+    expBtn.onclick = () => { window.api.stashExportSettings().catch(() => {}); };
+    btns.appendChild(expBtn);
     const calBtn = el('button', 'nw-set-btn', state.calibrated ? t('networth.settings.cal_button_recalibrate') : t('networth.settings.cal_button_calibrate'));
     calBtn.onclick = () => { try { window.api.stashCalibrateStart(); } catch {} };
     btns.appendChild(calBtn);
@@ -1250,6 +1254,15 @@
           : t('networth.tour.detected_ok', { tab: esc(TAB_LABEL[tab]) })));
         // unread slots are mostly items the player does not have - not a reading problem
         if (st.slotCount) info.appendChild(el('div', 'nw-dim', t('networth.tour.read', { read: st.readCount, empty: st.slotCount - st.readCount })));
+        // what the automatic snapping did (main.js tourAutoSnap)
+        const a = st.auto;
+        if (a) {
+          const line = !a.models ? t('networth.tour.auto_nomodel')
+            : a.kept ? t('networth.tour.auto_kept', { moved: a.moved, models: a.models, before: a.readBefore, after: a.readAfter })
+              : a.moved ? t('networth.tour.auto_discarded', { moved: a.moved, before: a.readBefore, after: a.readAfter == null ? '?' : a.readAfter })
+                : t('networth.tour.auto_none', { models: a.models });
+          info.appendChild(el('div', 'nw-tour-auto', line + (a.unsure ? ' ' + t('networth.tour.auto_unsure', { n: a.unsure }) : '')));
+        }
         if (st.old) info.appendChild(el('div', 'nw-dim', t('networth.tour.from_before')));
       }
       shot.appendChild(info);
@@ -1273,7 +1286,7 @@
             : code === 'game-window-black' ? t('networth.sample.capture_black')
               : t('networth.sample.capture_failed', { error: code });
         } else if (r.ask) tr.status[tab] = { state: 'ask', detected: r.detected, thumb: r.thumb };
-        else tr.status[tab] = { state: 'ok', detected: r.detected, learned: r.learned, readCount: r.readCount, slotCount: r.slotCount, thumb: r.thumb };
+        else tr.status[tab] = { state: 'ok', detected: r.detected, learned: r.learned, readCount: r.readCount, slotCount: r.slotCount, thumb: r.thumb, auto: r.auto };
         render();
       };
       if (st && st.state === 'ask') {
@@ -1285,7 +1298,7 @@
           tr.busy = true; render();
           const r = await window.api.stashTourConfirm(tab).catch((e) => ({ ok: false, error: String(e) }));
           tr.busy = false;
-          if (r && r.ok) tr.status[tab] = { state: 'ok', detected: r.detected, learned: true, readCount: r.readCount, slotCount: r.slotCount, thumb: r.thumb };
+          if (r && r.ok) tr.status[tab] = { state: 'ok', detected: r.detected, learned: true, readCount: r.readCount, slotCount: r.slotCount, thumb: r.thumb, auto: r.auto };
           else tr.error = t('networth.sample.capture_failed', { error: (r && r.error) || '?' });
           render();
         };
@@ -1324,6 +1337,8 @@
       if (tr.error) box.appendChild(el('div', 'nw-notice nw-error', esc(tr.error)));
       const last = tr.lastThumb;
       if (last) { const im = document.createElement('img'); im.className = 'nw-tour-last'; im.src = last; im.alt = ''; box.appendChild(im); }
+      // how the last picture was cut - a whole-screen one means the stash frame was not found
+      if (last && tr.lastSource && tr.lastSource !== 'found') box.appendChild(el('div', 'nw-dim', t('networth.tour.support_src_' + tr.lastSource.replace('-', '_'))));
       const btns = el('div', 'nw-tour-btns');
       if (tr.busy) {
         const busy = el('div', 'nw-sample-busy');
@@ -1336,7 +1351,7 @@
           tr.busy = true; tr.error = null; render();
           const r = await window.api.stashSupportShot(tab).catch((e) => ({ ok: false, error: String(e) }));
           tr.busy = false;
-          if (r && r.ok) { tr.status[tab] = { state: 'ok' }; tr.lastThumb = r.thumb; tr.i++; }
+          if (r && r.ok) { tr.status[tab] = { state: 'ok' }; tr.lastThumb = r.thumb; tr.lastSource = r.source; tr.i++; }
           else {
             const code = (r && r.error) || '?';
             tr.error = code === 'game-window-not-found' ? t('networth.sample.capture_no_game')

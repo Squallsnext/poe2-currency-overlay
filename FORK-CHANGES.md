@@ -427,6 +427,33 @@ margin and saved to `userData/tab-shots/support/<tab>.png` (+ `.json`: frame siz
 how it was found). After each picture it moves straight to the next tab; "Done - open
 folder" closes the run and opens the folder. Tested headless with a stubbed capture.
 
+**Found in the first real support run:** after two tabs the pictures showed the hideout's
+map device. The panel is found by its frame colour, which is the colour the player gave
+the tab; where it was not found, the crop fell back to the reference-size box (a 1920
+layout), which at 5K is the middle of the screen. Now the fallback is where the panel was
+found for an earlier tab of the same run (the stash does not move between tabs), then
+the calibration, and without either the **whole screen** is saved - never a wrong crop.
+The dialog says which was used. The full tour does the same: a tab whose frame is not
+found is read again at the panel position of an earlier tab (`runReaderWorker` got an
+optional `calBox`).
+
+**Automatic snapping in the full tour** (`tourAutoSnap`): after reading, the boxes read
+with high confidence (≥ 0.9, up to 12) are models, every other box is snapped to its own
+cell frame (`renderer/stash/frame-snap.js`, the align tool's logic moved into a shared
+module), the tab is read again with the new positions, and they are saved only if that
+read is not worse (same or more counts; counts read before not less sure). The trial
+positions are handed to the reader synchronously and restored at once, so a config save
+during the read cannot write them. The dialog says what happened ("12 boxes snapped
+automatically, 48 instead of 46 counts read - kept" / "discarded" / "no model").
+**Needs the real game to test** - the headless tests cover the shared snapping module
+(same results as before in the align tool) and the dialog, not the full read-compare
+cycle.
+
+**Export settings** (next to the tour buttons): alignment and per-slot reader settings,
+calibration, hi-res switch, learned tab fingerprints and learned digit templates into
+the support folder as `einstellungen.json` (+ `learned-digit-templates.json`), folder
+opens - meant for turning a well-tested setup into defaults for others.
+
 ### 4.6c Quieter Net Worth cards, fold-all
 
 - "Wrong tab? / Align / Debug" on each tab card stay faint (18 %) until the card is

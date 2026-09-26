@@ -112,6 +112,7 @@ contextBridge.exposeInMainWorld('api', {
   // quick picture-only run for support (no reading)
   stashSupportShot: (tab) => ipcRenderer.invoke('stash-support-shot', tab),
   stashSupportOpenFolder: () => ipcRenderer.invoke('stash-support-open-folder'),
+  stashExportSettings: () => ipcRenderer.invoke('stash-export-settings'),
   stashSampleDrop: (i) => ipcRenderer.invoke('stash-sample-drop', i),
   stashSampleScope: (i, scope) => ipcRenderer.invoke('stash-sample-scope', i, scope),
   stashSamplePreview: (i) => ipcRenderer.invoke('stash-sample-preview', i),

@@ -2045,3 +2045,4 @@ footer {
 .fold-all:hover { opacity: 1; color: var(--tx-hi); border-color: var(--am-hi); }
 #buckets.hidden + #cur-fold-all, #networth-root.hidden + #nw-fold-all { display: none; }
 .nw-tour-last { width: 180px; border-radius: 4px; border: 1px solid var(--in-bd); margin: 2px 0 8px; opacity: .8; }
+.nw-tour-auto { color: var(--tx-gold2); line-height: 1.4; }

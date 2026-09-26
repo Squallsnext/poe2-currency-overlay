@@ -1877,7 +1877,7 @@ const TAB_MAPS = {
   expedition: require('./renderer/stash/expedition-tab-map'),
 };
 
-function runReaderWorker(bitmap, W, H, onDetected) {
+function runReaderWorker(bitmap, W, H, onDetected, opts) {
   return new Promise((resolve) => {
     let w;
     try {
@@ -1899,7 +1899,9 @@ function runReaderWorker(bitmap, W, H, onDetected) {
     // keyed by tab, then apiId. The worker doesn't know the tab until it detects one, so
     // the whole map rides along and it looks up its own tab's entry.
     const slotOverrides = config.stashSlotOverrides || null;
-    w.postMessage({ bitmap: ab, W, H, calBox: config.stashCalibration || null, learnedTemplates, slotOverrides, hiRes: !!config.stashHiRes, userTabSigs: config.stashUserTabSigs || null }, [ab]); // transfer the ~8MB frame, no copy
+    // opts.calBox: a panel box to use instead of the calibration (tab tour: where the
+    // panel was found for an earlier tab of the same run)
+    w.postMessage({ bitmap: ab, W, H, calBox: (opts && opts.calBox) || config.stashCalibration || null, learnedTemplates, slotOverrides, hiRes: !!config.stashHiRes, userTabSigs: config.stashUserTabSigs || null }, [ab]); // transfer the ~8MB frame, no copy
   });
 }
 
@@ -2473,7 +2475,7 @@ ipcMain.handle('stash-forget-digits', (_e, { digits } = {}) => {
 let adjustWin = null;
 function closeAdjustWin() { try { if (adjustWin && !adjustWin.isDestroyed()) adjustWin.close(); } catch {} adjustWin = null; }
 
-function buildAdjustSlotData(tab, cap) {
+function buildAdjustSlotData(tab, cap, noImage) {
   const map = TAB_MAPS[tab];
   if (!map || !Array.isArray(map.STATIC_SLOTS)) return null;
   const TT = require('./renderer/stash/tab-templates.json');
@@ -2508,10 +2510,11 @@ function buildAdjustSlotData(tab, cap) {
       apiId: s.apiId, label, cls,
       x: +(cx - strip * kx).toFixed(2), y: +(cy - up * ky).toFixed(2),
       w: +(strip * 2 * kx).toFixed(2), h: +((up + dn) * ky).toFixed(2),
-      cxRef: s.cx, cyRef: s.cy,
+      cxRef: s.cx, cyRef: s.cy, conf: r.count == null ? null : conf,
     });
   }
   if (!rows.length) return { ok: true, rows: [], width, height, refBox, x, y };
+  if (noImage) return { ok: true, rows, width, height, refBox, x, y };
   const img = nativeImage.createFromBitmap(Buffer.from(cap.bitmap), { width: cap.W, height: cap.H });
   const panelPng = img.crop({ x, y, width, height }).toPNG();
   return { ok: true, rows, width, height, refBox, panelBase64: panelPng.toString('base64') };
@@ -3737,7 +3740,8 @@ const tourFile = (tab, ext) => path.join(TOUR_DIR(), `${tab}.${ext}`);
 // one asked for, nothing is learned or saved until the player says which it is. (The
 // first version learned right away - a player who simply had the wrong tab open taught
 // the app that Abyss looks like Essences.)
-let tourPending = null; // { expected, bitmap, W, H, res } awaiting "yes, it is that tab"
+let tourPending = null;
+let tourLastBox = null; // where the panel was found for an earlier tab (same screen size) // { expected, bitmap, W, H, res } awaiting "yes, it is that tab"
 async function tourGrab() {
   const wasVisible = win && win.isVisible() && win.getOpacity() > 0;
   await primeCapture();
@@ -3794,6 +3798,74 @@ function tourKeep(expected, bitmap, W, H, res) {
   return { ok: true, tab: expected, readCount: meta.readCount, slotCount: meta.slotCount,
     thumb: panel.resize({ width: Math.min(420, crop.w), quality: 'good' }).toDataURL() };
 }
+// ---- automatic snapping after a tour picture ----
+// The boxes whose number was read with high confidence demonstrably sit right - they are
+// the models (like the ★ in the align tool); every other box is placed at the same spot
+// in its own cell frame (frame-snap.js). Then the tab is read again with the new
+// positions, and they are kept only if that read is not worse (same or more counts, and
+// the counts read before not less sure). A box on an empty slot cannot be checked by a
+// number; it moves only if its frame was found clearly (and not "odd").
+const AUTO_MODEL_CONF = 0.9;
+async function tourAutoSnap(tab, cap, res) {
+  const out = { models: 0, moved: 0, unsure: 0, kept: false, readBefore: res.readCount || 0, readAfter: null };
+  try {
+    const data = buildAdjustSlotData(tab, cap, true);
+    if (!data || !data.rows.length) return out;
+    const rows = data.rows;
+    const modelIdx = rows.map((r, i) => (r.conf != null && r.conf >= AUTO_MODEL_CONF ? i : -1)).filter((i) => i >= 0)
+      .sort((a, b) => rows[b].conf - rows[a].conf).slice(0, 12);
+    out.models = modelIdx.length;
+    if (!modelIdx.length) return out;
+    const FS = require('./renderer/stash/frame-snap.js');
+    const gray = FS.grayFromRGBA(cap.bitmap, cap.W, data.x, data.y, data.width, data.height);
+    const snap = FS.create(gray, data.width, data.height);
+    const targets = rows.map((_, i) => i).filter((i) => !modelIdx.includes(i));
+    const props = snap.propose(rows, modelIdx.map((i) => rows[i]), targets, { range: Math.max(4, Math.round(rows[0].h * 0.35)), minShare: 0.5 });
+    const kx = data.width / data.refBox.w, ky = data.height / data.refBox.h;
+    const deltas = {};
+    for (const q of props) {
+      if (q.need < 0.5 || q.odd) { out.unsure++; continue; }
+      if (Math.abs(q.dx) < 0.5 && Math.abs(q.dy) < 0.5) continue;
+      const r = rows[q.i];
+      deltas[r.apiId] = {
+        cx: +(data.refBox.x + (q.x + r.w / 2) / kx).toFixed(2), cy: +(data.refBox.y + (q.y + r.h / 2) / ky).toFixed(2),
+        stripWidth: +((r.w / kx) / 2).toFixed(2), up: +((r.h / ky) / 2).toFixed(2), dn: +((r.h / ky) / 2).toFixed(2),
+      };
+      out.moved++;
+    }
+    if (!out.moved) return out;
+    // read again with the new positions (not saved yet) and compare
+    const saved = config.stashSlotOverrides;
+    const trial = JSON.parse(JSON.stringify(saved || {}));
+    trial[tab] = trial[tab] || {};
+    for (const [id, d] of Object.entries(deltas)) trial[tab][id] = Object.assign({}, trial[tab][id], d);
+    // the worker is handed the overrides synchronously when it starts - restore right
+    // away, so a config save during the read can never write the trial positions
+    config.stashSlotOverrides = trial;
+    let pending;
+    try { pending = runReaderWorker(cap.bitmap, cap.W, cap.H, null); } finally { config.stashSlotOverrides = saved; }
+    const res2 = await pending;
+    if (!res2 || !res2.ok || res2.mismatch || res2.tab !== tab) return out;
+    out.readAfter = res2.readCount;
+    const before = new Map((res.reads || []).map((r) => [r.apiId, r]));
+    const after = new Map((res2.reads || []).map((r) => [r.apiId, r]));
+    let confBefore = 0, confAfter = 0, n = 0;
+    for (const [id, r] of before) {
+      if (r.count == null || !after.get(id)) continue;
+      confBefore += r.conf || 0; confAfter += after.get(id).conf || 0; n++;
+    }
+    const notWorse = res2.readCount >= res.readCount && (!n || confAfter / n >= confBefore / n - 0.02);
+    if (notWorse) {
+      mergeSlotOverrides(tab, deltas);
+      out.kept = true;
+      out.res = res2;
+      logToggle('stash-learn', `tab tour auto-snap ${tab}: ${out.moved} moved, reads ${res.readCount} -> ${res2.readCount}`);
+    } else {
+      logToggle('stash-learn', `tab tour auto-snap ${tab}: discarded (reads ${res.readCount} -> ${res2.readCount})`);
+    }
+  } catch (e) { logToggle('stash-learn', `tab tour auto-snap failed: ${e && e.message}`); }
+  return out;
+}
 async function tourCapture(expected) {
   if (!TAB_MAPS[expected]) return { ok: false, error: 'unknown-tab' };
   tourPending = null;
@@ -3802,7 +3874,11 @@ async function tourCapture(expected) {
     if (!shot) return { ok: false, error: 'game-window-not-found' };
     if (frameLooksBlank(shot.bitmap)) return { ok: false, error: 'game-window-black' };
     const bitmap = Buffer.from(shot.bitmap), W = shot.W, H = shot.H;
-    const res = await runReaderWorker(bitmap, W, H, null);
+    let res = await runReaderWorker(bitmap, W, H, null);
+    // panel not found by its frame (its colour is the tab's own): read again at the spot
+    // it was found for an earlier tab of this run - the stash does not move between tabs
+    if (res && res.ok && res.autoFound && res.box) tourLastBox = { box: res.box, W, H };
+    else if (tourLastBox && tourLastBox.W === W && tourLastBox.H === H) res = await runReaderWorker(bitmap, W, H, null, { calBox: tourLastBox.box });
     const detected = res && res.ok && !res.mismatch ? res.tab : (res && res.detectedTab) || null;
     if (detected !== expected) {
       // ask first - most likely the wrong tab is open in game
@@ -3813,7 +3889,8 @@ async function tourCapture(expected) {
       return { ok: true, ask: true, tab: expected, detected, thumb: prev.resize({ width: 420, quality: 'good' }).toDataURL() };
     }
     if (res.box) pruneTabSigs(expected, tourSig(bitmap, W, H, res.box));
-    return Object.assign(tourKeep(expected, bitmap, W, H, res), { detected });
+    const auto = await tourAutoSnap(expected, { bitmap, W, H, box: res.box, res }, res);
+    return Object.assign(tourKeep(expected, bitmap, W, H, auto.kept ? auto.res : res), { detected, auto: stripAuto(auto) });
   } catch (e) {
     syncOverlayState();
     return { ok: false, error: String((e && e.message) || e) };
@@ -3836,11 +3913,14 @@ async function tourConfirm(expected) {
       logToggle('stash-learn', `tab tour: confirmed ${expected} (read as ${pd.res && pd.res.tab || 'none'})`);
     }
     const res = await runReaderWorker(pd.bitmap, pd.W, pd.H, null);
-    return Object.assign(tourKeep(expected, pd.bitmap, pd.W, pd.H, res), { detected: expected, learned: true });
+    const ok = res && res.ok && !res.mismatch && res.tab === expected;
+    const auto = ok ? await tourAutoSnap(expected, { bitmap: pd.bitmap, W: pd.W, H: pd.H, box: res.box, res }, res) : null;
+    return Object.assign(tourKeep(expected, pd.bitmap, pd.W, pd.H, auto && auto.kept ? auto.res : res), { detected: expected, learned: true, auto: auto && stripAuto(auto) });
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };
   }
 }
+const stripAuto = (a) => ({ models: a.models, moved: a.moved, unsure: a.unsure, kept: a.kept, readBefore: a.readBefore, readAfter: a.readAfter });
 // a saved tour picture as a capture the align tool can open (panel crop = the frame)
 function loadTourCapture(tab) {
   try {
@@ -3858,6 +3938,7 @@ function loadTourCapture(tab) {
 // frame (panel-finder, fast - the slow part of a scan is reading the digits) and cut out
 // with a generous margin; without a frame found, the calibration / reference box is used.
 const SUPPORT_DIR = () => path.join(TOUR_DIR(), 'support');
+let supportLastBox = null; // panel box found for an earlier tab (same run / same screen size)
 async function supportShot(tab) {
   if (!TAB_MAPS[tab]) return { ok: false, error: 'unknown-tab' };
   try {
@@ -3865,30 +3946,62 @@ async function supportShot(tab) {
     if (!shot) return { ok: false, error: 'game-window-not-found' };
     if (frameLooksBlank(shot.bitmap)) return { ok: false, error: 'game-window-black' };
     const bitmap = Buffer.from(shot.bitmap), W = shot.W, H = shot.H;
+    // Where the panel is: found by its coloured frame; else where it was found for an
+    // earlier tab of this run (the stash does not move between tabs); else the
+    // calibration; else the WHOLE screen. Reported: the frame colour is whatever the
+    // player gave the tab, some tabs were not found, and the reference-size fallback (a
+    // 1920 layout) landed in the middle of a 5K hideout - pictures of the map device.
     let box = null, source = 'found';
     try {
       const PF = require('./renderer/stash/panel-finder.js');
       const found = PF.findPanel(bitmap, W, H);
       if (found) box = PF.frameToContent(found);
     } catch { /* fall back below */ }
-    if (!box) {
-      source = config.stashCalibration ? 'calibration' : 'reference';
-      box = config.stashCalibration || (() => { const k = W / 1920; return { x: REF_BOX.x * k, y: REF_BOX.y * k, w: REF_BOX.w * k, h: REF_BOX.h * k }; })();
-    }
-    const M = Math.round(Math.max(24, box.h * 0.04));
-    const x = Math.max(0, Math.round(box.x) - M), y = Math.max(0, Math.round(box.y) - M);
-    const w = Math.min(Math.round(box.w) + M * 2, W - x), h = Math.min(Math.round(box.h) + M * 2, H - y);
+    if (box) supportLastBox = { box, W, H };
+    else if (supportLastBox && supportLastBox.W === W && supportLastBox.H === H) { box = supportLastBox.box; source = 'earlier-tab'; }
+    else if (config.stashCalibration) { box = config.stashCalibration; source = 'calibration'; }
+    let x, y, w, h;
+    if (box) {
+      const M = Math.round(Math.max(24, box.h * 0.04));
+      x = Math.max(0, Math.round(box.x) - M); y = Math.max(0, Math.round(box.y) - M);
+      w = Math.min(Math.round(box.w) + M * 2, W - x); h = Math.min(Math.round(box.h) + M * 2, H - y);
+    } else { source = 'whole-screen'; x = 0; y = 0; w = W; h = H; }
     const panel = nativeImage.createFromBitmap(bitmap, { width: W, height: H }).crop({ x, y, width: w, height: h });
     fs.mkdirSync(SUPPORT_DIR(), { recursive: true });
     fs.writeFileSync(path.join(SUPPORT_DIR(), `${tab}.png`), panel.toPNG());
     fs.writeFileSync(path.join(SUPPORT_DIR(), `${tab}.json`), JSON.stringify({ tab, at: Date.now(), frame: { w: W, h: H }, box, crop: { x, y, w, h }, source, app: app.getVersion() }));
-    return { ok: true, tab, thumb: panel.resize({ width: Math.min(300, w), quality: 'good' }).toDataURL() };
+    return { ok: true, tab, source, thumb: panel.resize({ width: Math.min(300, w), quality: 'good' }).toDataURL() };
   } catch (e) {
     syncOverlayState();
     return { ok: false, error: String((e && e.message) || e) };
   }
 }
 ipcMain.handle('stash-support-shot', async (_e, tab) => supportShot(tab));
+// "Export my settings": the player's tuned setup (alignment + per-slot reader settings,
+// hi-res switch, calibration, learned tab fingerprints and digit templates) into the
+// support folder - so a setup that works can become the default for others. Nothing
+// leaves the PC unless the player sends the file.
+ipcMain.handle('stash-export-settings', async () => {
+  try {
+    fs.mkdirSync(SUPPORT_DIR(), { recursive: true });
+    const disp = screen.getPrimaryDisplay();
+    const out = {
+      app: app.getVersion(), at: new Date().toISOString(),
+      screen: { w: Math.round(disp.size.width * disp.scaleFactor), h: Math.round(disp.size.height * disp.scaleFactor), scaleFactor: disp.scaleFactor },
+      stashCalibration: config.stashCalibration || null,
+      stashHiRes: !!config.stashHiRes,
+      stashSlotOverrides: config.stashSlotOverrides || {},
+      stashUserTabSigs: config.stashUserTabSigs || {},
+    };
+    fs.writeFileSync(path.join(SUPPORT_DIR(), 'einstellungen.json'), JSON.stringify(out, null, 1));
+    try {
+      const learned = path.join(app.getPath('userData'), 'learned-digit-templates.json');
+      if (fs.existsSync(learned)) fs.copyFileSync(learned, path.join(SUPPORT_DIR(), 'learned-digit-templates.json'));
+    } catch { /* optional */ }
+    await shell.openPath(SUPPORT_DIR());
+    return { ok: true };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
 ipcMain.handle('stash-support-open-folder', async () => { fs.mkdirSync(SUPPORT_DIR(), { recursive: true }); return shell.openPath(SUPPORT_DIR()); });
 ipcMain.handle('stash-tour-capture', async (_e, tab) => tourCapture(tab));
 ipcMain.handle('stash-tour-confirm', async (_e, tab) => tourConfirm(tab));
