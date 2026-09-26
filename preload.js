@@ -103,6 +103,10 @@ contextBridge.exposeInMainWorld('api', {
   onRepriceSampleReady: (fn) => ipcRenderer.on('reprice-sample-ready', (_e, p) => fn(p)),
   onRepriceMode: (fn) => ipcRenderer.on('reprice-mode', (_e, on) => fn(!!on)),
   stashSampleCapture: () => ipcRenderer.invoke('stash-sample-capture'),
+  // tab tour (Fächer scannen): one picture per tab, saved for aligning later
+  stashTourCapture: (tab) => ipcRenderer.invoke('stash-tour-capture', tab),
+  stashTourList: () => ipcRenderer.invoke('stash-tour-list'),
+  stashTourOpenFolder: () => ipcRenderer.invoke('stash-tour-open-folder'),
   stashSampleDrop: (i) => ipcRenderer.invoke('stash-sample-drop', i),
   stashSampleScope: (i, scope) => ipcRenderer.invoke('stash-sample-scope', i, scope),
   stashSamplePreview: (i) => ipcRenderer.invoke('stash-sample-preview', i),

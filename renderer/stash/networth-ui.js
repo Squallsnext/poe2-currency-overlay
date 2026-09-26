@@ -330,6 +330,10 @@
     wzBtn.title = t('networth.wizard.start_title');
     wzBtn.onclick = () => startWizard();
     btns.appendChild(wzBtn);
+    const tourBtn = el('button', 'nw-set-btn', t('networth.tour.start'));
+    tourBtn.title = t('networth.tour.start_title');
+    tourBtn.onclick = () => startTour();
+    btns.appendChild(tourBtn);
     const calBtn = el('button', 'nw-set-btn', state.calibrated ? t('networth.settings.cal_button_recalibrate') : t('networth.settings.cal_button_calibrate'));
     calBtn.onclick = () => { try { window.api.stashCalibrateStart(); } catch {} };
     btns.appendChild(calBtn);
@@ -1155,6 +1159,134 @@
     return wrap;
   }
 
+  // ---------- tab tour ("Fächer scannen") ----------
+  // One tab after the other: "open tab X in game, then take the picture" - the app hides
+  // itself and takes it - or "not owned / skip". Each picture is checked against the tab
+  // it should be (main.js tourCapture: a mismatch teaches that tab's fingerprint), kept
+  // for the align tool, and saved (userData/tab-shots) so aligning works later without
+  // scanning again. Tabs already scanned show their picture and can be redone.
+  const TOUR_TABS = () => Object.keys(TAB_LABEL);
+  async function startTour() {
+    const settings = document.getElementById('settings');
+    if (settings) settings.classList.add('hidden');
+    const tabBtn = document.getElementById('tab-networth');
+    if (tabBtn && !tabBtn.classList.contains('active')) tabBtn.click();
+    let saved = {};
+    try { saved = (await window.api.stashTourList()) || {}; } catch {}
+    const status = {};
+    for (const k of Object.keys(saved)) status[k] = Object.assign({ state: 'ok', old: true }, saved[k]);
+    state.tour = { i: 0, status, busy: false, error: null };
+    render();
+  }
+  function tourNext() {
+    const tr = state.tour;
+    tr.error = null;
+    tr.i = Math.min(TOUR_TABS().length, tr.i + 1);
+    render();
+  }
+  function tourModalEl() {
+    const tr = state.tour;
+    const tabs = TOUR_TABS();
+    const back = el('div', 'nw-modal-back');
+    const box = el('div', 'nw-modal nw-tour');
+    box.appendChild(el('div', 'nw-modal-title', t('networth.tour.title')));
+    // progress: every tab as a chip - done, skipped, current
+    const chips = el('div', 'nw-tour-chips');
+    tabs.forEach((tab, k) => {
+      const st = tr.status[tab];
+      const mark = st ? (st.state === 'ok' ? '✓ ' : '– ') : '';
+      const c = el('button', 'nw-tour-chip' + (k === tr.i ? ' cur' : '') + (st && st.state === 'ok' ? ' ok' : '') + (st && st.state === 'skip' ? ' skip' : ''), esc(mark + TAB_LABEL[tab]));
+      c.onclick = () => { tr.i = k; tr.error = null; render(); };
+      chips.appendChild(c);
+    });
+    box.appendChild(chips);
+    if (tr.i >= tabs.length) {
+      // summary: what was scanned, a way to align each, where the pictures are
+      const done = tabs.filter((tb) => tr.status[tb] && tr.status[tb].state === 'ok').length;
+      box.appendChild(el('div', 'nw-modal-sub', t('networth.tour.summary', { done, total: tabs.length })));
+      const list = el('div', 'nw-tour-sumlist');
+      for (const tab of tabs) {
+        const st = tr.status[tab];
+        if (!st || st.state !== 'ok') continue;
+        const row = el('div', 'nw-tour-sumrow');
+        row.appendChild(el('span', null, esc(TAB_LABEL[tab])));
+        const al = el('button', 'nw-set-btn nw-set-btn-ghost', t('networth.row.adjust_label'));
+        al.onclick = () => { window.api.stashAdjustOpen(tab).catch(() => {}); };
+        row.appendChild(al);
+        list.appendChild(row);
+      }
+      box.appendChild(list);
+      const folder = el('button', 'nw-set-btn nw-set-btn-ghost', t('networth.tour.open_folder'));
+      folder.title = t('networth.tour.open_folder_title');
+      folder.onclick = () => { window.api.stashTourOpenFolder().catch(() => {}); };
+      box.appendChild(folder);
+      const close = el('button', 'nw-modal-opt nw-modal-new', t('networth.tour.close'));
+      close.onclick = () => { state.tour = null; render(); };
+      box.appendChild(close);
+      back.appendChild(box);
+      return back;
+    }
+    const tab = tabs[tr.i];
+    const st = tr.status[tab];
+    box.appendChild(el('div', 'nw-tour-step', t('networth.tour.step', { n: tr.i + 1, total: tabs.length, tab: esc(TAB_LABEL[tab]) })));
+    if (tr.error) box.appendChild(el('div', 'nw-notice nw-error', esc(tr.error)));
+    if (st && st.state === 'ok') {
+      const shot = el('div', 'nw-tour-shot');
+      if (st.thumb) { const im = document.createElement('img'); im.src = st.thumb; im.alt = ''; shot.appendChild(im); }
+      const info = el('div', 'nw-tour-info');
+      info.appendChild(el('div', null, st.detected === tab
+        ? t('networth.tour.detected_ok', { tab: esc(TAB_LABEL[tab]) })
+        : t('networth.tour.detected_learned', { tab: esc(TAB_LABEL[tab]), other: esc(st.detected ? (TAB_LABEL[st.detected] || st.detected) : t('networth.tour.nothing')) })));
+      if (st.slotCount) info.appendChild(el('div', 'nw-dim', t('networth.tour.read', { read: st.readCount, total: st.slotCount })));
+      if (st.old) info.appendChild(el('div', 'nw-dim', t('networth.tour.from_before')));
+      shot.appendChild(info);
+      box.appendChild(shot);
+    }
+    const btns = el('div', 'nw-tour-btns');
+    if (tr.busy) {
+      const busy = el('div', 'nw-sample-busy');
+      busy.appendChild(el('span', 'nw-spin'));
+      busy.appendChild(el('span', 'nw-busy-lab', t('networth.tour.capturing')));
+      box.appendChild(busy);
+    } else {
+      const cap = el('button', 'nw-modal-opt nw-modal-new', st && st.state === 'ok' ? t('networth.tour.recapture') : t('networth.tour.capture'));
+      cap.onclick = async () => {
+        tr.busy = true; tr.error = null; render();
+        const r = await window.api.stashTourCapture(tab).catch((e) => ({ ok: false, error: String(e) }));
+        tr.busy = false;
+        if (!r || !r.ok) {
+          const code = (r && r.error) || '?';
+          tr.error = code === 'game-window-not-found' ? t('networth.sample.capture_no_game')
+            : code === 'game-window-black' ? t('networth.sample.capture_black')
+              : t('networth.sample.capture_failed', { error: code });
+        } else tr.status[tab] = { state: 'ok', detected: r.detected, learned: r.learned, readCount: r.readCount, slotCount: r.slotCount, thumb: r.thumb };
+        render();
+      };
+      btns.appendChild(cap);
+      if (st && st.state === 'ok') {
+        const al = el('button', 'nw-modal-opt', t('networth.row.adjust_label'));
+        al.onclick = () => { window.api.stashAdjustOpen(tab).catch(() => {}); };
+        btns.appendChild(al);
+        const nx = el('button', 'nw-modal-opt', t('networth.tour.next'));
+        nx.onclick = () => tourNext();
+        btns.appendChild(nx);
+      } else {
+        const sk = el('button', 'nw-modal-opt', t('networth.tour.skip'));
+        sk.title = t('networth.tour.skip_title');
+        sk.onclick = () => { tr.status[tab] = { state: 'skip' }; tourNext(); };
+        btns.appendChild(sk);
+      }
+    }
+    box.appendChild(btns);
+    box.appendChild(el('div', 'nw-sample-req', t('networth.tour.hint')));
+    const cancel = el('button', 'nw-modal-cancel', t('networth.tour.close'));
+    cancel.onclick = () => { state.tour = null; render(); };
+    box.appendChild(cancel);
+    back.appendChild(box);
+    back.onclick = null; // closes only via its buttons - a stray click must not lose the run
+    return back;
+  }
+
   function startSampleFlow() {
     return window.api.stashSampleReset().then(() => {
       state.sample = { shots: [], error: null, sending: false, done: 0 };
@@ -1232,6 +1364,10 @@
         + t('networth.empty.supported_tabs', { tabs: esc(Object.values(TAB_LABEL).join(', ')) })
         ));
       if (!state.wizard) {
+        const tb = el('button', 'nw-set-btn', t('networth.tour.start'));
+        tb.title = t('networth.tour.start_title');
+        tb.onclick = () => startTour();
+        wrap.appendChild(tb);
         const wz = el('button', 'nw-set-btn', t('networth.wizard.start'));
         wz.onclick = () => startWizard();
         wrap.appendChild(wz);
@@ -1280,6 +1416,7 @@
     root.appendChild(wrap);
     if (state.modal) root.appendChild(modalEl());
     if (state.sample) root.appendChild(sampleModalEl());
+    if (state.tour) root.appendChild(tourModalEl());
     root.scrollTop = scrollTop;
     persistRows();
   }

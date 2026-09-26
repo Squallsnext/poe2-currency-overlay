@@ -2524,7 +2524,8 @@ ipcMain.handle('stash-adjust-data', () => adjustData);
 
 ipcMain.handle('stash-adjust-open', (_e, tab) => {
   try {
-    const cap = lastCaptureByTab.get(tab);
+    // the last scan of this tab, else its saved tour picture (Fächer scannen)
+    const cap = lastCaptureByTab.get(tab) || loadTourCapture(tab);
     if (!cap) return { ok: false, reason: 'no-recent-capture' };
     const data = buildAdjustSlotData(tab, cap);
     if (!data || !data.rows.length) return { ok: false, reason: 'nothing-to-adjust' };
@@ -3722,6 +3723,98 @@ async function captureStashSample() {
     return { ok: false, error: String((e && e.message) || e) };
   }
 }
+
+// ---------- tab tour ("Fächer scannen") ----------
+// Setup walks the player through every supported tab: "open tab X", one press, the app
+// takes the picture itself with the overlay hidden - or "not owned / skip". Each picture
+// is checked against the tab it should be (a mismatch teaches that tab's fingerprint,
+// like "Wrong tab?"), kept for the align tool right away, and saved as a panel crop in
+// userData/tab-shots, so aligning works later without scanning again - and the pictures
+// are there for building frame templates (e.g. for lower resolutions).
+const TOUR_DIR = () => path.join(app.getPath('userData'), 'tab-shots');
+const tourFile = (tab, ext) => path.join(TOUR_DIR(), `${tab}.${ext}`);
+async function tourCapture(expected) {
+  if (!TAB_MAPS[expected]) return { ok: false, error: 'unknown-tab' };
+  const wasVisible = win && win.isVisible() && win.getOpacity() > 0;
+  try {
+    await primeCapture();
+    const disp = screen.getPrimaryDisplay();
+    const capW = Math.round(disp.size.width * disp.scaleFactor);
+    const capH = Math.round(disp.size.height * disp.scaleFactor);
+    if (wasVisible) { win.setOpacity(0); if (process.platform !== 'win32') win.hide(); await new Promise((r) => setTimeout(r, 70)); }
+    const shot = await grabGameWindow(capW, capH);
+    syncOverlayState();
+    if (!shot) return { ok: false, error: 'game-window-not-found' };
+    if (frameLooksBlank(shot.bitmap)) return { ok: false, error: 'game-window-black' };
+    const bitmap = Buffer.from(shot.bitmap), W = shot.W, H = shot.H;
+    let res = await runReaderWorker(bitmap, W, H, null);
+    const detected = res && res.ok && !res.mismatch ? res.tab : null;
+    let learned = false;
+    if (res && res.ok && res.box && detected !== expected) {
+      // the player says which tab this is - remember its fingerprint, then read again
+      const TD = require('./renderer/stash/tab-detect.js');
+      const TT = require('./renderer/stash/tab-templates.json');
+      const sig = TD.panelSignature(bitmap, W, H, res.box, TT.tw, TT.th);
+      config.stashUserTabSigs = config.stashUserTabSigs || {};
+      const list = config.stashUserTabSigs[expected] || (config.stashUserTabSigs[expected] = []);
+      list.push(Array.from(sig, (v) => Math.round(v * 10000)));
+      if (list.length > 3) list.shift();
+      saveConfig();
+      learned = true;
+      logToggle('stash-learn', `tab tour: ${detected || 'no tab'} -> ${expected}`);
+      res = await runReaderWorker(bitmap, W, H, null);
+    }
+    const box = (res && res.box) || config.stashCalibration
+      || (() => { const k = W / 1920; return { x: REF_BOX.x * k, y: REF_BOX.y * k, w: REF_BOX.w * k, h: REF_BOX.h * k }; })();
+    const okRead = res && res.ok && !res.mismatch && res.tab === expected;
+    lastCaptureByTab.set(expected, { bitmap, W, H, box, res: okRead ? res : { reads: [] } });
+    // saved: the panel with a margin (its border is what detection and snapping key on)
+    const full = nativeImage.createFromBitmap(bitmap, { width: W, height: H });
+    const M = 14;
+    const crop = { x: Math.max(0, Math.round(box.x) - M), y: Math.max(0, Math.round(box.y) - M) };
+    crop.w = Math.min(Math.round(box.w) + M * 2, W - crop.x);
+    crop.h = Math.min(Math.round(box.h) + M * 2, H - crop.y);
+    const panel = full.crop({ x: crop.x, y: crop.y, width: crop.w, height: crop.h });
+    fs.mkdirSync(TOUR_DIR(), { recursive: true });
+    fs.writeFileSync(tourFile(expected, 'png'), panel.toPNG());
+    const meta = {
+      tab: expected, at: Date.now(), detected, learned, frame: { w: W, h: H }, box, crop,
+      reads: okRead ? (res.reads || []).map((r) => ({ apiId: r.apiId, count: r.count, conf: r.conf })) : [],
+      readCount: okRead ? res.readCount : 0, slotCount: okRead ? res.slotCount : 0,
+    };
+    fs.writeFileSync(tourFile(expected, 'json'), JSON.stringify(meta));
+    return { ok: true, tab: expected, detected, learned, readCount: meta.readCount, slotCount: meta.slotCount,
+      thumb: panel.resize({ width: Math.min(420, crop.w), quality: 'good' }).toDataURL() };
+  } catch (e) {
+    syncOverlayState();
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+}
+// a saved tour picture as a capture the align tool can open (panel crop = the frame)
+function loadTourCapture(tab) {
+  try {
+    const meta = JSON.parse(fs.readFileSync(tourFile(tab, 'json'), 'utf8'));
+    const img = nativeImage.createFromPath(tourFile(tab, 'png'));
+    const { width, height } = img.getSize();
+    if (!width) return null;
+    const box = { x: meta.box.x - meta.crop.x, y: meta.box.y - meta.crop.y, w: meta.box.w, h: meta.box.h };
+    return { bitmap: img.toBitmap(), W: width, H: height, box, res: { reads: meta.reads || [] } };
+  } catch { return null; }
+}
+ipcMain.handle('stash-tour-capture', async (_e, tab) => tourCapture(tab));
+ipcMain.handle('stash-tour-list', async () => {
+  const out = {};
+  for (const tab of Object.keys(TAB_MAPS)) {
+    try {
+      const meta = JSON.parse(fs.readFileSync(tourFile(tab, 'json'), 'utf8'));
+      const img = nativeImage.createFromPath(tourFile(tab, 'png'));
+      out[tab] = { at: meta.at, detected: meta.detected, learned: meta.learned, readCount: meta.readCount, slotCount: meta.slotCount,
+        thumb: img.resize({ width: Math.min(420, img.getSize().width), quality: 'good' }).toDataURL() };
+    } catch { /* not scanned */ }
+  }
+  return out;
+});
+ipcMain.handle('stash-tour-open-folder', async () => { fs.mkdirSync(TOUR_DIR(), { recursive: true }); return shell.openPath(TOUR_DIR()); });
 
 ipcMain.handle('stash-sample-capture', async () => captureStashSample());
 ipcMain.handle('stash-sample-reset', async () => { sampleShots = []; return { ok: true }; });

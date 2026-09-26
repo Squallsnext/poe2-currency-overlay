@@ -395,6 +395,21 @@ the extra Exalted cells, 4.7) appear in the tool automatically.
   (`currency-tab-map.js`); slot alignment tool ("Ausrichten") writes per-slot
   `cx/cy/stripWidth/up/dn` overrides (see 4.5).
 
+### 4.6b Tab tour ("Fächer scannen")
+
+Settings → Net Worth (next to calibration) and the empty Net Worth tab. Goes through every
+supported tab: "open tab X in game, then take the picture" - the app hides the overlay
+and captures the game window itself - or "not owned / skip". Chips jump to any tab.
+Per picture (`main.js` `tourCapture`): the reader checks which tab it is; a mismatch
+teaches the expected tab's fingerprint (like "Wrong tab?") and reads again; the capture
+is kept for the align tool right away and the panel (with a margin) is saved to
+`userData/tab-shots/<tab>.png` + `.json` (box, frame size, reads). The align tool falls
+back to that saved picture when a tab has no recent scan, so aligning works after a
+restart without scanning again. "Open picture folder" shows the files - meant as the
+source for frame templates (also for lower resolutions). Tested headless with stubbed
+captures (walk, skip, learned mismatch, align from the tour, summary); the capture
+itself needs the real game and is **not yet tested in game**.
+
 ### 4.7 Calibration window (4K/5K, taskbar)
 
 - **Exact capture size:** the screenshot size is taken from the capture Chromium actually
