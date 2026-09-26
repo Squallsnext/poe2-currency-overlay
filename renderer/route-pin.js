@@ -40,6 +40,8 @@ window.routePinApi.onContent((p) => {
 document.getElementById('rp-close').onclick = () => window.routePinApi.action({ type: 'close' });
 
 tip.addEventListener('click', (e) => {
+  // "fix rate" folds the rate editor open/closed (the overlay renders it)
+  if (e.target.closest('.tip-fix')) { window.routePinApi.action({ type: 'toggleFix' }); return; }
   const clr = e.target.closest('.tip-fix-clear');
   if (clr) {
     const row = clr.closest('.tip-fix-row');
@@ -52,6 +54,15 @@ tip.addEventListener('click', (e) => {
   }
 });
 tip.addEventListener('keydown', (e) => {
+  // Enter in the size/rounds box: send it now and leave the box
+  const qty = e.target.closest && e.target.closest('.tip-gold-qty');
+  if (qty && e.key === 'Enter') {
+    e.preventDefault();
+    clearTimeout(qtyTimer);
+    window.routePinApi.action({ type: 'qty', value: qty.value });
+    qty.blur();
+    return;
+  }
   const inp = e.target.closest && e.target.closest('.tip-fix-in');
   if (!inp) return;
   if (e.key === 'Escape') { inp.blur(); return; }

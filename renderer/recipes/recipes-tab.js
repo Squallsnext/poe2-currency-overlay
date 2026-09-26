@@ -120,7 +120,7 @@
   }
 
   // one recipe in detail - also the content of the pinned window (detached: editor open)
-  function cardHtml(id, detached) {
+  function cardHtml(id, detached, fixOpen) {
     const r = recipeById(id);
     if (!r) return '';
     const ev = evaluate(r);
@@ -128,8 +128,8 @@
     let h = `<div class="rc-card" data-recipe="${esc(r.id)}">`;
     h += `<div class="rc-card-head"><span class="rc-card-title">${iconOf(r.group === 'split' ? r.inputs[0].id : r.outputs[0].id)} ${esc(titleOf(r))}</span>`
       + `<span class="rc-card-btns">`
-      + (detached ? '' : `<button class="tip-fix rc-fix" title="${esc(t('currency.arb.fix_rate_btn_title'))}">${t('currency.arb.fix_rate_btn')}</button>`
-        + `<button class="tip-detach rc-pin" title="${esc(t('recipes.pin_title'))}">📌</button>`)
+      + `<button class="tip-fix rc-fix" title="${esc(t('currency.arb.fix_rate_btn_title'))}">${t('currency.arb.fix_rate_btn')}</button>`
+      + (detached ? '' : `<button class="tip-detach rc-pin" title="${esc(t('recipes.pin_title'))}">📌</button>`)
       + `</span></div>`;
     h += `<div class="rc-formula">${esc(formulaText(r))}</div>`;
     if (!detached) {
@@ -153,7 +153,7 @@
     h += sumHtml(ev);
     h += thinHtml(ev);
     // rate editor: one leg per part against the recipe's currency, same as a route's
-    if (detached || state.fixOpen) {
+    if (detached ? fixOpen : state.fixOpen) {
       const ctx = { baseId: B, itemId: r.outputs[0].id, acqOptions: [],
         route: { legPairs: r.inputs.concat(r.outputs).filter((p) => p.id !== B).map((p) => ({ have: p.id, want: B })) } };
       h += `<div class="tip-out">${fixSectionHtml(ctx)}</div>`;
@@ -248,6 +248,6 @@
   window.Recipes = {
     render: () => { wire(); render(); },
     setRounds,
-    detachedPayload: (id) => { const r = recipeById(id); return { title: r ? titleOf(r) : '', html: cardHtml(id, true), copyText: '' }; },
+    detachedPayload: (id, fixOpen) => { const r = recipeById(id); return { title: r ? titleOf(r) : '', html: cardHtml(id, true, fixOpen), copyText: '' }; },
   };
 })();

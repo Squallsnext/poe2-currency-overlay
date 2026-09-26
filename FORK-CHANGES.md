@@ -456,6 +456,11 @@ These existed in the player's own build and were **deliberately left out** here:
   no currency names - `abbr()` only knows English names; the full name is used now.
   The tooltip is capped at the window height and scrolls, since a route with every
   acquisition way and the editor can be taller than the overlay.
+- Reported after the first round, fixed: emptying the size box while typing set the
+  size to 0, and every rebuild after that dropped the size row - for all routes, with
+  no way back in. An empty box now leaves the size alone; Enter takes the number. The
+  rate editor in the 📌 window was always open and pushed the size out of reach - it is
+  folded now and opens/closes with its "fix rate" button (also for recipe cards).
 - Tested headless: an arbitrage row pinned, a click into a field keeps it open, Enter
   saves (config written, tooltip stays, "✓ saved" shown), "22,5:1" parsed, invalid input
   rejected with a message, ✕ clears, 📌 sends the route with the editor; the window page

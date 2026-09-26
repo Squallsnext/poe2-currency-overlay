@@ -1062,16 +1062,19 @@ function openRateFix() {
 // The window only displays: this renderer computes the content (it holds the rates) and
 // main relays it; clicks and entries there come back as actions (route-pin-action).
 let detached = null; // { baseId, itemId } or { recipe: id } shown in the route window
+// rate editor in that window: folded until its "fix rate" button opens it - always open,
+// it pushed the size box out of reach and could not be closed
+let detachedFix = false;
 function detachedPayload() {
   // a recipe card (Recipes tab) renders itself - same editor markup, same actions
-  if (detached.recipe && window.Recipes) return window.Recipes.detachedPayload(detached.recipe);
+  if (detached.recipe && window.Recipes) return window.Recipes.detachedPayload(detached.recipe, detachedFix);
   const keepCtx = lastArbCtx, keepCopy = lastArbCopyText; // the overlay's own tooltip state
   try {
     const inp = arbInputs(detached.baseId, detached.itemId);
     const title = `${nameOf(detached.itemId)} ⇄ ${nameOf(detached.baseId)}`;
     if (!inp) return { title, html: `<div class="tip-sub">${esc(t('currency.arb.pin_no_data'))}</div>`, copyText: '' };
-    const html = arbTooltipHtml(detached.baseId, detached.itemId, inp.direct, inp.cross, inp.gap)
-      .replace('<div class="tip-out"></div>', `<div class="tip-out">${fixSectionHtml(lastArbCtx)}</div>`);
+    let html = arbTooltipHtml(detached.baseId, detached.itemId, inp.direct, inp.cross, inp.gap);
+    if (detachedFix) html = html.replace('<div class="tip-out"></div>', `<div class="tip-out">${fixSectionHtml(lastArbCtx)}</div>`);
     return { title, html, copyText: lastArbCopyText };
   } finally {
     lastArbCtx = keepCtx; lastArbCopyText = keepCopy;
@@ -1103,7 +1106,8 @@ if (window.api && window.api.onRoutePinAction) {
     if (act.type === 'setRate') await applyRateInput(act.a, act.b, act.qa, act.qb);
     else if (act.type === 'clearRate') await clearRateInput(act.a, act.b);
     else if (act.type === 'qty' && detached.recipe && window.Recipes) window.Recipes.setRounds(detached.recipe, act.value);
-    else if (act.type === 'qty') { const n = parseInt(String(act.value).replace(/[^0-9]/g, ''), 10); arbQty = Number.isFinite(n) && n > 0 ? Math.min(n, 10000000) : 0; }
+    else if (act.type === 'qty') { const n = parseInt(String(act.value).replace(/[^0-9]/g, ''), 10); if (Number.isFinite(n) && n > 0) arbQty = Math.min(n, 10000000); }
+    else if (act.type === 'toggleFix') detachedFix = !detachedFix;
     sendDetached();
   });
 }
@@ -4131,6 +4135,9 @@ async function main() {
   // rate editor: Enter saves the leg (both of its fields), Esc leaves the field - neither
   // reaches the document handler (Esc there hides the whole overlay)
   tipEl.addEventListener('keydown', (e) => {
+    // Enter in the size box: take the number and leave the box
+    const qty = e.target.closest && e.target.closest('.tip-gold-qty');
+    if (qty && e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); qty.blur(); return; }
     const inp = e.target.closest && e.target.closest('.tip-fix-in');
     if (!inp) return;
     e.stopPropagation();
@@ -4147,9 +4154,12 @@ async function main() {
     const box = e.target.closest('.tip-gold-qty');
     if (!box) return;
     const n = parseInt(String(box.value).replace(/[^0-9]/g, ''), 10);
-    arbQty = Number.isFinite(n) && n > 0 ? Math.min(n, 10000000) : 0;
+    // an empty/invalid box (mid-typing) leaves the size alone: setting it to 0 used to
+    // drop the whole size row on the next rebuild - for every route, with no way back in
+    const ok = Number.isFinite(n) && n > 0;
+    if (ok) arbQty = Math.min(n, 10000000);
     const ctx = lastArbCtx;
-    const plan = arbQty ? arbGoldPlan(ctx && ctx.route, arbQty) : null;
+    const plan = ok ? arbGoldPlan(ctx && ctx.route, arbQty) : null;
     const costEl = tipEl.querySelector('.tip-gold-cost');
     if (costEl) {
       costEl.innerHTML = plan
