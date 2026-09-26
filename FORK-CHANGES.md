@@ -674,6 +674,8 @@ y): a instead of b counts read surely - kept", or that the rule was tried and di
 then what the model snapping did. And both compare SURE reads (>= 80 %) instead of all
 reads: unsure "counts" are mostly item art in empty cells, which boxes on the right spot
 drop - counting every read called the better boxes worse (essence: 54 -> 46).
+(The rule result also has to reach the dialog: `stripAuto` passed only the model
+fields, so the first version of this still said "no count sure enough".)
 
 **Read filters shipped per resolution** (`renderer/stash/slot-defaults.js`). The per-slot
 filters that make a count readable depend on how big the digits are drawn, and a 5K

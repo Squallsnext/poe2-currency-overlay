@@ -4045,7 +4045,9 @@ async function tourConfirm(expected) {
     return { ok: false, error: String((e && e.message) || e) };
   }
 }
-const stripAuto = (a) => ({ models: a.models, moved: a.moved, unsure: a.unsure, kept: a.kept, readBefore: a.readBefore, readAfter: a.readAfter });
+// what the dialog shows of the automatic placement (rule result included - it was left
+// out here, so a kept rule placement read as "no count sure enough")
+const stripAuto = (a) => ({ models: a.models, moved: a.moved, unsure: a.unsure, kept: a.kept, readBefore: a.readBefore, readAfter: a.readAfter, rule: a.rule || null });
 // a saved tour picture as a capture the align tool can open (panel crop = the frame)
 function loadTourCapture(tab) {
   try {
