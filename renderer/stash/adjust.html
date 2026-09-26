@@ -23,6 +23,13 @@
       <label title="Wie weit ein Kästchen beim Einrasten höchstens springen darf (px). Etwas größer als die Verschiebung, die du am ersten Kästchen gebraucht hast - zu groß, und es kann an der Nachbarzelle einrasten. Wird pro Tab gemerkt.">Suchbereich <input id="snaprange" type="number" min="1" max="120" step="1"> px</label>
       <label title="Wie sicher die Rahmenerkennung sein muss (0-100 %). Darunter bleibt ein Kästchen stehen, wird gestrichelt und zeigt, welcher Wert nötig wäre. Wird pro Tab gemerkt.">Sicherheit <input id="snapmin" type="number" min="0" max="100" step="5"> %</label>
     </span>
+    <span class="grp"><span class="grp-lab">Regel</span>
+      <button id="rulesnap" title="Jedes Kästchen an den Innenrahmen seiner Zelle setzen: so viele Pixel rechts/unter der inneren Rahmenecke, in der eingestellten Größe. Braucht kein Vorbild. Wirkt auf die markierten, sonst auf alle. Taste G">Nach Regel setzen</button>
+      <label title="Abstand vom Innenrahmen nach rechts (px in diesem Bild)">links <input id="rulel" type="number" step="1"></label>
+      <label title="Abstand vom Innenrahmen nach unten (px in diesem Bild)">oben <input id="rulet" type="number" step="1"></label>
+      <label title="Breite der Kästchen nach der Regel (px in diesem Bild)">B <input id="rulew" type="number" step="1"></label>
+      <label title="Höhe der Kästchen nach der Regel (px in diesem Bild)">H <input id="ruleh" type="number" step="1"></label>
+    </span>
     <span class="grp"><span class="grp-lab">Angleichen</span>
       <button id="rowalign" title="Alle Kästchen rechts vom ausgewählten, die höchstens 10 px höher/tiefer sitzen, auf dieselbe Höhe. Taste R">Reihe →</button>
       <button id="colalign" title="Alle Kästchen unter dem ausgewählten, die höchstens 25 px links/rechts sitzen, in dieselbe Spalte. Taste S">Spalte ↓</button>
@@ -68,6 +75,12 @@
     <li><b>2 · Vorbild:</b> Ein Kästchen genau auf die Zahl ziehen. Die Statuszeile zeigt, wie weit du es verschoben hast, und schlägt einen Suchbereich vor.</li>
     <li><b>3 · Einrasten (<kbd>F</kbd>):</b> Alle anderen Kästchen übernehmen die Lage des Vorbilds in ihrem eigenen Zellrahmen. Was schon passt, bleibt stehen.</li>
     <li><b>4 · Gestrichelte:</b> Die Erkennung war zu unsicher – oft, weil der Rahmen anders aussieht (verzierter Rahmen höherer Stufen). Die dünne Vorschau zeigt, wo es hinspringen würde. Entweder <b>eins davon von Hand setzen und nochmal F</b> – es wird Vorbild für alle gleichen Rahmen –, die Sicherheit auf den angezeigten Wert senken, oder „Unsichere trotzdem einrasten“. <kbd>Strg</kbd>+<kbd>Z</kbd> macht alles rückgängig.</li>
+  </ul>
+  <h3>Regel statt Vorbild (<kbd>G</kbd>)</h3>
+  <ul>
+    <li>„Nach Regel setzen“ sucht in jeder Zelle die <b>innere Rahmenecke</b> – dort, wo der Rahmen endet und das dunkle Innere beginnt – und setzt das Kästchen „links“/„oben“ Pixel daneben, in der Größe B×H. Kein Vorbild nötig, auch für leere Zellen.</li>
+    <li>Vorgabe (gemessen bei 5120×2880): 5 px rechts, 6 px unter der Ecke, 125×55 – bei anderen Auflösungen passend umgerechnet. Geänderte Werte merkt sich das Programm.</li>
+    <li>Wo die Ecke nicht klar zu erkennen ist, bleibt das Kästchen stehen und wird gestrichelt (z. B. ein Symbol, das über dem Rahmen liegt). Vorschau prüfen, dann „Unsichere trotzdem einrasten“ oder von Hand setzen.</li>
   </ul>
   <h3>Maus &amp; Tasten</h3>
   <ul>

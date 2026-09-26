@@ -334,6 +334,31 @@ the extra Exalted cells, 4.7) appear in the tool automatically.
 5. Several slots with the same kind of background → **Copy** on the good one, **Paste** on
    the others.
 
+**"Nach Regel setzen" (G) – box by a fixed rule, no model.** A player's tested 5K setup:
+every box 125×55 px, 5 px right of and 6 px below the cell's *inner* frame corner (where
+the frame band ends and the dark interior begins). The button finds that corner in every
+cell (`innerCorners` in `frame-snap.js`) and places the box by the rule; empty cells and
+cells whose frame differs by tier work too, since nothing is compared with a model.
+- Finding the corner: along a cell-long run, the 4 px left of / above the line are frame
+  (bright), the 7 px right of / below it interior (dark). Score = frame brightness minus
+  the brightest interior pixel, 30th percentile over the run (a count or icon art covers
+  only part of it). The frame's outer edge, the neighbour's inner edge (dark → bright)
+  and the neighbour's outer edge (only 2-3 px before this cell's frame starts) all fail
+  that test.
+- First one shift for the whole tab (median of each cell's best over ±70 px at 5K - a tab
+  sits off by up to ~25 px), then each cell on its own over ±30 px (tab maps place their
+  centres by the digit, single cells are off by up to ~20 px - the essence map's second
+  column by 21 px). Unsure (score < 15, or found at the edge of the range): the box keeps
+  its spot, is dashed ("Ecke?") with a preview, and "Unsichere trotzdem einrasten" takes it.
+- Rule values are editable (links / oben / B / H in the capture's pixels), stored in
+  reference units for all tabs; default = the 5K measurement scaled with the panel.
+- **Measured** on the player's 12 support pictures of 5K tabs (native size): 11 tabs,
+  ~0.3-1 s each; unsure only where no cell is (two map slots of Kalguur runes and three
+  ritual slots, one of them on the tribute badge) - all correct cells found. Against the
+  player's hand-aligned boxes the spread inside a tab is ≤ 1 reference px; the saved size
+  is exactly theirs (stripWidth 21.94, up/dn 9.65). Tested headless in the align page
+  (essence 82/82). **Not yet tested in game.**
+
 ### 4.6 Other Net Worth changes
 
 - **Implausible prices on thin markets** (`sanitizeThinPrices` in `main.js`, applied when

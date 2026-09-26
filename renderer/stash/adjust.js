@@ -340,6 +340,78 @@ function forceSnap(){
   refreshSteps();
 }
 
+// ---- "Nach Regel setzen": box = inner frame corner + fixed offset, fixed size ----
+// Reported rule from a tested 5K setup: box 125x55, 5 px right of and 6 px below the
+// cell's INNER frame corner. Needs no model, so it also places empty cells and cells
+// whose frame differs by tier. Stored in reference units (the same rule at 1440p / 4K
+// scales with the panel); shown and edited in this capture's pixels. Finding the corner:
+// frame-snap.js innerCorners (one shift for the whole tab, then each cell on its own).
+const RULE_5K = 2.849; // capture px per reference px at 5120x2880 (1658 / 582)
+const RULE_DEFAULT = { l: 5 / RULE_5K, t: 6 / RULE_5K, w: 125 / RULE_5K, h: 55 / RULE_5K };
+const ruleEls = { l: $('rulel'), t: $('rulet'), w: $('rulew'), h: $('ruleh') };
+function loadRule(){
+  let r = null; try { r = JSON.parse(localStorage.getItem('adjRule') || 'null'); } catch {}
+  return Object.assign({}, RULE_DEFAULT, r || {});
+}
+function showRule(){
+  const r = loadRule();
+  ruleEls.l.value = Math.round(r.l * KX); ruleEls.t.value = Math.round(r.t * KY);
+  ruleEls.w.value = Math.round(r.w * KX); ruleEls.h.value = Math.round(r.h * KY);
+}
+function saveRule(){
+  const v = (el, d) => (el.value === '' || !isFinite(+el.value) ? d : +el.value);
+  const cur = loadRule();
+  const r = { l: v(ruleEls.l, cur.l * KX) / KX, t: v(ruleEls.t, cur.t * KY) / KY, w: Math.max(12, v(ruleEls.w, cur.w * KX)) / KX, h: Math.max(12, v(ruleEls.h, cur.h * KY)) / KY };
+  try { localStorage.setItem('adjRule', JSON.stringify(r)); } catch {}
+}
+function ruleWhy(c){
+  const parts = ['Die innere Rahmenecke ist hier nicht klar zu erkennen (Deutlichkeit senkrecht ' + Math.round(c.sx) + ', waagerecht ' + Math.round(c.sy) + ', nötig 15' + (c.edgeHit ? '; am Rand des Suchbereichs gefunden' : '') + ').'];
+  parts.push('Oft liegt ein Symbol über dem Rahmen, oder an dieser Stelle ist gar keine Zelle.');
+  parts.push('Die dünne Vorschau zeigt, wo es hinspringen würde. Passt sie: „Unsichere trotzdem einrasten“. Sonst von Hand setzen.');
+  return parts.join('\n');
+}
+function ruleSnap(){
+  saveRule();
+  const rule = loadRule();
+  const L = rule.l * KX, T = rule.t * KY, W = rule.w * KX, H = rule.h * KY;
+  snapshot();
+  clearAllSnapFail();
+  const targets = marked.size ? [...marked] : DATA.map((_, i) => i);
+  // where each corner should be if the box's CENTRE already sits on the count
+  const guesses = targets.map((i) => { const r = DATA[i]; return { x: r.x + r.w / 2 - L - W / 2, y: r.y + r.h / 2 - T - H / 2 }; });
+  const found = snapper().innerCorners(guesses, { scale: KX / RULE_5K });
+  let moved = 0, unsure = 0;
+  found.forEach((c, k) => {
+    const i = targets[k], r = DATA[i], el = boxEl(i);
+    const nx = c.x + L, ny = c.y + T;
+    if (!c.ok) {
+      // keep the spot, take the size (centred), show where the rule would put it
+      unsure++;
+      const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+      r.w = W; r.h = H; r.x = cx - W / 2; r.y = cy - H / 2;
+      if (el) { place(el, r); el.classList.add('snapfail'); c.edgeHit = !(c.sx < 15 || c.sy < 15); el.title = ruleWhy(c); el.querySelector('.need').textContent = 'Ecke?'; }
+      const g = document.createElement('div');
+      g.className = 'ghost';
+      place(g, { x: nx, y: ny, w: W, h: H });
+      const lab = document.createElement('span'); lab.textContent = arrowText(nx - r.x, ny - r.y);
+      g.appendChild(lab);
+      wrap.appendChild(g);
+      ghosts.set(i, { el: g, x: nx, y: ny });
+      return;
+    }
+    r.x = nx; r.y = ny; r.w = W; r.h = H; moved++;
+    if (el) place(el, r);
+  });
+  gwInput.value = Math.round(W); ghInput.value = Math.round(H);
+  sizeTouched = true; snapRuns++;
+  let txt = 'Nach Regel: ' + moved + ' gesetzt · ' + unsure + ' unsicher (gestrichelt, Ecke nicht klar)';
+  if (unsure) txt += ' – Maus darauf: warum.';
+  $('snapinfo').textContent = txt;
+  $('forcesnap').hidden = !unsure;
+  $('forcesnap').textContent = 'Unsichere trotzdem einrasten (' + unsure + ')';
+  updateGuide(); refreshSteps();
+}
+
 // ---- steps: what to do next, one short tip at a time ----
 const STEP_TIPS = {
   1: 'Breite/Höhe: so klein wie möglich, aber eine 4-stellige Zahl (z. B. 9999) muss mit ein paar Pixeln Luft hineinpassen – Stapel wachsen, und GGGs Ziffern sind je nach Zahl ein paar Pixel höher, tiefer oder breiter. Zu klein schneidet Ziffern ab, zu groß holt Kanten des Item-Bilds ins Lesen.',
@@ -423,6 +495,10 @@ function init(d){
   gwInput.addEventListener('input', () => setGlobalSize(+gwInput.value || DATA[0].w, DATA[0].h));
   ghInput.addEventListener('input', () => setGlobalSize(DATA[0].w, +ghInput.value || DATA[0].h));
 
+  // the rule (inner frame corner + offset): remembered for all tabs, in reference units
+  showRule();
+  for (const el of Object.values(ruleEls)) el.addEventListener('change', saveRule);
+
   // snap settings: remembered per tab; default range ~ a third of a box height
   rangeEl.value = loadSetting('adjSnapRange', DATA.length ? Math.max(4, Math.round(DATA[0].h * 0.35)) : 10);
   minEl.value = loadSetting('adjSnapMin', 50);
@@ -462,6 +538,7 @@ $('undo').onclick = () => undo();
 $('unmark').onclick = () => clearMarked();
 $('unleader').onclick = () => clearLeaders();
 $('snapframe').onclick = () => snapToFrames();
+$('rulesnap').onclick = () => ruleSnap();
 $('forcesnap').onclick = () => forceSnap();
 $('helpbtn').onclick = () => toggleHelp(true);
 $('helpclose').onclick = () => toggleHelp(false);
@@ -480,6 +557,7 @@ document.addEventListener('keydown', (ev) => {
   }
   if (ev.key === 'Escape' && $('help').classList.contains('open')) { toggleHelp(false); ev.preventDefault(); return; }
   if (ev.key === 'h' || ev.key === 'H' || ev.key === '?') { toggleHelp(); ev.preventDefault(); return; }
+  if (ev.key === 'g' || ev.key === 'G') { ruleSnap(); ev.preventDefault(); return; }
   if (!selected) return;
   if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'z' || ev.key === 'Z')) { undo(); ev.preventDefault(); return; }
   if (ev.key === 'r' || ev.key === 'R') { alignRow(); ev.preventDefault(); return; }

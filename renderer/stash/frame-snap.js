@@ -112,7 +112,73 @@
       }
       return props;
     }
-    return { findCorner, model, propose };
+    // ---- fixed rule: box = cell's INNER frame corner + offset ----
+    // No model needed. The inner corner is where the (gold or grey) frame band ends and
+    // the dark cell interior begins. Measured on 12 real 5K tabs (FORK-CHANGES.md,
+    // "Regel"): along a cell-long run, the 4 px left of that line are the frame (bright),
+    // the 7 px right of it are interior (dark) in nearly every row. Other lines around a
+    // cell fail that: the frame's outer edge has the frame band to its RIGHT, the left
+    // neighbour's inner edge goes dark -> bright, and at its outer edge the gap is only
+    // 2-3 px before this cell's frame starts (the "right side dark for 7 px" part fails).
+    // Score = frame minus the brightest interior pixel, 30th percentile over the run
+    // (digits and icon art only cover part of the run). s = scale against a 5K capture.
+    function innerColScore(x, y0, len, s) {
+      const B = Math.max(2, Math.round(4 * s)), D = Math.max(3, Math.round(7 * s)); const v = [];
+      for (let k = 0; k < len; k++) {
+        const y = y0 + k; let l = 0; for (let i = 1; i <= B; i++) l += px(x - i, y); l /= B;
+        let r = 0; for (let i = 0; i < D; i++) r = Math.max(r, px(x + i, y)); v.push(l - r);
+      }
+      v.sort((p, q) => p - q); return v[Math.floor(v.length * 0.3)];
+    }
+    function innerRowScore(y, x0, len, s) {
+      const B = Math.max(2, Math.round(4 * s)), D = Math.max(3, Math.round(7 * s)); const v = [];
+      for (let k = 0; k < len; k++) {
+        const x = x0 + k; let l = 0; for (let i = 1; i <= B; i++) l += px(x, y - i); l /= B;
+        let r = 0; for (let i = 0; i < D; i++) r = Math.max(r, px(x, y + i)); v.push(l - r);
+      }
+      v.sort((p, q) => p - q); return v[Math.floor(v.length * 0.3)];
+    }
+    const bestAlong = (c0, R, score) => {
+      let best = -1e9, at = c0;
+      for (let k = -R; k <= R; k++) {
+        const e = score(c0 + k);
+        if (e > best + 0.5 || (e > best - 0.5 && Math.abs(k) < Math.abs(at - c0))) { if (e > best) best = e; at = c0 + k; }
+      }
+      return { at, s: best, edge: Math.abs(at - c0) >= R };
+    };
+    // guesses: [{x, y}] = where each cell's inner corner is expected (from the tab map /
+    // current boxes). Returns [{x, y, sx, sy, dx, dy, ok}] in the same order.
+    // First one shift for the whole tab (the median of each cell's best over a wide
+    // range - a whole tab sits off by up to ~25 px at 5K), then each cell on its own
+    // (tab maps place their centres by digit, so single cells are off by up to ~20 px).
+    // ok = both lines clear (score >= minScore) and not found at the edge of the range.
+    function innerCorners(guesses, opts) {
+      const s = opts && opts.scale > 0 ? opts.scale : 1;
+      const len = Math.round(90 * s), m = Math.round(14 * s);
+      const RB = Math.round(70 * s), R = Math.round((opts && opts.range) || 30 * s);
+      const minScore = opts && opts.minScore != null ? opts.minScore : 15;
+      const med = (a) => { a = a.slice().sort((p, q) => p - q); return a.length ? a[Math.floor(a.length / 2)] : 0; };
+      // median jump of the cells whose line is clear (the rest says nothing)
+      const shift = (found, key, old) => {
+        const d = found.map((b, i) => ({ b, d: b.at - Math.round(guesses[i][key]) })).filter((o) => o.b.s >= minScore).map((o) => o.d);
+        return d.length ? med(d) : old;
+      };
+      let dx = 0, dy = 0;
+      for (let pass = 0; pass < 2 && guesses.length; pass++) {
+        dx = shift(guesses.map((g) => bestAlong(Math.round(g.x), RB, (x) => innerColScore(x, Math.round(g.y + dy) + m, len, s))), 'x', dx);
+        dy = shift(guesses.map((g) => bestAlong(Math.round(g.y), RB, (y) => innerRowScore(y, Math.round(g.x + dx) + m, len, s))), 'y', dy);
+      }
+      return guesses.map((g) => {
+        const gx = Math.round(g.x + dx), gy = Math.round(g.y + dy);
+        let x = gx, y = gy, a = null, b = null;
+        for (let pass = 0; pass < 2; pass++) {
+          a = bestAlong(gx, R, (xx) => innerColScore(xx, y + m, len, s)); x = a.at;
+          b = bestAlong(gy, R, (yy) => innerRowScore(yy, x + m, len, s)); y = b.at;
+        }
+        return { x, y, sx: a.s, sy: b.s, dx: x - g.x, dy: y - g.y, ok: a.s >= minScore && b.s >= minScore && !a.edge && !b.edge };
+      });
+    }
+    return { findCorner, model, propose, innerCorners };
   }
 
   // grey from an RGBA/BGRA buffer (channel order does not matter for (r+g+b)/3), for a
