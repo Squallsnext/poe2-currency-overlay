@@ -4363,6 +4363,18 @@ ipcMain.on('stash-calibrate-confirm', async (_e, frame) => {
     }
     const normalizedFrame = normalizeStashFrame(frame);
     config.stashCalibration = frameToCalBox(normalizedFrame);
+    // The dragged box is only a starting point: with the currency tab open, the panel's
+    // exact place and size come from its cells (cell-calibrate.js). With a controller UI
+    // there is no coloured border to snap to, and a hand-dragged box differed by several
+    // px per player - enough for the boxes to sit half in the neighbour cell at 1080p.
+    // Not the currency tab / not found: the dragged box stays, and the UI says so.
+    let fit = null;
+    try {
+      if (calibCap && calibCap.buf) {
+        fit = require('./renderer/stash/cell-calibrate.js').fromCapture(calibCap.buf, calibCap.W, calibCap.H, config.stashCalibration);
+        if (fit && fit.box) config.stashCalibration = fit.box;
+      }
+    } catch (err) { fit = { error: err.message }; }
     saveConfig();
     closeCalibWin();
     // how big the calibrated panel is vs the reference - below ~1 the digits shrink
@@ -4372,7 +4384,7 @@ ipcMain.on('stash-calibrate-confirm', async (_e, frame) => {
     // tab the normal way - its result arrives like any scan. This called doStashCapture,
     // which a refactor had removed: the call threw, 'stash-calibrated' was never sent, and
     // the setup wizard stayed on "step 1 of 5" after a successful calibration (reported).
-    if (win && !win.isDestroyed()) win.webContents.send('stash-calibrated', { calScale, ok: true, scanning: true });
+    if (win && !win.isDestroyed()) win.webContents.send('stash-calibrated', { calScale, ok: true, scanning: true, fit: fit && (fit.box ? { cells: fit.cells, of: fit.of, rms: fit.rms } : { error: fit.error || 'none', cells: fit.cells || 0 }) });
     captureAndBroadcast();
   } catch (err) { console.error('calibrate-confirm failed:', err.message); }
 });

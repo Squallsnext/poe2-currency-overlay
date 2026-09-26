@@ -556,6 +556,31 @@ opens - meant for turning a well-tested setup into defaults for others.
 tested: 1080p/1440p, 150 %/200 % Windows scaling at other resolutions, taskbar left/right
 or auto-hide, multi-monitor with the game on a secondary display.
 
+### 4.7b Calibration from the currency tab's cells
+
+With a controller UI the stash panel has no coloured border, so the calibration's
+snap-to-border has nothing to hold on to and the box is only as exact as the drag -
+several px different per player, enough at 1080p for the boxes to sit half in the
+neighbour cell (reported). Now the dragged box is only a starting point: on confirm,
+`cell-calibrate.js` looks for the inner frame corner of every currency-tab cell
+(`frame-snap.js` innerCorners, as the align tool's "Nach Regel") and fits one scale +
+position to them (least squares; near cells first, then farther ones, dropping any > 2
+reference px off). The result is the calibration box; the test read follows at once and
+its notice says how the box was measured and whether the read looks right (> 30 % of the
+read slots unsure -> "calibrate again, or correct with Align").
+- **Reference:** `currency-cells.js`, 38 inner corners in reference coordinates, measured
+  on a real 5K capture. They agree with `currency-tab-map.js` (count centres = corner +
+  (25.8, 12.1) within +-0.6 ref px) and with a hand-aligned setup (boxes = corner + the
+  5/6 px rule within +-1 ref px), so the tab maps stay valid.
+- **Measured** (the 5K currency picture, and scaled to 1080p / 1440p size): 37 of 38
+  cells, box exact to <= 1 px; a rough box off by up to 60 px (5K) and 8 % in size still
+  lands on the same box, 0.6 s at 5K, < 0.1 s at 1080p. The player's own screenshot of
+  the currency tab in controller mode: 37 of 38, rms 0.17 ref px. Other tabs (11 tested)
+  are rejected (at most 15 of 38 cells "fit" a runes/essence grid; 60 % needed) - the
+  dragged box is kept and the notice asks for the currency tab.
+- Calibration hint text: open the currency tab, a rough box is enough.
+- **Not yet tested in game.**
+
 ### 4.8 Setup-specific parts – already removed from this branch
 
 These existed in the player's own build and were **deliberately left out** here:

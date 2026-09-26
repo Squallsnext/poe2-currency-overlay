@@ -100,6 +100,21 @@
     state.rows.splice(ti, 0, moved);
   }
 
+  // ---------- test read right after a calibration ----------
+  // The calibration says how it was measured (from the currency tab's cells, or the box
+  // as dragged); the first scan after it says whether that worked: many unsure slots ->
+  // "calibrate again, or correct with Align". Only for that one scan.
+  function calCheckResult(res) {
+    const c = state.calCheck; if (!c) return;
+    state.calCheck = null;
+    if (!res || !res.ok || res.mismatch) return; // applyResult already says what went wrong
+    const lines = (res.lines || []).filter((ln) => !ln.missing && ln.count != null);
+    const weak = lines.filter((ln) => ln.conf != null && ln.conf < 0.80).length;
+    const bad = !lines.length || weak / lines.length > 0.3;
+    state.notice = { kind: bad ? 'warn' : 'ok', msg: c.how + ' ' + t(bad ? 'networth.calibrate.check_bad' : 'networth.calibrate.check_ok', { tab: TAB_LABEL[res.tab] || res.tab, read: lines.length, weak }) + c.small };
+    render();
+  }
+
   // ---------- setup wizard ("Einrichtung") ----------
   // Guides a player through what a controller player (or anyone with a non-standard UI
   // size) otherwise has to discover alone: calibrate the panel, scan a tab, open "Align"
@@ -1549,6 +1564,7 @@
       for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
       wizardOnScan(res);
       applyResult(res);
+      calCheckResult(res);
     });
     if (window.api.onStashQueued) window.api.onStashQueued((info) => {
       state.queued = (info && info.depth) || 0;
@@ -1565,7 +1581,10 @@
       const smallMsg = small ? t('networth.calibrate.small_panel_warning', { scalePercent: Math.round(scale * 100) }) : '';
       if (state.wizard && state.wizard.step === 1) state.wizard.step = 2; // calibrated - now scan
       if (res && res.scanning) { // saved; the test scan runs and reports like any scan
-        state.notice = { kind: small ? 'warn' : 'ok', msg: t('networth.calibrate.saved_scanning', { smallPanelWarning: smallMsg }) };
+        const f = res.fit || {};
+        const how = f.cells && !f.error ? t('networth.calibrate.by_cells', { cells: f.cells, of: f.of }) : t('networth.calibrate.by_hand');
+        state.calCheck = { how, small: smallMsg };
+        state.notice = { kind: small || f.error ? 'warn' : 'ok', msg: how + ' ' + t('networth.calibrate.saved_scanning', { smallPanelWarning: smallMsg }) };
         render(); return;
       }
       if (res && res.ok && !res.mismatch) {

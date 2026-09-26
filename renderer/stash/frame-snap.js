@@ -155,7 +155,7 @@
     function innerCorners(guesses, opts) {
       const s = opts && opts.scale > 0 ? opts.scale : 1;
       const len = Math.round(90 * s), m = Math.round(14 * s);
-      const RB = Math.round(70 * s), R = Math.round((opts && opts.range) || 30 * s);
+      const RB = Math.round((opts && opts.shiftRange) || 70 * s), R = Math.round((opts && opts.range) || 30 * s);
       const minScore = opts && opts.minScore != null ? opts.minScore : 15;
       const med = (a) => { a = a.slice().sort((p, q) => p - q); return a.length ? a[Math.floor(a.length / 2)] : 0; };
       // median jump of the cells whose line is clear (the rest says nothing)
