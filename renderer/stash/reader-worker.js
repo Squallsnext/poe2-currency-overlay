@@ -27,6 +27,7 @@ const TABS = {
   delirium: require('./delirium-tab-map'),
   breach: require('./breach-tab-map'),
   expedition: require('./expedition-tab-map'),
+  fragment: require('./fragment-tab-map'),
 };
 // multi-rendering bank: the base exemplars plus one set per baked capture, so a digit
 // drawn slightly differently on someone else's machine still has something to match

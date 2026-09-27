@@ -931,6 +931,19 @@ over whole orbs, so the start amount is rounded up. Checked with the player's
 screenshot rates (1 Chaos = 70.9 Ex, 1 Div = 532 Ex, direct 8.21 Chaos per Div):
 via Exalted 7.50 Chaos per Div, 8.6 % cheaper, for 10 Div 7 Chaos saved - the same as
 by hand. Hideable like Recipes (`showSwapTab`).
+### 4.12 Fragment tab (sub-tab "Fragmente")
+
+Asked for: the Fragment stash tab (patch 0.5) was not supported. `renderer/stash/
+fragment-tab-map.js`, 20 slots: the three Crisis Fragments, Breach Splinter and
+Breachstone, Origin Spark and Origin Cradle, Breachlord Sac, Shattered Triskelion and The
+Triskelion Reforged, An Audience with the King, Head of the King, Call of the Shadows,
+Simulacrum Splinter, Simulacrum, Raven's Reflection, Kulemak's Invitation and the Deadly /
+Cowardly / Victorious Fate. Identities from the player's tooltips and item texts plus the
+item art of the empty cells; positions measured on a screenshot (see the file's header).
+Registered like every tab (main.js `TAB_MAPS`, reader-worker `TABS`, Net Worth label, last
+stop of "scan tabs"). No shipped detection template: the tab tour (or "Wrong tab?") learns
+its fingerprint on the first capture, the first scan places the boxes on the cells.
+**Not yet tested on a real capture of the tab.**
 
 ## 5. New config keys
 

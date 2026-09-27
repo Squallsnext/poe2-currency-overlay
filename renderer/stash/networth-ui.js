@@ -48,7 +48,7 @@
   // one being tuned. Kept across re-renders (so a save doesn't snap it shut), not across
   // restarts.
   const dbgSettingsOpen = new Set();
-  const TAB_LABEL = { currency: t('networth.tab.currency'), abyss: t('networth.tab.abyss'), essence: t('networth.tab.essence'), runes: t('networth.tab.runes'), 'runes-kalguuran': t('networth.tab.runes_kalguuran'), ritual: t('networth.tab.ritual'), soulcore: t('networth.tab.soulcore'), idol: t('networth.tab.idol'), 'ancient-augment': t('networth.tab.ancient_augment'), delirium: t('networth.tab.delirium'), breach: t('networth.tab.breach'), expedition: t('networth.tab.expedition') };
+  const TAB_LABEL = { currency: t('networth.tab.currency'), abyss: t('networth.tab.abyss'), essence: t('networth.tab.essence'), runes: t('networth.tab.runes'), 'runes-kalguuran': t('networth.tab.runes_kalguuran'), ritual: t('networth.tab.ritual'), soulcore: t('networth.tab.soulcore'), idol: t('networth.tab.idol'), 'ancient-augment': t('networth.tab.ancient_augment'), delirium: t('networth.tab.delirium'), breach: t('networth.tab.breach'), expedition: t('networth.tab.expedition'), fragment: t('networth.tab.fragment') };
   const MIRROR_ICON = 'https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lEdXBsaWNhdGUiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/26bc31680e/CurrencyDuplicate.png';
 
   if (window.api && window.api.getConfig) window.api.getConfig().then((c) => { state.dup = !!(c && c.stashDupTabs); state.sortLayout = !!(c && c.stashSortLayout); state.showMissing = !!(c && c.stashShowMissing); state.showConfidence = !!(c && c.stashShowConfidence); state.showOcrDebug = !!(c && c.stashShowOcrDebug); state.hiRes = !!(c && c.stashHiRes); state.showRel = !!(c && c.stashShowReliability); state.calibrated = !!(c && c.stashCalibration); state.hotkey = (c && c.stashHotkey) || 'F7'; state.bannerHidden = !!(c && c.stashBannerHidden); render(); }).catch(() => {});
@@ -1259,7 +1259,7 @@
   // In the order the tabs are reached in game: the runes tab's five sub-tabs one after
   // the other (ritual used to sit between Kalguur runes and soul cores - out of the runes
   // tab and back in, reported), then the rest.
-  const TOUR_ORDER = ['currency', 'abyss', 'essence', 'runes', 'runes-kalguuran', 'soulcore', 'idol', 'ancient-augment', 'ritual', 'delirium', 'breach', 'expedition'];
+  const TOUR_ORDER = ['currency', 'abyss', 'essence', 'runes', 'runes-kalguuran', 'soulcore', 'idol', 'ancient-augment', 'ritual', 'delirium', 'breach', 'expedition', 'fragment'];
   const TOUR_TABS = () => TOUR_ORDER.filter((k) => TAB_LABEL[k]).concat(Object.keys(TAB_LABEL).filter((k) => !TOUR_ORDER.includes(k)));
   let tourHotkeyOn = false;
   // a reload with the dialog open must not leave the scan key stuck in tour mode

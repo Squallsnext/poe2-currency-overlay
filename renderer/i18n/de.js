@@ -982,6 +982,7 @@ window.I18N_CATALOGS.de = {
   "networth.tab.delirium": "Delirium",
   "networth.tab.essence": "Essenzen",
   "networth.tab.expedition": "Expedition",
+  "networth.tab.fragment": "Fragmente",
   "networth.tab.idol": "Götzen",
   "networth.tab.ritual": "Ritual",
   "networth.tab.runes": "Runen",

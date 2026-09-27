@@ -1991,6 +1991,7 @@ const TAB_MAPS = {
   delirium: require('./renderer/stash/delirium-tab-map'),
   breach: require('./renderer/stash/breach-tab-map'),
   expedition: require('./renderer/stash/expedition-tab-map'),
+  fragment: require('./renderer/stash/fragment-tab-map'),
 };
 
 function runReaderWorker(bitmap, W, H, onDetected, opts) {

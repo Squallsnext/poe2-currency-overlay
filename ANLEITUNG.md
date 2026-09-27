@@ -106,6 +106,10 @@ Gegenstände und die umbenannten Wiederbelebungs-Runen. Nichts einzustellen.
 
 Andere Auflösung oder UI-Größe? Einfach neu kalibrieren.
 
+**Fragment-Fach** (Unter-Reiter „Fragmente“): ist dabei, als letztes Fach der Tour. Beim
+ersten Mal lernt das Programm das Fach über die Tour kennen (oder über „Falsches Fach?“ →
+Fragmente), danach wird es erkannt wie die anderen.
+
 ### 3.2 Ausrichten (Kästchen auf die Zahlen setzen)
 
 Beim Fach auf **„Ausrichten“** klicken. Jedes Kästchen ist die Stelle, an der gelesen wird.
