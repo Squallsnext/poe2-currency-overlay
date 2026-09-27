@@ -1972,6 +1972,7 @@
     onHistoryOpen(i) {
       const rec = state.history[i];
       if (!rec) return;
+      searchGen++; state.searching = false; // a running search belongs to the item shown before
       // currency entry: restore the exchange-value view and re-fetch a live price
       if (rec.currency && rec.model && rec.model.currencyTag) {
         state.item = rec.model;
@@ -2306,9 +2307,16 @@
     render();
   }
 
+  // Every search belongs to the item it started for. Reported: a result landed on the
+  // item checked meanwhile - after each await the code wrote into whatever item was
+  // showing by then. A new item bumps searchGen; an outdated search drops its result and
+  // leaves the state to the newer one (which it also no longer blocks - see tryParse).
+  let searchGen = 0;
   async function doSearch() {
     if (!state.item || state.searching) return;
     if (state.item.currencyTag) return doCurrencyPrice(); // exchange-value lookup, not a whisper search
+    const gen = searchGen;
+    const outdated = () => gen !== searchGen;
     state.searching = true; // keep previous results visible (dimmed) while updating
     state.notice = null;
     if (state.parseFail && state.parseFail.kind === 'search') state.parseFail = null; // a new try
@@ -2316,6 +2324,7 @@
     render();
     try {
       const league = await resolveLeague();
+      if (outdated()) return;
       const hasPseudo = state.item.mods.some((m) => m.mode === 'pseudo' && !m.group);
       // ONE search = ONE hit. Server-side weighted matching needs a login, but we
       // don't spend a request probing for it - the search itself is the probe.
@@ -2335,11 +2344,13 @@
       const tryServer = hasPseudo && state.authed !== false;
       const PAGE = 10; // fetch + show 10 comps at a time; "Load more" pages the rest
       let res = await window.api.trade2SearchFetch(league, compileWith(tryServer ? 'server' : 'client'), PAGE);
+      if (outdated()) return;
       // "Query too complex / Logging in will increase this limit" == logged out.
       // Remember it (so future searches skip straight to client), fall back, retry.
       if (!res.ok && tryServer && /complex|logg?ing? ?in|log in/i.test(res.error || '')) {
         state.authed = false;
         res = await window.api.trade2SearchFetch(league, compileWith('client'), PAGE);
+        if (outdated()) return;
       } else if (tryServer && res.ok) {
         state.authed = true; // a weighted search that succeeded proves the login
       }
@@ -2356,6 +2367,7 @@
       if (!rawAll.length) state.notice = t('itemtab.search.no_listings');
       pushHistory(rawAll, d.total);
     } catch (err) {
+      if (outdated()) return;
       state.notice = t('itemtab.search.failed', { error: err.message });
       if (window.logAction) window.logAction('item-search-error', String(err.message));
       // The trade site not knowing the item (Byrnabas: the data's English name was
@@ -2561,6 +2573,7 @@
       const viaCurrency = currencyFromRawText(text);
       if (viaCurrency) {
         state.parseFail = null;
+        searchGen++; state.searching = false;
         state.item = viaCurrency;
         state.itemOriginal = JSON.parse(JSON.stringify(viaCurrency));
         state.openFolds = new Set();
@@ -2587,6 +2600,7 @@
       return false;
     }
     state.parseFail = null;
+    searchGen++; state.searching = false; // a search still running belongs to the old item
     state.excAssume = null; // fresh paste: drop any prior item's per-item assume override
     state.item = toModel(res.item);
     applyExceptionalDefaults(); // Exceptional Normal base: assume OFF + corrupted=No
