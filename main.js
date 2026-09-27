@@ -602,12 +602,20 @@ const THIN_UNITS = 20; // latest daily quantity below this = a thin market
 // 1.51 (13 Div volume); a 3x rule would never have caught that. Setting: ninjaCheck.
 const NINJA_OUTLIER = 1.5;
 const NINJA_MIN_VOL = 1;
+const CX_TRUST_UNITS = 50;    // direct rate vs Exalted this well traded ...
+const CX_TRUST_OUTLIER = 1.5; // ... replaces a feed price already 1.5x off
 function sanitizeThinPrices(items, cx, ninja) {
   sanitizeAgainstRefs(items, cx, ninja);
   if (!ninja) return items;
   for (const it of items) {
     const n = ninja[it.apiId];
     if (!n || !(n.ex > 0) || !(n.volDiv >= NINJA_MIN_VOL) || !(it.price > 0)) continue;
+    // Only a DIRECT Exalted price replaces anything: poe.ninja values an item via the
+    // currency it trades most against, and for cheap items that is often Divine - a
+    // detour that sits far above what they sell for (Orb of Transmutation: 1.51 Ex via
+    // Divine, 0.34 Ex direct). The exchange's own direct rate, where it was taken above,
+    // is not second-guessed either. Otherwise poe.ninja stays a listed source only.
+    if (n.via !== 'exalted' || it.priceSource === 'cx') continue;
     const ratio = it.price / n.ex;
     if (ratio > NINJA_OUTLIER || ratio < 1 / NINJA_OUTLIER) {
       if (it.priceRaw == null) it.priceRaw = it.price;
@@ -622,13 +630,13 @@ function sanitizeAgainstRefs(items, cx, ninja) {
   for (const it of items) {
     if (!(it.price > 0)) continue;
     // reference 1: GGG exchange, direct against Exalted, with enough units traded
-    let ref = null, src = null;
+    let ref = null, src = null, cxUnits = 0;
     if (cx) {
       const e = cx[[it.apiId, 'exalted'].sort().join('|')];
       // crossed volumes (cx-feed.js): e.exalted holds the ITEM's traded units
       const units = e ? e.exalted : 0;
       const v = cxPairVal(cx, it.apiId, 'exalted');
-      if (v != null && units >= CX_MIN_UNITS) { ref = v; src = 'cx'; }
+      if (v != null && units >= CX_MIN_UNITS) { ref = v; src = 'cx'; cxUnits = units; }
     }
     // reference 2: median of the recent daily prices - only for an item that is thin
     // RIGHT NOW (few units in the latest log); a liquid item that rose 3x in a week is a
@@ -642,7 +650,11 @@ function sanitizeAgainstRefs(items, cx, ninja) {
     it.priceRefs = priceRefs(it, cx, ninja);
     if (!(ref > 0)) continue;
     const ratio = it.price / ref;
-    if (ratio > PRICE_OUTLIER || ratio < 1 / PRICE_OUTLIER) {
+    // a WELL-traded direct rate against Exalted is the market itself - trusted at 1.5x
+    // (reported: Orb of Transmutation 0.85 Ex from the feed, the game's exchange 2.4 : 1
+    // = 0.42 Ex, the direct rate 0.34 Ex on 2126 units - 2.5x off, under the 3x rule)
+    const limit = src === 'cx' && cxUnits >= CX_TRUST_UNITS ? CX_TRUST_OUTLIER : PRICE_OUTLIER;
+    if (ratio > limit || ratio < 1 / limit) {
       it.priceRaw = it.price;
       it.price = ref;
       it.priceEstimated = true;

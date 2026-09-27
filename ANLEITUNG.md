@@ -95,9 +95,10 @@ Einstellungen haben immer Vorrang.
 ### 3.4 Preise und Zählen
 
 - **Eigener Preis**: auf den Wert einer Zeile klicken – gilt pro Stück für alle Fächer.
-- **Preise mit poe.ninja abgeglichen**: weicht der Preis mehr als 1,5× von poe.ninja ab
-  (und poe.ninja hat genug Handel dafür), nimmt das Programm den poe.ninja-Preis – Zeichen
-  ≈, beim Drüberfahren stehen alle Quellen. Dein eigener Preis gewinnt immer.
+- **Preise abgeglichen**: weicht der Preis mehr als 1,5× vom direkten Tausch gegen
+  Erhabene ab (GGGs Währungsmarkt, genug gehandelt), gilt der Tauschkurs; poe.ninja wird
+  als weitere Quelle gezeigt. Zeichen ≈, beim Drüberfahren stehen alle Quellen. Dein
+  eigener Preis gewinnt immer.
 - **„Nicht mitzählen“**: Listen von Items, die nicht in die Summe sollen (z. B. „Kleine
   & normale Runen“), oben im Vermögen an- und ausschaltbar.
 - **Anzahl korrigieren**: auf die Anzahl klicken – eine echte Korrektur lehrt den Leser.

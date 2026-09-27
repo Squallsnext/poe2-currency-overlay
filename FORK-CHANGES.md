@@ -770,8 +770,21 @@ of volume behind an item and the price is more than 1.5x off it, its price is ta
 (marked ≈, "price from poe.ninja - the feed said …"). Looser than the 3x outlier rule on
 purpose - the transmutation case is 1.8x (poe.ninja: 1.51 Ex on 13 Div volume). Items
 poe.ninja trades thinly (under 1 Div) are left alone. The player's own price still wins.
-Config `ninjaCheck` (default on). Checked against the live API: transmute 0.85 -> 1.51,
-alch 3.0 stays (poe.ninja 3.17).
+Config `ninjaCheck` (default on).
+**Corrected the same day** (the player's screenshot of the in-game exchange: "2.40 : 1"
+means 2.4 transmutations per Exalted = 0.42 Ex, not 2.40 Ex): poe.ninja's 1.51 Ex was
+the WRONG direction - it values cheap items via the currency they trade most against,
+here Divine, a detour far above their price (the warning in `priceRefs` above). GGG's
+own direct rate against Exalted said 0.34 Ex on 2126 units - it was already there, but
+only used at 3x off (0.85 vs 0.34 is 2.5x). Now:
+- a direct Exalted rate with at least 50 units traded (`CX_TRUST_UNITS`) replaces a feed
+  price already 1.5x off;
+- poe.ninja replaces a price only where its own value is direct against Exalted
+  (`maxVolumeCurrency`), never after the exchange's direct rate was taken; otherwise it
+  is a listed source only.
+Live check (Forbidden Rites): transmute 0.85 -> 0.34 (exchange), breach splinter 9 -> 3.03
+(exchange; poe.ninja 3.69), alch 3.0 / chance 9.5 / greater transmutation 0.90 unchanged
+(sources within 1.5x).
 
 These existed in the player's own build and were **deliberately left out** here:
 
@@ -880,7 +893,7 @@ Is it worth buying the parts, combining (or splitting at a vendor) and selling?
 | `arbVendorSplit` | `false` | Arbitrage also considers vendor splits (Greater → 3 normal) |
 | `showRecipesTab`, `recipeBases`, `recipeRounds` | `true`, `{}`, `{}` | Recipes tab visible; per-recipe currency and rounds |
 | `priceOverrides` | `{}` | `apiId → { ex, at }`: the player's own price per unit |
-| `ninjaCheck` | `true` | compare prices with poe.ninja and take its price when the feed is > 1.5× off (≥ 1 Div volume) |
+| `ninjaCheck` | `true` | poe.ninja as a price source; replaces a price > 1.5× off only when its own value is direct against Exalted (≥ 1 Div volume) |
 
 Learned templates (`userData/learned-digit-templates.json`) gained `byScale[ms]` for
 high-resolution templates; "Forget template" clears both.

@@ -5,9 +5,10 @@
 // Each line: primaryValue (in the league's primary currency, Divine), the traded volume
 // in that currency, and core.rates = how many Exalted / Chaos one Divine is.
 //
-// Used by main.js (sanitizeThinPrices): where the feed's price and poe.ninja's disagree
-// strongly and poe.ninja has real volume behind it, poe.ninja's price is taken - reported:
-// Orb of Transmutation at 0.85 Ex in the app, 2.40 in game, poe.ninja 1.51.
+// Used by main.js (sanitizeThinPrices): listed as a price source; it replaces a price
+// only where it disagrees strongly, has real volume, AND is a direct Exalted price
+// (`via`) - values via Divine overprice cheap items (Orb of Transmutation 1.51 Ex via
+// Divine; the game's exchange 2.4 : 1 = 0.42 Ex).
 const https = require('https');
 
 const UA = 'poe2-price-overlay (+https://github.com/POE2-VibeTools/poe2-currency-overlay)';
@@ -44,7 +45,7 @@ async function getNinjaMap(league, force) {
     if (!(exPerDiv > 0) || !Array.isArray(j.lines)) continue;
     for (const l of j.lines) {
       if (!l || !l.id || !(l.primaryValue > 0)) continue;
-      map[l.id] = { ex: l.primaryValue * exPerDiv, volDiv: typeof l.volumePrimaryValue === 'number' ? l.volumePrimaryValue : 0, type: t };
+      map[l.id] = { ex: l.primaryValue * exPerDiv, volDiv: typeof l.volumePrimaryValue === 'number' ? l.volumePrimaryValue : 0, via: l.maxVolumeCurrency || null, type: t };
     }
   }
   if (!Object.keys(map).length) throw new Error('poe.ninja: no prices');
