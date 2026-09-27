@@ -996,6 +996,15 @@ Numbers on Net Worth and the Swap tab follow the UI language (asked for: German 
 · 3,0 div" instead of "1,596 ex · 3.0 div"; English stays as it was). A typed price
 "1.000,5" reads as 1000.5. In the lines each currency is its own right-aligned column (Ex under Ex,
 Div under Div - asked for), tabular figures.
+### 4.16 Tab card: tools behind ⚙, unknown tabs asked right away
+
+Asked for: "Wrong tab?" and "Align" in every card header are rarely needed now. They sit
+behind one ⚙ on the card (with Debug when the debug switch is on); "Align" is also in the
+unsure-numbers notice and in the check bar. A scan of a tab the reader does not know no
+longer just says so: its picture is kept ("__unknown") and the notice asks "Which tab is
+this?" - picking one pairs it from that picture (stash-correct-tab, like the tour) and
+reads it; "+ New tab" opens the tab builder on the same picture. Tested in the browser
+(⚙ menu, align call, unknown scan -> pick -> paired and listed).
 
 ## 5. New config keys
 

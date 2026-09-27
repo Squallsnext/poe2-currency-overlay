@@ -111,8 +111,8 @@ Andere Auflösung oder UI-Größe? Einfach neu kalibrieren.
   dran ist, und fragt „Ist das wirklich dieses Fach?“ – mit Ja lernt es das Aussehen des
   Fachs (es wird „gepaart“) und setzt die Kästchen auf die Zellen.
 - **F7** (bzw. deine Scan-Taste) liest danach **jedes gepaarte Fach** jederzeit, auch
-  außerhalb der Tour. Ein Fach, das noch nie gepaart wurde, erkennt F7 nicht sicher – dann
-  erst die Tour (oder beim Scan „Falsches Fach?“ → richtiges Fach wählen).
+  außerhalb der Tour. Kennt F7 ein Fach nicht, **fragt es sofort „Welches Fach ist
+  das?“** – Fach wählen, fertig (es ist gepaart) – oder „+ Neues Fach anlegen“.
 
 **Ein neues Fach in Betrieb nehmen** (z. B. das **Fragment-Fach**, Unter-Reiter
 „Fragmente“ – es ist der letzte Schritt der Tour):
@@ -142,7 +142,8 @@ Andere Auflösung oder UI-Größe? Einfach neu kalibrieren.
 
 ### 3.2 Ausrichten (Kästchen auf die Zahlen setzen)
 
-Beim Fach auf **„Ausrichten“** klicken. Jedes Kästchen ist die Stelle, an der gelesen wird.
+Am Fach auf **⚙ → „Ausrichten“** klicken (oder in der Prüf-Meldung / Prüfleiste). Jedes
+Kästchen ist die Stelle, an der gelesen wird.
 
 **Der schnellste Weg:**
 1. Auf freier Fläche einen **Rahmen um alle Kästchen** ziehen (alle markiert).
@@ -205,7 +206,7 @@ Einstellungen haben immer Vorrang.
   mehrere Listen, fragt ein kleines Menü, in welche. Zurückholen: auf das **⊘ Name ✕**
   in der Zeile klicken.
 - **Anzahl korrigieren**: auf die Anzahl klicken – eine echte Korrektur lehrt den Leser.
-- **„Falsches Fach?“**: wenn ein Fach als ein anderes erkannt wurde – das Programm merkt
+- **⚙ → „Falsches Fach?“**: wenn ein Fach als ein anderes erkannt wurde – das Programm merkt
   sich das für deinen Bildschirm.
 
 - **Werte anzeigen in**: Einstellungen → Vermögen → **Exalted / Divine / Chaos** – beliebig

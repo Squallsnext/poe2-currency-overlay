@@ -272,7 +272,15 @@
     // has actually come up empty
     if (res && typeof res.autoFound === 'boolean') state.autoFound = res.autoFound;
     if (!res || !res.ok) { state.notice = { kind: 'err', msg: t('networth.notice.capture_failed', { error: res && res.error || 'unknown error' }) }; return render(); }
-    if (res.mismatch) { state.notice = { kind: 'warn', msg: t('networth.notice.mismatch', { readCount: res.readCount || 0, supportedTabs: Object.values(TAB_LABEL).join(', ') }) }; return render(); }
+    if (res.mismatch) {
+      // Not recognised: ask right away which tab it is - the answer pairs it from this
+      // picture (like the tour) - or build it as a new tab. Before, it only said "not
+      // recognised" and the pairing had to be found in the tour.
+      state.notice = res.unknownKept
+        ? { kind: 'warn', msg: t('networth.notice.unknown_ask'), pickTab: true }
+        : { kind: 'warn', msg: t('networth.notice.mismatch', { readCount: res.readCount || 0, supportedTabs: Object.values(TAB_LABEL).join(', ') }) };
+      return render();
+    }
     state.notice = null;
     const existing = rowsOfType(res.tab);
     if (!existing.length) { addRow(res); return render(); }
@@ -496,6 +504,10 @@
   // used to show only with the OCR debug on - and a number the reader does not know yet
   // (a new tab, a count that grew a digit) went by unnoticed. Now the scan says so and
   // offers the check: one number after the other, picture, filters, learn - no switch.
+  async function openAlign(tab) {
+    const res = await window.api.stashAdjustOpen(tab).catch(() => ({ ok: false }));
+    if (!res || !res.ok) console.warn('stash-adjust-open:', res && res.reason);
+  }
   function weakLines(row) {
     return ((row.result && row.result.lines) || [])
       .filter((ln) => !ln.missing && ln.userCount == null && ln.conf != null && ln.conf < LEARN_BELOW)
@@ -514,6 +526,7 @@
     state.notice = { kind: 'warn', msg: prev + t('networth.review.offer', { n: weak.length, tab: TAB_LABEL[res.tab] || res.tab, list }),
       actions: [
         { label: t('networth.review.start'), fn: () => startReview(row, weak.map((ln) => ln.apiId)) },
+        { label: t('networth.row.adjust_label'), ghost: true, fn: () => openAlign(row.tab) },
         { label: t('networth.review.later'), ghost: true, fn: () => {} },
       ] };
     render();
@@ -549,9 +562,40 @@
     const b = (label, fn, ghost, dis) => { const x = el('button', 'nw-set-btn' + (ghost ? ' nw-set-btn-ghost' : ''), esc(label)); x.disabled = !!dis; x.onclick = (e) => { e.stopPropagation(); fn(); }; btns.appendChild(x); };
     b('◀ ' + t('networth.review.prev'), () => go(-1), true, r.i === 0);
     if (r.i < r.ids.length - 1) b(t('networth.review.next') + ' ▶', () => go(1));
+    b(t('networth.row.adjust_label'), () => openAlign(row.tab), true);
     b(t('networth.review.done'), () => endReview(), r.i < r.ids.length - 1);
     bar.appendChild(btns);
     return bar;
+  }
+
+  // "Welches Fach ist das?" under the notice of a scan that did not know the tab
+  function unknownPicker() {
+    const box = el('div', 'nw-notice-actions');
+    const sel = el('select', 'nw-card-tabsel');
+    sel.appendChild(el('option', null, esc(t('networth.row.tabfix_pick'))));
+    for (const [k, label] of Object.entries(TAB_LABEL)) { const o = el('option', null, esc(label)); o.value = k; sel.appendChild(o); }
+    sel.onchange = async () => {
+      const toTab = sel.value; if (!toTab) return;
+      sel.disabled = true;
+      const res = await window.api.stashCorrectTab('__unknown', toTab).catch(() => null);
+      state.notice = null;
+      if (res && res.ok && !res.mismatch) {
+        applyResult(res);
+        state.notice = { kind: 'ok', msg: t('networth.notice.unknown_paired', { tab: TAB_LABEL[res.tab] || res.tab }) };
+        reviewOffer(res);
+      } else state.notice = { kind: 'warn', msg: t('networth.row.tabfix_failed') };
+      render();
+    };
+    box.appendChild(sel);
+    const nb = el('button', 'nw-set-btn', esc(t('networth.builder.new')));
+    nb.onclick = async () => {
+      state.notice = { kind: 'info', msg: t('networth.builder.capturing') }; render();
+      const r = await window.api.stashBuilderStart({ useUnknown: true }).catch(() => null);
+      state.notice = r && r.ok ? { kind: 'ok', msg: t('networth.builder.opened', { n: r.cells }) } : { kind: 'err', msg: t('networth.builder.failed', { error: esc((r && r.error) || '?') }) };
+      render();
+    };
+    box.appendChild(nb);
+    return box;
   }
 
   function rowCard(row) {
@@ -590,10 +634,17 @@
     title.appendChild(el('span', 'nw-chev', open ? '▾' : '▸'));
     title.appendChild(document.createTextNode(labelFor(row)));
     head.appendChild(title);
+    // The tab's tools behind one ⚙ (asked for: "Wrong tab?" and "Align" are rarely needed
+    // now - the scan asks when it does not know a tab, and the check of unsure numbers
+    // leads to aligning). Open: Wrong tab?, Align, and Debug when the debug switch is on.
     // "Wrong tab?": pick what this tab really is. main keeps this capture's panel
     // fingerprint for that tab (so it is recognised next time on this setup) and reads
     // the same frame again as that tab.
-    if (window.api.stashCorrectTab) {
+    const menuOpen = state.cardMenu === row.id;
+    const gear = el('button', 'nw-card-gear' + (menuOpen ? ' on' : ''), '⚙');
+    gear.title = t('networth.row.tools_title');
+    gear.onclick = (e) => { e.stopPropagation(); state.cardMenu = menuOpen ? null : row.id; if (menuOpen) state.tabFix = null; render(); };
+    if (menuOpen && window.api.stashCorrectTab) {
       if (state.tabFix === row.id) {
         const sel = el('select', 'nw-card-tabsel');
         sel.appendChild(el('option', null, esc(t('networth.row.tabfix_pick'))));
@@ -607,7 +658,7 @@
           const toTab = sel.value; if (!toTab) return;
           sel.disabled = true;
           const res = await window.api.stashCorrectTab(row.tab, toTab).catch(() => null);
-          state.tabFix = null;
+          state.tabFix = null; state.cardMenu = null;
           if (res && res.ok && !res.mismatch) {
             row.tab = res.tab; row.result = res;
             for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
@@ -627,26 +678,17 @@
         head.appendChild(fix);
       }
     }
-
-    // On every scanned tab (it needs the captured frame, so it can only exist after a scan).
-    // Used to appear only when a slot was flagged unsure - but a slot can read confidently
-    // AND sit a few px off, and a tab that reads fine today is exactly the one worth
-    // aligning before the next icon change. Opens the drag-to-fix tool as a real window;
-    // saving writes straight into config so the fix applies from the very next scan.
-    if (window.api.stashAdjustOpen) {
+    // Align: on every scanned tab (it needs the captured frame). Opens the drag-to-fix
+    // tool as a real window; saving writes straight into config for the next scan.
+    if (menuOpen && window.api.stashAdjustOpen) {
       const adj = el('button', 'nw-card-adjust', t('networth.row.adjust_label'));
       adj.title = t('networth.row.adjust_title');
-      adj.onclick = async (e) => {
-        e.stopPropagation();
-        const res = await window.api.stashAdjustOpen(row.tab).catch(() => ({ ok: false }));
-        if (!res || !res.ok) console.warn('stash-adjust-open:', res && res.reason);
-      };
+      adj.onclick = (e) => { e.stopPropagation(); openAlign(row.tab); };
       head.appendChild(adj);
     }
     // OCR debug per TAB: the global switch only makes this button available; the images,
-    // sliders and previews are built just for the tab(s) switched on here. With debug on
-    // for every tab at once, four tabs of previews (each a full re-read) were a real load.
-    if (state.showOcrDebug) {
+    // sliders and previews are built just for the tab(s) switched on here.
+    if (menuOpen && state.showOcrDebug) {
       const on = state.debugRows.has(row.id);
       const dbgBtn = el('button', 'nw-card-adjust' + (on ? ' nw-card-adjust-on' : ''), t(on ? 'networth.row.debug_on' : 'networth.row.debug_off'));
       dbgBtn.title = t('networth.row.debug_title');
@@ -657,6 +699,7 @@
       };
       head.appendChild(dbgBtn);
     }
+    head.appendChild(gear);
     const rowEx = rowTotalEx(r);
     const tot = el('div', 'nw-card-total' + (rowEdited(r) ? ' nw-edited' : ''));
     tot.insertAdjacentHTML('beforeend', unitsHtml(rowEx, { div: r.divPrice, chaos: r.chaosPrice }));
@@ -1731,6 +1774,7 @@
 
     if (state.notice) {
       const n = el('div', 'nw-notice nw-' + state.notice.kind, esc(state.notice.msg));
+      if (state.notice.pickTab) n.appendChild(unknownPicker());
       if (state.notice.actions) {
         const row = el('div', 'nw-notice-actions');
         for (const a of state.notice.actions) {

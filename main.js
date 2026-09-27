@@ -2852,8 +2852,12 @@ async function readStashFrame(shot, onDetected) {
       + (res && res.tab ? ` tab=${res.tab} slots=${res.slotCount} read=${res.readCount} digitBank=${res.digitBank} scale=${res.scale}` : ''));
     if (!res || !res.ok) return res || { ok: false, error: 'reader failed' };
     if (res.mismatch) {
+      // kept as "__unknown": the scan then asks which tab it is ("Welches Fach ist das?")
+      // and pairs it from this very picture (stash-correct-tab), or opens the tab builder
+      // on it (stash-builder-start { useUnknown })
+      if (res.box) lastCaptureByTab.set('__unknown', { bitmap, W, H, box: res.box, res: { reads: [] } });
       return {
-        ok: true, mismatch: true, autoFound: !!res.autoFound, readCount: res.readCount, slotCount: res.slotCount,
+        ok: true, mismatch: true, unknownKept: !!res.box, autoFound: !!res.autoFound, readCount: res.readCount, slotCount: res.slotCount,
         boxSource: res.boxSource || null, panelCoverage: res.panelCoverage || null, detect: res.detect || null,
       };
     }
@@ -4322,11 +4326,17 @@ ipcMain.handle('stash-builder-data', () => builderData);
 ipcMain.handle('stash-builder-start', async (_e, opts) => {
   try {
     const editKey = opts && opts.edit;
-    const shot = await tourGrab();
-    if (!shot) return { ok: false, error: 'game-window-not-found' };
-    if (frameLooksBlank(shot.bitmap)) return { ok: false, error: 'game-window-black' };
-    const bitmap = Buffer.from(shot.bitmap), W = shot.W, H = shot.H;
-    const res = await runReaderWorker(bitmap, W, H, null);
+    // from a scan that did not know the tab: its picture, no new capture
+    const unk = opts && opts.useUnknown ? lastCaptureByTab.get('__unknown') : null;
+    let bitmap, W, H, res;
+    if (unk) { bitmap = Buffer.from(unk.bitmap); W = unk.W; H = unk.H; res = { box: unk.box }; }
+    else {
+      const shot = await tourGrab();
+      if (!shot) return { ok: false, error: 'game-window-not-found' };
+      if (frameLooksBlank(shot.bitmap)) return { ok: false, error: 'game-window-black' };
+      bitmap = Buffer.from(shot.bitmap); W = shot.W; H = shot.H;
+      res = await runReaderWorker(bitmap, W, H, null);
+    }
     const box = (res && res.box) || config.stashCalibration;
     if (!box) return { ok: false, error: 'no-box' };
     const TT = require('./renderer/stash/tab-templates.json');

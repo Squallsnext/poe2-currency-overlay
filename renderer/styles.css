@@ -2110,3 +2110,7 @@ footer {
 .nw-ucol-ex { min-width: 82px; }
 .nw-ucol-div, .nw-ucol-chaos { min-width: 58px; }
 .nw-ucol + .nw-ucol { color: var(--tx-body); font-weight: 500; }
+
+/* Net Worth card: the tab's tools behind one ⚙ */
+.nw-card-gear { background: transparent; border: 1px solid transparent; color: var(--tx-dim); border-radius: 5px; cursor: pointer; font-size: 13px; padding: 0 6px; margin-left: 4px; line-height: 20px; }
+.nw-card-gear:hover, .nw-card-gear.on { color: var(--am-hi); border-color: var(--am); }
