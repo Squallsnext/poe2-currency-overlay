@@ -689,8 +689,6 @@ part of it. The same merge runs in the reader, the OCR debug preview and teachin
 Measured: with the player's 5K box positions and only the shipped filters, the 5K
 currency read is identical to their own full settings (38 of 38 records).
 
-### 4.8 Setup-specific parts – already removed from this branch
-
 **Tested on real 1080p and 1440p support pictures** (all 12 tabs each, from the player).
 - Calibration from the cells: the saved box found again to the pixel at both sizes
   (0.2-0.3 s).
@@ -785,6 +783,8 @@ only used at 3x off (0.85 vs 0.34 is 2.5x). Now:
 Live check (Forbidden Rites): transmute 0.85 -> 0.34 (exchange), breach splinter 9 -> 3.03
 (exchange; poe.ninja 3.69), alch 3.0 / chance 9.5 / greater transmutation 0.90 unchanged
 (sources within 1.5x).
+
+### 4.8 Setup-specific parts – already removed from this branch
 
 These existed in the player's own build and were **deliberately left out** here:
 
@@ -910,6 +910,9 @@ high-resolution templates; "Forget template" clears both.
   onto artificial backgrounds, incl. a 2.67× upscale for the 5K regime): local cut, speck
   filter, contrast gate, cluster fix, ×2 learning. These show the mechanisms work; they are
   **not** a measurement on ground-truthed captures.
+- **Measured on real captures** (the player's 1080p, 1440p and 5K support pictures, all
+  12 tabs): cell finding and rule placement, calibration search, shipped per-resolution
+  filters, parallel 5K read (identical reads) - see 4.7b.
 - **Not re-measured:** the upstream eval harnesses (`dev/stash-matcher/*`,
   `scripts/test-stash-*.js`) were not run, because the fixture screenshots are not in the
   repo. Before merging reader changes upstream, please re-run them – especially for the
