@@ -972,6 +972,19 @@ with the tab open in game:
 Tested: the cell finder on the captures above, the window with the Fragment screenshot
 (20 cells shown, German search "krisen" -> the three Crisis Fragments, Enter names and
 moves on, save sends the named cells). **Not yet run in the Electron app / in game.**
+### 4.14 Unsure numbers: checked right after the scan
+
+Reported: after adding a tab everything sat right, but the Breach Splinter count was read
+unsure - and that only shows with the OCR debug switched on: switch on, rescan, check,
+switch off again. A number the reader does not know yet (a count that grew a digit) went
+by unnoticed. Now every scan (scan key, tour, tab builder) lists its unsure numbers (under
+the teach limit, 85 %) in a notice - "2 unsure in Fragments: Breach Splinter 62 %, ..." -
+with **[Check now] [Later]**. Check now opens a bar on that tab that goes through them one
+by one: the debug panel of that number (pictures, filters, "learn from this image"), the
+confidence and ✓ - without the debug switch (`dbgActive` in networth-ui.js: the switch OR
+a running check). **Done** closes it. With percentages hidden, an unsure number carries a
+small "?" (red under 65 %) that opens the check for just that one. Tested in the browser
+with a mocked scan (notice, bar, picture requested per number, next / done).
 
 ## 5. New config keys
 

@@ -54,6 +54,10 @@
   if (window.api && window.api.getConfig) window.api.getConfig().then((c) => { state.dup = !!(c && c.stashDupTabs); state.sortLayout = !!(c && c.stashSortLayout); state.showMissing = !!(c && c.stashShowMissing); state.showConfidence = !!(c && c.stashShowConfidence); state.showOcrDebug = !!(c && c.stashShowOcrDebug); state.hiRes = !!(c && c.stashHiRes); state.showRel = !!(c && c.stashShowReliability); state.calibrated = !!(c && c.stashCalibration); state.hotkey = (c && c.stashHotkey) || 'F7'; state.bannerHidden = !!(c && c.stashBannerHidden); render(); }).catch(() => {});
 
   const rowsOfType = (tab) => state.rows.filter((r) => r.tab === tab);
+  // The debug panel of a row: with the OCR-debug switch, or during a check the scan
+  // offered ("Jetzt prüfen") - the switch is not needed for that (reported: turning it on,
+  // rescanning, checking and turning it off again for every unsure number is too much).
+  const dbgActive = (row) => (state.showOcrDebug || (state.review && state.review.rowId === row.id)) && state.debugRows.has(row.id);
   function labelFor(row) {
     const same = rowsOfType(row.tab);
     const base = TAB_LABEL[row.tab] || row.tab;
@@ -432,6 +436,69 @@
     root.appendChild(cal);
   }
 
+  // ---------- check unsure numbers right after a scan ----------
+  // Every scan already knows how sure each number is. Unsure ones (under LEARN_BELOW)
+  // used to show only with the OCR debug on - and a number the reader does not know yet
+  // (a new tab, a count that grew a digit) went by unnoticed. Now the scan says so and
+  // offers the check: one number after the other, picture, filters, learn - no switch.
+  function weakLines(row) {
+    return ((row.result && row.result.lines) || [])
+      .filter((ln) => !ln.missing && ln.userCount == null && ln.conf != null && ln.conf < LEARN_BELOW)
+      .sort((a, b) => a.conf - b.conf);
+  }
+  function reviewOffer(res) {
+    if (!res || !res.ok || res.mismatch || state.review) return;
+    const rows = rowsOfType(res.tab);
+    const row = rows[rows.length - 1];
+    if (!row) return;
+    const weak = weakLines(row);
+    if (!weak.length) return;
+    if (state.notice && (state.notice.actions || state.notice.kind === 'err')) return; // a question is already open
+    const list = weak.slice(0, 3).map((ln) => `${window.gameName(ln.name)} ${Math.round(ln.conf * 100)} %`).join(', ') + (weak.length > 3 ? ' …' : '');
+    const prev = state.notice ? state.notice.msg + ' ' : '';
+    state.notice = { kind: 'warn', msg: prev + t('networth.review.offer', { n: weak.length, tab: TAB_LABEL[res.tab] || res.tab, list }),
+      actions: [
+        { label: t('networth.review.start'), fn: () => startReview(row, weak.map((ln) => ln.apiId)) },
+        { label: t('networth.review.later'), ghost: true, fn: () => {} },
+      ] };
+    render();
+  }
+  function startReview(row, ids) {
+    if (!ids.length) return;
+    state.review = { rowId: row.id, ids, i: 0 };
+    state.debugRows.add(row.id);
+    state.expanded[row.id] = true;
+    state.dbgLine = ids[0];
+    state.notice = null;
+    render();
+    const el0 = document.querySelector('.nw-review');
+    if (el0) el0.scrollIntoView({ block: 'nearest' });
+  }
+  function endReview() {
+    const r = state.review;
+    state.review = null;
+    if (r && !state.showOcrDebug) state.debugRows.delete(r.rowId);
+    state.dbgLine = null;
+    render();
+  }
+  function reviewBar(row) {
+    const r = state.review;
+    const ln = ((row.result && row.result.lines) || []).find((l) => l.apiId === r.ids[r.i]);
+    const bar = el('div', 'nw-review');
+    const name = ln ? window.gameName(ln.name) : r.ids[r.i];
+    const pct = ln && ln.conf != null ? Math.round(ln.conf * 100) + ' %' : '';
+    bar.appendChild(el('div', 'nw-review-head', t('networth.review.head', { i: r.i + 1, n: r.ids.length, name: esc(name), pct })));
+    bar.appendChild(el('div', 'nw-review-how', t('networth.review.how')));
+    const btns = el('div', 'nw-review-btns');
+    const go = (d) => { r.i = Math.max(0, Math.min(r.ids.length - 1, r.i + d)); state.dbgLine = r.ids[r.i]; render(); };
+    const b = (label, fn, ghost, dis) => { const x = el('button', 'nw-set-btn' + (ghost ? ' nw-set-btn-ghost' : ''), esc(label)); x.disabled = !!dis; x.onclick = (e) => { e.stopPropagation(); fn(); }; btns.appendChild(x); };
+    b('◀ ' + t('networth.review.prev'), () => go(-1), true, r.i === 0);
+    if (r.i < r.ids.length - 1) b(t('networth.review.next') + ' ▶', () => go(1));
+    b(t('networth.review.done'), () => endReview(), r.i < r.ids.length - 1);
+    bar.appendChild(btns);
+    return bar;
+  }
+
   function rowCard(row) {
     const r = row.result;
     const open = !!state.expanded[row.id];
@@ -549,6 +616,7 @@
     card.appendChild(head);
     if (!open) return card;
 
+    if (state.review && state.review.rowId === row.id) card.appendChild(reviewBar(row));
     const list = el('div', 'nw-lines');
     const byVal = (a, b) => (lineVal(b) - lineVal(a)) || ((b.count || 0) - (a.count || 0));
     const bySlot = (a, b) => (a.slot || 0) - (b.slot || 0);
@@ -557,7 +625,7 @@
     const missing = all.filter((ln) => ln.missing).sort(bySlot); // shown only with "Show missing", at the bottom
     // with this tab's debug on, the unread slots are listed too - they are the ones that
     // need tuning (reported: at 1080p nothing was read, so there was nothing to pick)
-    const dbgOn = state.showOcrDebug && state.debugRows.has(row.id);
+    const dbgOn = dbgActive(row);
     const shown = state.showMissing || dbgOn ? owned.concat(missing) : owned;
     for (const ln of shown) {
       // Rows our own testing says to distrust are marked, so a wrong number is visible
@@ -585,6 +653,13 @@
       if (ln.icon) { const img = el('img', 'nw-ic'); img.src = ln.icon; img.onerror = () => img.remove(); line.appendChild(img); }
       else line.appendChild(el('div', 'nw-ic nw-ic-none'));
       line.appendChild(el('div', 'nw-name', esc(window.gameName(ln.name) + (ln.suffix || '')))); // feed is English; show the client's own name (+ "#2" for an extra slot of the same currency)
+      // unsure read, even with the percentages hidden: a "?" that opens its check
+      if (!ln.missing && ln.userCount == null && ln.conf != null && ln.conf < LEARN_BELOW && !state.showConfidence && !dbgActive(row)) {
+        const q = el('button', 'nw-weak' + (ln.conf < 0.65 ? ' nw-weak-bad' : ''), '?');
+        q.title = t('networth.review.weak_title', { pct: Math.round(ln.conf * 100) });
+        q.onclick = (e) => { e.stopPropagation(); startReview(row, [ln.apiId]); };
+        line.appendChild(q);
+      }
       const skipKey = ln.priceId || ln.apiId;
       if (sg) {
         // click the tag = take it back out of that list (counts again)
@@ -599,7 +674,7 @@
         qb.onclick = (e) => { e.stopPropagation(); window.NwSkipGroups.quickSkip(skipKey, qb, render); };
         line.appendChild(qb);
       }
-      if (state.showConfidence && ln.conf != null) {
+      if ((state.showConfidence || dbgActive(row)) && ln.conf != null) {
         const pct = Math.round(ln.conf * 100);
         const cl = pct >= 88 ? 'ok' : (pct >= 80 ? 'mid' : 'low');
         const cf = el('div', 'nw-conf nw-conf-' + cl, pct + '%');
@@ -667,7 +742,7 @@
       // with this tab's debug on: one 🔍 per row, and only the ONE row picked gets images,
       // sliders and live previews - they are computed one slot at a time instead of every
       // slot of the tab at once
-      if (state.showOcrDebug && state.debugRows.has(row.id)) {
+      if (dbgActive(row)) {
         const lb = el('button', 'nw-line-dbg' + (state.dbgLine === ln.apiId ? ' nw-line-dbg-on' : ''), '🔍');
         lb.title = t('networth.line.debug_open_title');
         lb.onclick = (e) => { e.stopPropagation(); state.dbgLine = state.dbgLine === ln.apiId ? null : ln.apiId; render(); };
@@ -680,7 +755,7 @@
       // number (the count field above already teaches on a real correction) or confirm it
       // (the checkmark above already teaches on confirmation), and if the digit templates
       // themselves seem to be the problem, forget them and let them rebuild from scratch.
-      if (state.showOcrDebug && state.debugRows.has(row.id) && state.dbgLine === ln.apiId && window.api.stashSlotDebugImage) {
+      if (dbgActive(row) && state.dbgLine === ln.apiId && window.api.stashSlotDebugImage) {
         const dbg = el('div', 'nw-dbg');
         const cached = dbgImgCache[ln.apiId];
         if (cached === 'loading') {
@@ -1704,6 +1779,7 @@
       calCheckResult(res);
       // first scan of a tab: its boxes were put onto the cells (main.js autoPlaceNewTab)
       if (res && res.autoPlaced && !state.notice) { state.notice = { kind: 'ok', msg: t('networth.notice.auto_placed', { tab: TAB_LABEL[res.tab] || res.tab, n: res.autoPlaced }) }; render(); }
+      reviewOffer(res);
     });
     if (window.api.onStashQueued) window.api.onStashQueued((info) => {
       state.queued = (info && info.depth) || 0;

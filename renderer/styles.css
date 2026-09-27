@@ -2088,3 +2088,11 @@ footer {
 .nw-dbg-guide summary { cursor: pointer; color: var(--am); }
 .nw-dbg-guide-body { margin-top: 4px; line-height: 1.5; }
 .nw-dbg-guide-body ol { margin: 4px 0; padding-left: 18px; }
+
+/* Net Worth: unsure number marker + the check bar the scan offers (networth-ui.js review) */
+.nw-weak { background: transparent; border: 1px solid var(--am); color: var(--am-hi); border-radius: 50%; width: 16px; height: 16px; font-size: 10px; line-height: 13px; padding: 0; margin-left: 6px; cursor: pointer; flex: 0 0 auto; }
+.nw-weak-bad { border-color: var(--red-warn); color: var(--red-warn); }
+.nw-review { border: 1px solid var(--am); border-radius: 7px; padding: 7px 10px; margin: 6px 0; background: color-mix(in srgb, var(--am) 8%, transparent); }
+.nw-review-head { font-weight: 600; color: var(--tx-hi); }
+.nw-review-how { font-size: 11px; color: var(--tx-dim); margin: 3px 0 6px; }
+.nw-review-btns { display: flex; gap: 6px; flex-wrap: wrap; }

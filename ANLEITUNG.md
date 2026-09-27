@@ -156,6 +156,16 @@ Weitere Tasten: Pfeile = 1 px, Shift+Pfeil = 5 px, Strg+Z = rückgängig, **F** 
 einrasten (nach einem von Hand gesetzten Vorbild), **H** = Hilfe. Gestrichelte Kästchen =
 unsicher, Maus darauf zeigt warum.
 
+### 3.3a Unsichere Zahlen – meldet das Programm selbst
+
+Nach jedem Scan (F7, Tour, neues Fach) zählt das Programm die **unsicheren Zahlen** (unter
+85 %) und meldet sie: „2 Zahlen unsicher in Fragmente: Riss-Splitter 62 %, …“ →
+**„Jetzt prüfen“**. Dann geht eine Leiste über dem Fach die Zahlen **einzeln** durch: Bild,
+Filter, ✓ (richtig → lernt sie) oder „Aus diesem Bild lernen“ (falsch → richtige Zahl
+eintragen), **Weiter**, zum Schluss **Fertig**. Der Debug-Schalter muss dafür **nicht** an
+sein. Ohne Prozentanzeige steht neben einer unsicheren Zahl ein kleines **?** – anklicken
+prüft genau diese Zahl.
+
 ### 3.3 Debug: eine Zahl sauber lesen
 
 **Einstellungen → „OCR-Debug-Bilder zeigen“** an, dann beim Fach **„Debug“** und in der
