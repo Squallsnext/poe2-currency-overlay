@@ -1292,6 +1292,11 @@ read from the same capture the gallery came from - the next scan is the real tes
 - **Green edge**: with "save the edge" on, the OCR panel's black/white picture shows the
   hard cut white and what the edge rescue brought back from the original green, with
   the pixel count - the rescue sliders can be judged by eye.
+- **The freed number on the original** (asked for: "die Ziffer, die freigestellt wurde,
+  auf der Original-Ansicht ... um sehen zu können, wo sie sich befindet"): a 5th
+  picture - the original's cell, cut and shrunk exactly like the black/white one so they
+  line up - with the number's pixels tinted: blue = the hard cut, green = what the edge
+  rescue added, red = in the black/white picture but not part of the number (art).
 - **Magnifier** (asked for: "mit einer Lupe am besten"): a click on any of the four
   pictures shows all four big and pixel-sharp, one under the other; a click closes it.
 

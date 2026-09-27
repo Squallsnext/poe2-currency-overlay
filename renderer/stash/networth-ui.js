@@ -77,10 +77,10 @@
   // the OCR panel's magnifier: the four pictures big and pixel-sharp
   function openLoupe(imgs, note) {
     const ov = el('div', 'nw-loupe');
-    const labels = [t('networth.line.loupe_1'), t('networth.line.loupe_2'), t('networth.line.loupe_3'), t('networth.line.loupe_4')];
-    imgs.forEach((im, i) => {
+    const labels = [t('networth.line.loupe_1'), t('networth.line.loupe_2'), t('networth.line.loupe_3'), t('networth.line.loupe_4'), t('networth.line.loupe_5')];
+    imgs.forEach((im) => {
       const row = el('div', 'nw-loupe-row');
-      row.appendChild(el('div', 'nw-loupe-lab', esc(labels[i] || '')));
+      row.appendChild(el('div', 'nw-loupe-lab', esc(labels[im.i] || '')));
       const big = el('img', 'nw-loupe-img'); big.src = im.src; row.appendChild(big);
       ov.appendChild(row);
     });
@@ -1171,10 +1171,14 @@
           const binImg = el('img', 'nw-dbg-img'); binImg.src = cached.binUrl; binImg.title = t('networth.line.debug_img_binarized');
           // 4th: the difference to the templates it matched (red missing / blue extra)
           const diffImg = el('img', 'nw-dbg-img'); diffImg.title = t('networth.line.debug_img_diff');
+          // 5th: the freed number laid on the original - where it sits (debugging aid)
+          const overImg = el('img', 'nw-dbg-img'); overImg.title = t('networth.line.debug_img_overlay');
           const diffInfo = el('div', 'nw-dbg-diffinfo');
           const showDiff = (r) => {
             diffImg.style.display = r && r.diffUrl ? '' : 'none';
             if (r && r.diffUrl) diffImg.src = r.diffUrl;
+            overImg.style.display = r && r.overlayUrl ? '' : 'none';
+            if (r && r.overlayUrl) overImg.src = r.overlayUrl;
             diffInfo.innerHTML = r && r.diffGlyphs && r.diffGlyphs.length
               ? esc(t('networth.line.debug_diff_legend')) + ' ' + r.diffGlyphs.map((g) => esc(t('networth.line.debug_diff_glyph', {
                 digit: g.digit, pct: Math.round((g.score || 0) * 100), miss: g.miss, extra: g.extra,
@@ -1185,11 +1189,12 @@
           showDiff(cached);
           // the magnifier (asked for: "mit einer Lupe am besten"): a click on any picture
           // shows all four big and pixel-sharp, one under the other; a click closes it
-          for (const im of [rawImg, filtImg, binImg, diffImg]) {
+          const all5 = [rawImg, filtImg, binImg, diffImg, overImg];
+          for (const im of all5) {
             im.style.cursor = 'zoom-in';
-            im.onclick = (e) => { e.stopPropagation(); openLoupe([rawImg, filtImg, binImg, diffImg].filter((x) => x.style.display !== 'none' && x.src), diffInfo.textContent); };
+            im.onclick = (e) => { e.stopPropagation(); openLoupe(all5.map((x, i) => ({ src: x.style.display !== 'none' ? x.src : '', i })).filter((x) => x.src), diffInfo.textContent); };
           }
-          imgs.appendChild(rawImg); imgs.appendChild(filtImg); imgs.appendChild(binImg); imgs.appendChild(diffImg);
+          for (const im of all5) imgs.appendChild(im);
           dbg.appendChild(imgs);
           dbg.appendChild(diffInfo);
           // how to use the sliders - folded, opened once and remembered
@@ -1301,7 +1306,7 @@
               showDiff(res);
               showPreview(res.preview);
               showTemplates(res.templates);
-              Object.assign(cached, { templates: res.templates, defaults: res.defaults, effFloor: res.effFloor, rawUrl: res.rawUrl, filtUrl: res.filtUrl, binUrl: res.binUrl, diffUrl: res.diffUrl, diffGlyphs: res.diffGlyphs, grow: res.grow, rescued: res.rescued, preview: res.preview });
+              Object.assign(cached, { templates: res.templates, defaults: res.defaults, effFloor: res.effFloor, rawUrl: res.rawUrl, filtUrl: res.filtUrl, binUrl: res.binUrl, diffUrl: res.diffUrl, diffGlyphs: res.diffGlyphs, grow: res.grow, rescued: res.rescued, overlayUrl: res.overlayUrl, preview: res.preview });
               for (const sp of specs) cached[sp.key] = res[sp.key];
               if (!touched.has('floor')) sliders.floor.s.value = res.floor;
               sliders.floor.mark();

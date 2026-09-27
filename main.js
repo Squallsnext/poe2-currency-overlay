@@ -2763,6 +2763,8 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
       }
     }
     const { shrunk, binarized } = DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Object.assign({}, P, { floor }), cs);
+    // the hard cut alone (no edge rescue), for the green edge and the overlay below
+    const core = P.growV ? DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Object.assign({}, P, { floor, growV: null }), cs).binarized : null;
     // the cut actually applied: binarize() takes the higher of floor and the cell's own
     // Otsu threshold, so a floor below Otsu does nothing - show which one is in charge
     const effFloor = Math.max(DR.otsu(shrunk.data), floor);
@@ -2802,9 +2804,35 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
       diffGlyphs.push({ digit: bankInfo.unmap(g.ch), source: bankInfo.sourceOf(g.ch), score: g.score, both, miss, extra });
     }
     const diffUrl = diffGlyphs.length ? toUrl(diffBuf, Wd, Hd, 6) : null;
+    // The freed digit ON the original (asked for: "die Ziffer, die freigestellt wurde, auf
+    // der Original-Ansicht ... um sehen zu können, wo sie sich befindet"): the original's
+    // cell, cut and shrunk exactly like the black/white picture so they line up pixel for
+    // pixel, with the number's pixels tinted - cyan = the hard cut, green = what the edge
+    // rescue added; the rest of the black/white picture (art) red
+    let overlayUrl = null;
+    try {
+      const n = ch.W2 * ch.H2, Rc = new Uint8Array(n), Gc = new Uint8Array(n), Bc = new Uint8Array(n);
+      for (let i = 0; i < n; i++) { Rc[i] = ch.orig[i * 4]; Gc[i] = ch.orig[i * 4 + 1]; Bc[i] = ch.orig[i * 4 + 2]; }
+      const Pw = Object.assign({}, P, { floor });
+      const wr = DR.cellWindow(Rc, ch.W2, ch.H2, pos.cx, pos.cy, Pw, cs), wg = DR.cellWindow(Gc, ch.W2, ch.H2, pos.cx, pos.cy, Pw, cs), wb = DR.cellWindow(Bc, ch.W2, ch.H2, pos.cx, pos.cy, Pw, cs);
+      if (wr && wr.w === Wd && wr.h === Hd) {
+        const Sx = P.matchScale > 1 ? P.matchScale : 1;
+        const num = new Uint8Array(Wd * Hd);
+        for (const c of DR.numberPieces(DR.components(binarized, Sx), Sx)) for (let y = 0; y < c.mask.h; y++) for (let x = 0; x < c.mask.w; x++) if (c.mask.data[y * c.mask.w + x]) num[(c.y + y) * Wd + c.x + x] = 1;
+        const ob = Buffer.alloc(Wd * Hd * 4);
+        const mix = (o, r, g, b2, k) => { ob[o] = Math.round(ob[o] * (1 - k) + r * k); ob[o + 1] = Math.round(ob[o + 1] * (1 - k) + g * k); ob[o + 2] = Math.round(ob[o + 2] * (1 - k) + b2 * k); };
+        for (let i = 0; i < Wd * Hd; i++) {
+          const o = i * 4; ob[o] = wr.data[i]; ob[o + 1] = wg.data[i]; ob[o + 2] = wb.data[i]; ob[o + 3] = 255;
+          if (!binarized.data[i]) continue;
+          if (!num[i]) mix(o, 235, 50, 50, 0.55);                   // in the black/white picture, not the number
+          else if (core && !core.data[i]) mix(o, 60, 220, 90, 0.7); // edge rescued from the original
+          else mix(o, 40, 200, 255, 0.45);                          // the hard cut's digit
+        }
+        overlayUrl = toUrl(ob, Wd, Hd, 6);
+      }
+    } catch { /* the view is a debugging aid only */ }
     // with "save the edge" on, what the edge rescue added is GREEN (the hard cut white),
     // so the player sees what the rescue does while moving its sliders
-    const core = P.growV ? DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Object.assign({}, P, { floor, growV: null }), cs).binarized : null;
     const binBuf = Buffer.alloc(binarized.w * binarized.h * 4);
     let rescued = 0;
     for (let i = 0; i < binarized.w * binarized.h; i++) {
@@ -2818,7 +2846,7 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
       rawUrl: toUrl(rawBuf, cw, chh, UPSCALE),
       filtUrl: toUrl(filtBuf, cw, chh, UPSCALE),
       binUrl: toUrl(binBuf, binarized.w, binarized.h, 6),
-      diffUrl, diffGlyphs, rescued,
+      diffUrl, diffGlyphs, rescued, overlayUrl,
       floor, effFloor, desatSat, contrast, minBlob, bright, gain, satPct, localThr, growFloor, growDepth, growSat, grow,
       // matchScale as asked for (slider), effective one actually used, and the most
       // this capture allows (1 = not available in this regime)

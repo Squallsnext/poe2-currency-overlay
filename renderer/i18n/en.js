@@ -929,6 +929,8 @@ window.I18N_CATALOGS.en = {
   "networth.line.loupe_2": "2 Grey",
   "networth.line.loupe_3": "3 Black/white",
   "networth.line.loupe_4": "4 Comparison",
+  "networth.line.debug_img_overlay": "The freed number on the original: blue = hard cut, green = brought back by the edge rescue, red = in the black/white picture but not part of the number (art)",
+  "networth.line.loupe_5": "5 On the original",
   "networth.row.remove_title": "Remove this tab",
   "networth.sample.answer_first": "Answer the question on each screenshot before sending.",
   "networth.sample.capture_black": "The game window came back black. That's exclusive fullscreen. Switch to Windowed or Borderless and try again.",

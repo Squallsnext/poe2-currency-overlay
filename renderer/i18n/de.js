@@ -924,6 +924,8 @@ window.I18N_CATALOGS.de = {
   "networth.line.loupe_2": "2 Graubild",
   "networth.line.loupe_3": "3 Schwarz-Weiß",
   "networth.line.loupe_4": "4 Vergleich",
+  "networth.line.debug_img_overlay": "Die freigestellte Zahl auf dem Original: blau = harter Schnitt, grün = vom Rand-Retter geholt, rot = im Schwarz-Weiß-Bild, aber nicht Teil der Zahl (Icon)",
+  "networth.line.loupe_5": "5 Auf dem Original",
   "networth.row.remove_title": "Diesen Tab entfernen",
   "networth.sample.answer_first": "Beantworte die Frage zu jedem Screenshot, bevor du sendest.",
   "networth.sample.capture_black": "Das Spielfenster kam schwarz zurück. Das ist exklusiver Vollbildmodus. Wechsle zu Fenster oder Randlos und versuche es erneut.",
