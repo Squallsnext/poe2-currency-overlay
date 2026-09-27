@@ -1372,6 +1372,19 @@ including the fidelity line. A panel rebuilt for the same slot keeps it; ✕ or 
 the window's title bar, an Electron drag region that takes every click whatever lies on
 top - the floating one never goes above the title bar and is marked no-drag.)
 
+Then: "die Lupe lässt sich nur im Fenster vom Overlay bewegen". It is now its own window
+(main.js `loupe-update`, `renderer/stash/loupe.html`): frameless, always on top, movable
+anywhere on any screen and resizable at its edges; place and size are kept
+(`stashLoupeBounds`, dropped when that spot no longer lies on a screen). The panel sends it
+its pictures on every preview refresh; a window still loading draws the newest ones, not
+the first. ✕ or Esc in it closes it. (The floating box
+stays as the fallback for a build without the window.)
+
+Also reported: "die Regler haben mal was ausgelöst, jetzt aber nicht". At 5K a preview takes
+a moment; with the slider moved on, an older answer arriving after the newer one drew the
+old pictures over the new - the slider seemed dead. Every preview now carries a number and
+only the answer to the latest one is drawn.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
@@ -1389,6 +1402,7 @@ top - the floating one never goes above the title bar and is marked no-drag.)
 | `stashGrowDigits` | `false` | Reader and learning grow the digits from the hard cut into the original's edge (own learned set) |
 | `stashConfirmed` | `{}` | Per tab and slot: the count the player confirmed; not asked about again while read the same |
 | `stashTuneBackup` | `{}` | Per tab: slot settings from before the last auto-tune (Undo) |
+| `stashLoupeBounds` | `null` | The OCR magnifier window's last place and size |
 | `showSwapTab` | `true` | Swap tab visible |
 | `swapHotkey`, `gamepadBindings.swapItem` | `''`, – | Hover a currency, press: Swap tab with it as "I have" |
 | `stashUnits` | `['ex', 'div']` | Net Worth values shown in Exalted / Divine / Chaos |

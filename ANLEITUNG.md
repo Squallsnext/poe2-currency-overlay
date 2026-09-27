@@ -248,6 +248,9 @@ Bild, und sie wird normal gelesen und einmal neu bestätigt.
 **Einstellungen → „OCR-Debug-Bilder zeigen“** an, dann beim Fach **„Debug“** und in der
 Zeile die **Lupe 🔍**. Du siehst drei Bilder: Original · was der Leser bekommt · Schwarz/Weiß.
 **Ziel:** im rechten Bild nur die Zahl, weiß auf schwarz, jede Ziffer ein eigenes Stück.
+Klick auf ein Bild öffnet die **große Lupe** als eigenes Fenster: überall hinschiebbar
+(auch auf einen zweiten Bildschirm), an den Rändern größer ziehbar, Platz und Größe bleiben
+gespeichert. Sie zeigt bei jeder Regler-Bewegung die neuen Bilder; ✕ oder Esc schließt sie.
 
 1. **Farb-Grenze ganz runter** (5) – farbiges Item-Leuchten fliegt raus.
 2. Noch helle Stellen vom Item-Bild? **Flecken** hoch, **Helligkeit** runter,

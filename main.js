@@ -283,6 +283,7 @@ const DEFAULT_CONFIG = {
   stashGrowDigits: false, // "save the digit's edge": the digit grows from the hard cut into the original's light edge (reader + learning, own learned set)
   stashConfirmed: {}, // per-tab, per-apiId count the player confirmed (✓ / typed / learned) - not asked about again while the scan reads that count
   stashTuneBackup: {}, // per-tab slot settings from before the last "Automatisch einstellen" (undo)
+  stashLoupeBounds: null, // the OCR magnifier window's last place and size {x,y,width,height}; null = default
   stashSlotOverrides: {}, // per-tab, per-apiId {cx,cy,stripWidth,up,dn} from the in-app "align" tool; overrides the shipped map for slots a user's setup misreads
   itemQ20: true,       // search armour/weapons as if 20% quality
   itemFillRunes: true, // search as if empty rune sockets held Greater Iron Runes
@@ -2440,8 +2441,37 @@ function recomputeLearnedTemplates(learned, digits) {
     learned.templates[ch] = glyphs[inks[Math.floor(glyphs.length / 2)].i];
   }
 }
+// ---- The OCR panel's magnifier as its own window (asked for: "die Lupe lässt sich nur im
+// Fenster vom Overlay bewegen"): frameless, always on top, movable anywhere and resizable;
+// the panel sends its pictures on every slider move, the window's size and place are kept.
+let loupeWin = null, loupeLast = null;
+ipcMain.on('loupe-update', (_e, data) => {
+  loupeLast = data; // a page still loading gets the newest pictures when it is ready, not the first
+  try {
+    if (!loupeWin || loupeWin.isDestroyed()) {
+      // kept bounds only when they still lie on a screen (a monitor unplugged since)
+      let b = config.stashLoupeBounds || {};
+      if (b.width && !screen.getAllDisplays().some((d) => { const a = d.workArea; return b.x < a.x + a.width - 40 && b.x + b.width > a.x + 40 && b.y >= a.y - 10 && b.y < a.y + a.height - 40; })) b = {};
+      loupeWin = new BrowserWindow({
+        width: b.width || 520, height: b.height || 820, x: b.x, y: b.y, frame: false, resizable: true, alwaysOnTop: true,
+        skipTaskbar: true, backgroundColor: '#0c0b0a', title: 'Lupe', show: false,
+        webPreferences: { preload: path.join(__dirname, 'renderer', 'stash', 'loupe-preload.js'), contextIsolation: true, nodeIntegration: false },
+      });
+      loupeWin.setAlwaysOnTop(true, 'screen-saver');
+      const keep = () => { try { config.stashLoupeBounds = loupeWin.getBounds(); saveConfig(); } catch {} };
+      loupeWin.on('moved', keep); loupeWin.on('resized', keep);
+      loupeWin.on('closed', () => { loupeWin = null; try { if (win && !win.isDestroyed()) win.webContents.send('loupe-closed'); } catch {} });
+      loupeWin.loadFile(path.join(__dirname, 'renderer', 'stash', 'loupe.html'));
+      loupeWin.webContents.once('did-finish-load', () => { try { loupeWin.webContents.send('loupe-data', loupeLast); loupeWin.showInactive(); } catch {} });
+      return;
+    }
+    loupeWin.webContents.send('loupe-data', data);
+  } catch (err) { logToggle('stash-learn', 'loupe failed: ' + (err && err.message || err)); }
+});
+ipcMain.on('loupe-close', () => { try { if (loupeWin && !loupeWin.isDestroyed()) loupeWin.close(); } catch {} });
 // "Gelernte Ziffern prüfen": every learned digit against the shipped ones
 // (learned-audit.js); apply = remove the suspicious ones
+
 // ---- Slot memory (the player's idea: "jeder Scan ist die Vorlage"): when a count is
 // confirmed, the slot keeps the number's freed picture from that capture (per digit, the
 // way teaching cuts it). A later scan whose freed picture is the SAME - every digit

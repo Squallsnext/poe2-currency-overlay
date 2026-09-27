@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Lupe</title>
+<style>
+  /* the magnifier as its own window (asked for: movable anywhere, not only inside the
+     overlay): dragged by its bar, resized at its edges like any window */
+  html, body { margin: 0; height: 100%; background: #0c0b0a; color: #d8d2c4; font: 13px system-ui, sans-serif; }
+  #bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; background: #1b1a17; border-bottom: 1px solid #b8862f; -webkit-app-region: drag; user-select: none; }
+  #title { color: #f0c46c; font-weight: 600; }
+  #close { -webkit-app-region: no-drag; background: transparent; border: 1px solid #3a3730; color: #d8d2c4; border-radius: 5px; cursor: pointer; padding: 2px 9px; }
+  #close:hover { color: #e05555; border-color: #e05555; }
+  #rows { padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; overflow: auto; height: calc(100% - 44px); box-sizing: border-box; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .lab { flex: 0 0 90px; font-size: 12px; color: #9c9588; text-align: right; }
+  .row img { flex: 1 1 auto; min-width: 0; width: 100%; height: auto; image-rendering: pixelated; border: 1px solid #2c2a25; background: #000; }
+  #note { font-size: 12px; color: #c9c2b4; padding: 2px 0 8px; }
+</style>
+</head>
+<body>
+  <div id="bar"><span id="title">Lupe</span><button id="close">✕</button></div>
+  <div id="rows"></div>
+  <script src="loupe.js"></script>
+</body>
+</html>

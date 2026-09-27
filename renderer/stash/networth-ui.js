@@ -80,10 +80,19 @@
   // und Regler zum Spielen"). `loupe.get` returns the current pictures of the slot it
   // was opened for; a rebuilt panel for the same slot re-points it (loupeFollow).
   let loupe = null; // { key, get, box }
+  // Its own window where the app has one (main.js "loupe-update": the in-panel box could
+  // only move inside the overlay - "die Lupe lässt sich nur im Fenster vom Overlay
+  // bewegen"); the floating box below stays for a build without it.
+  const loupeWinApi = !!(window.api && window.api.loupeUpdate);
+  if (loupeWinApi && window.api.onLoupeClosed) window.api.onLoupeClosed(() => { loupe = null; });
   function loupeDraw() {
     if (!loupe) return;
     const { imgs, note } = loupe.get();
     const labels = [t('networth.line.loupe_1'), t('networth.line.loupe_2'), t('networth.line.loupe_3'), t('networth.line.loupe_4'), t('networth.line.loupe_5'), t('networth.line.loupe_6')];
+    if (!loupe.box) {
+      window.api.loupeUpdate({ title: t('networth.line.loupe_title'), closeTitle: t('networth.line.loupe_close'), imgs: imgs.map((im) => ({ label: labels[im.i] || '', src: im.src })), note: note || '' });
+      return;
+    }
     const box = loupe.box;
     box.innerHTML = '';
     const bar = el('div', 'nw-loupe-bar');
@@ -111,7 +120,8 @@
     if (note) box.appendChild(el('div', 'nw-loupe-note', esc(note)));
   }
   function openLoupe(key, get) {
-    if (!loupe) {
+    if (!loupe && loupeWinApi) loupe = { key, get, box: null };
+    else if (!loupe) {
       // a floating window: dragged by its title bar, resized at its corner, both remembered
       const box = el('div', 'nw-loupe nw-loupe-float');
       let pos = null;
@@ -139,7 +149,8 @@
   }
   function closeLoupe() {
     if (!loupe) return;
-    loupe.box.remove(); loupe = null;
+    if (loupe.box) loupe.box.remove(); else window.api.loupeClose();
+    loupe = null;
     document.removeEventListener('keydown', loupeEsc);
   }
   function loupeEsc(e) { if (e.key === 'Escape') closeLoupe(); }
@@ -1383,14 +1394,19 @@
           };
           showTemplates(cached.templates);
           showPreview(cached.preview);
-          let debounceT = null;
+          let debounceT = null, previewSeq = 0;
           const refreshPreview = () => {
             clearTimeout(debounceT);
             debounceT = setTimeout(async () => {
               // an untouched, unsaved floor previews the adaptive sweep, like the live read
               const v = values();
               if (!touched.has('floor') && saved.floor == null) v.floor = null;
+              // only the answer to the LAST slider position counts: at 5K a preview takes a
+              // moment, and an older answer arriving late used to overwrite the newer one -
+              // the slider seemed to do nothing (reported)
+              const mySeq = ++previewSeq;
               const res = await window.api.stashSlotDebugImage(ln.apiId, v, row.tab).catch(() => null);
+              if (mySeq !== previewSeq) return;
               if (!res || !res.ok) return;
               rawImg.src = res.rawUrl; filtImg.src = res.filtUrl; binImg.src = res.binUrl;
               showDiff(res);
