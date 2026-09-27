@@ -200,14 +200,16 @@ warum. Stimmt es trotzdem: nochmal drücken. **Einstellungen → „Gelernte Zif
 vergleicht alle schon gelernten Ziffern mit den mitgelieferten und zeigt verdächtige (z. B.
 eine als „1“ gelernte 4) zum Entfernen.
 
-**Automatisch einstellen** (⚙ am Fach oder in der Prüf-Leiste): Das Programm dreht die
-Regler selbst – so wie du: Sättigung hoch, Farb-Grenze runter, Kontrast hoch, Flecken weg,
-dann Helligkeit, Bild-Kontrast, floor. Gemessen wird an den Zahlen, die sicher stimmen
-(von dir bestätigt oder schon 90 %+; mindestens 3). Erst sucht es **eine** Einstellung
-fürs ganze Fach (nur wenn sie besser ist als jetzt), dann für die schwächsten Felder eine
-**eigene**. Eine falsche Zahl zählt dabei immer als schlecht – höhere Prozente auf Kosten
-einer falschen Zahl gibt es nicht. Dauert je nach Rechner 20–60 s, oben steht der
-Fortschritt. Danach: „Ø 84 % → 92 %“, was noch schwach ist, und **Rückgängig**.
+**Automatisch einstellen** (⚙ am Fach oder in der Prüf-Leiste) macht es wie du: Sättigung
+200 %, Farb-Grenze 5, Helligkeit −20 fest, dann Flecken (bis 20), Kontrast und floor
+probieren, bis im Schwarz-Weiß-Bild **jede Ziffer einzeln und ganz** steht und daneben
+nichts übrig bleibt. Gemessen an den Zahlen, die sicher stimmen (von dir bestätigt oder
+90 %+). Danach **lernt** es die Ziffern aus den sauberen Bildern und **prüft alles nach**:
+Liest ein Feld danach eine andere Zahl, bekommt es seine alten Einstellungen zurück; hätte
+das Lernen andere Zahlen verändert (dünne 1en an Icon-Kanten), wird es zurückgenommen;
+werden die bekannten Zahlen nicht besser, bleibt alles, wie es war. Ein Fach, dessen
+Bilder schon sauber sind, wird nicht angefasst. Oben steht der Fortschritt, danach das
+Ergebnis und **Rückgängig**.
 
 ### 3.3 Debug: eine Zahl sauber lesen
 

@@ -96,7 +96,9 @@ function readOneSlot(s, c) {
   const glyphs = (r.glyphs || []).map((g) => ({
     ch: bk.unmap(g.ch), source: bk.sourceOf(g.ch), score: g.score, gapFilled: g.gapFilled,
   }));
-  return { apiId: s.apiId, priceAs: s.priceAs || null, suffix: s.suffix || null, count: raw === '?' ? null : parseInt(raw, 10), conf: raw === '?' ? null : r.conf, short, rel, glyphs };
+  const rec = { apiId: s.apiId, priceAs: s.priceAs || null, suffix: s.suffix || null, count: raw === '?' ? null : parseInt(raw, 10), conf: raw === '?' ? null : r.conf, short, rel, glyphs };
+  if (c.inspect) Object.assign(rec, RP.pictureQuality(ch, pos, Pm, r.floor)); // auto-tune: how clean
+  return rec;
 }
 const makeBankFor = (learnedTemplates) => {
   const cache = new Map();
@@ -152,8 +154,8 @@ function tuneRead(ctx, S, idxs) {
     tabOverrides = Object.assign({}, ctx.base);
     for (const i of idxs) { const id = ctx.map.STATIC_SLOTS[i].apiId; tabOverrides[id] = Object.assign({}, ctx.base[id], S); }
   }
-  const c = Object.assign({}, ctx, { tabOverrides });
-  return idxs.map((i) => { const r = readOneSlot(ctx.map.STATIC_SLOTS[i], c); return { count: r.count, conf: r.conf }; });
+  const c = Object.assign({}, ctx, { tabOverrides, inspect: true });
+  return idxs.map((i) => { const r = readOneSlot(ctx.map.STATIC_SLOTS[i], c); return { count: r.count, conf: r.conf, digits: r.digits, junk: r.junk }; });
 }
 async function runTune(msg) {
   const shared = new SharedArrayBuffer(msg.bitmap.byteLength);
@@ -191,7 +193,9 @@ async function runTune(msg) {
     const truth = msg.truth;
     const t = await AT.tuneTab(truth, evaluate, (done) => parentPort.postMessage({ phase: 'tune', done, total: AT.TAB_EVALS }));
     const perSlot = {}, stillBad = [];
-    const useTab = t.after.score > t.before.score;
+    // only a clear gain changes anything (reported: "96 % -> 96 %" and the Jawbone's
+    // picture worse - a picture already clean has nothing to win, only learned digits to lose)
+    const useTab = t.after.score > t.before.score + AT.MIN_GAIN;
     const final = truth.map((tr, k) => AT.slotScore((useTab ? t.after : t.before).reads[k], tr.value));
     // weak slots get their own search either way: from the tab setting when it won, and
     // with their own current settings as the one to beat (a hand-tuned tab often reads
@@ -210,9 +214,24 @@ async function runTune(msg) {
       }));
     }
     truth.forEach((tr, k) => { if (final[k] < AT.WEAK) stillBad.push(tr.apiId); });
+    // The tab setting goes only where it is safe: the known counts, and the other slots
+    // that read the SAME count with it as without (just a cleaner picture). Measured on
+    // the player's 1080p essence tab: the setting that cleaned all 17 known counts turned
+    // other slots' "12" into "2" and "41" into "1" - those keep their own settings.
+    const applyTo = [];
+    if (useTab) {
+      const known = new Set(truth.map((tr) => tr.i));
+      const others = ctx.map.STATIC_SLOTS.map((_s, i) => i).filter((i) => !known.has(i));
+      const now = others.length ? await evaluate(null, others) : [];
+      const withS = others.length ? await evaluate(t.settings, others) : [];
+      truth.forEach((tr) => { if (!(tr.apiId in perSlot)) applyTo.push(tr.apiId); });
+      others.forEach((i, k) => {
+        if (now[k] && withS[k] && now[k].count != null && now[k].count === withS[k].count) applyTo.push(ctx.map.STATIC_SLOTS[i].apiId);
+      });
+    }
     const right = final.filter((x) => x !== AT.WRONG);
     parentPort.postMessage({
-      ok: true, useTab, settings: t.settings, perSlot, stillBad,
+      ok: true, useTab, settings: t.settings, applyTo, perSlot, stillBad,
       before: { right: t.before.right, n: t.before.n, meanConf: t.before.meanConf },
       after: { right: right.length, n: truth.length, meanConf: right.length ? right.reduce((a, b) => a + b, 0) / right.length : 0 },
     });

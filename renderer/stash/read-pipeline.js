@@ -224,10 +224,11 @@
     out.tall = chainLength(tries[0], ms);
     return out;
   }
-  function chainLength(pieces, S) {
+  function chainLength(pieces, S) { return chainPieces(pieces, S).length; }
+  function chainPieces(pieces, S) {
     const top = Math.max(0, ...pieces.map((c) => c.mask.h));
     const list = pieces.filter((c) => c.mask.h >= top * 0.7).sort((a, b) => a.x - b.x);
-    if (!list.length) return 0;
+    if (!list.length) return [];
     const chain = [list[0]];
     for (let i = 1; i < list.length; i++) {
       const prev = chain[chain.length - 1], c = list[i];
@@ -236,7 +237,7 @@
       if (gap <= 4 * S && c.mask.w <= 10 * S && c.mask.h >= 0.8 * h && c.mask.h <= 1.25 * h) chain.push(c);
       else break;
     }
-    return chain.length;
+    return chain;
   }
   function teachCut(ch, pos, P, bank, value, fixedFloor) {
     let floors;
@@ -263,11 +264,23 @@
 
   // digits the picture shows at a read's floor (the chain above) - a read shorter than
   // this likely dropped one (reported: "61" read as "6" at 90 %)
+  // How clean the black/white picture is (auto-tune, asked for: "das Bild in der Mitte"
+  // must show the number and nothing else): the number's chain of pieces, and the ink
+  // left OUTSIDE it relative to the ink of the digits (0 = nothing but the number).
+  function pictureQuality(ch, pos, P, floor) {
+    const { binarized } = DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Object.assign({}, P, { floor }), ch.cellScale);
+    const S = P.matchScale > 1 ? P.matchScale : 1;
+    const comps = DR.components(binarized, S);
+    const chain = chainPieces(comps, S);
+    let all = 0; for (let i = 0; i < binarized.data.length; i++) all += binarized.data[i] ? 1 : 0;
+    let own = 0; for (const c of chain) for (let i = 0; i < c.mask.data.length; i++) own += c.mask.data[i] ? 1 : 0;
+    return { digits: chain.length, junk: own ? (all - own) / own : 1 };
+  }
   function digitsInPicture(ch, pos, P, floor) {
     const { binarized } = DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Object.assign({}, P, { floor }), ch.cellScale);
     const S = P.matchScale > 1 ? P.matchScale : 1;
     return chainLength(DR.components(binarized, S), S);
   }
 
-  return { EXTREME_SCALE, MARGIN, teachCut, segmentDigits, digitsInPicture, cropAroundSlot, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
+  return { EXTREME_SCALE, MARGIN, teachCut, segmentDigits, digitsInPicture, pictureQuality, cropAroundSlot, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
 });

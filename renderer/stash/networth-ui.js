@@ -625,9 +625,13 @@
       return render();
     }
     const pct = (x) => Math.round(x * 100);
-    let msg = !res.changed
+    let msg = res.reverted
+      ? t('networth.tune.reverted', { tab: esc(tabName), n: res.known })
+      : !res.changed
       ? t('networth.tune.nothing', { tab: esc(tabName), n: res.known })
-      : t('networth.tune.done', { tab: esc(tabName), n: res.known, before: pct(res.before.meanConf), after: pct(res.after.meanConf), own: res.own });
+      : t('networth.tune.done', { tab: esc(tabName), n: res.known, cleanBefore: pct(Math.max(0, Math.min(1, res.clean.before))), cleanAfter: pct(Math.max(0, Math.min(1, res.clean.after))), learned: res.learned, right: res.after.right, before: pct(res.before.meanConf), after: pct(res.after.meanConf), own: res.own })
+        + (res.restored ? ' ' + t('networth.tune.restored', { k: res.restored }) : '')
+        + (res.learnedBack ? ' ' + t('networth.tune.learned_back', { k: res.learnedBack }) : '');
     const rowNow = rowsOfType(row.tab)[0] || row;
     const weakNow = weakLines(rowNow);
     if (res.stillBad && res.stillBad.length) {

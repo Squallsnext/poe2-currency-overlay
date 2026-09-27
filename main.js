@@ -2457,11 +2457,11 @@ ipcMain.handle('stash-audit-learned', (_e, { apply } = {}) => {
   } catch (err) { return { ok: false, error: String(err && err.message || err) }; }
 });
 
-ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings, tab } = {}) => {
+function teachCount({ apiId, value, settings, tab: tabIn } = {}) {
   try {
     value = String(value == null ? '' : value).replace(/[^0-9]/g, '');
     if (!value) return { ok: false, reason: 'empty' };
-    const found = findTabSlot(apiId, tab);
+    const found = findTabSlot(apiId, tabIn);
     if (!found) return { ok: false, reason: 'no-recent-capture' };
     const { tab, slot, cap } = found;
     const DR = require('./renderer/stash/digit-reader.js');
@@ -2555,7 +2555,8 @@ ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings, tab } = {}) =
     logToggle('stash-learn', 'ERROR ' + (err && err.message || err));
     return { ok: false, reason: 'error', error: String(err && err.message || err) };
   }
-});
+}
+ipcMain.handle('stash-teach-count', (_e, args) => teachCount(args));
 
 // The "show me the material" tool the OCR debug toggle uses - the exact same crop the
 // reader itself worked from (native, upscaled for visibility) and the binarized version
@@ -2932,16 +2933,110 @@ ipcMain.handle('stash-autotune', async (_e, { tab } = {}) => {
       config.stashTuneBackup = config.stashTuneBackup || {};
       config.stashTuneBackup[tab] = JSON.parse(JSON.stringify(cur));
       const next = JSON.parse(JSON.stringify(cur));
-      if (out.useTab) for (const s of map.STATIC_SLOTS) next[s.apiId] = Object.assign({}, next[s.apiId], out.settings);
+      if (out.useTab) for (const id of out.applyTo || []) next[id] = Object.assign({}, next[id], out.settings); // known counts + slots that read the same with it
       for (const [id, S] of Object.entries(out.perSlot)) {
         next[id] = S ? Object.assign({}, cur[id], S) : Object.assign({}, cur[id]); // null: the slot keeps its own
       }
       config.stashSlotOverrides[tab] = next;
       saveConfig();
     }
-    logToggle('stash-learn', `autotune ${tab}: ${truth.length} known (${nConfirmed} confirmed), right ${out.before.right}->${out.after.right}, conf ${out.before.meanConf.toFixed(3)}->${out.after.meanConf.toFixed(3)}, tab setting ${out.useTab ? JSON.stringify(out.settings) : 'no'}, own ${Object.keys(out.perSlot).length}, weak ${out.stillBad.length}, ${Date.now() - t0}ms`);
-    const result = changed ? await readStashFrame({ bitmap: cap.bitmap, W: cap.W, H: cap.H }) : null;
-    return { ok: true, changed, useTab: out.useTab, own: Object.keys(out.perSlot).length, stillBad: out.stillBad, before: out.before, after: out.after, known: truth.length, confirmed: nConfirmed, result };
+    // how the known counts read (right / mean confidence) in a result's raw reads
+    const knownStats = (reads) => {
+      let right = 0, conf = 0;
+      for (const k of truth) { const r = reads && reads[k.i]; if (r && r.count === k.value) { right++; conf += r.conf || 0; } }
+      return { right, n: truth.length, meanConf: right ? conf / right : 0 };
+    };
+    const readsNow = () => { const c = lastCaptureByTab.get(tab); return c && c.res && c.res.reads; };
+    const reread = () => readStashFrame({ bitmap: cap.bitmap, W: cap.W, H: cap.H });
+    const cap0Reads = cap.res.reads.slice();
+    const before = knownStats(cap0Reads);
+    let result = null, learned = 0, restored = 0, learnedBack = 0, learnedSnapshot = null;
+    const changedNow = [];
+    if (changed) {
+      result = await reread();
+      // learn the digits from the clean pictures (the guards of teachCount apply): the
+      // known counts not yet read right and sure - at most 3 new copies of a digit per
+      // run, so one tab cannot flood the pool the other tabs read with too
+      const perDigit = {};
+      learnedSnapshot = loadLearnedTemplates();
+      let reads = readsNow();
+      for (const k of truth) {
+        const r = reads && reads[k.i];
+        if (r && r.count === k.value && r.conf >= TUNE_SURE) continue;
+        const digits = String(k.value);
+        if (digits.split('').some((d) => (perDigit[d] || 0) >= 3)) continue;
+        const tr = teachCount({ apiId: k.apiId, value: digits, tab });
+        if (tr && tr.ok) { learned++; for (const d of digits) perDigit[d] = (perDigit[d] || 0) + 1; }
+      }
+      if (learned) {
+        result = await reread();
+        // New digits change every read, not only the slots they came from. Measured: clean
+        // thin 1s learned on the 1440p essence tab made other slots read item-art edges as
+        // 1s ("61" -> "611", "50" -> "511"). A slot whose settings did not change and whose
+        // count now differs from before the tune -> this run's learning is taken back -
+        // unless the new count fills a digit the picture showed and the read had dropped
+        // (a "4" flagged as 2 digits now reading "42").
+        const r2 = readsNow();
+        const knownIdx = new Set(truth.map((k) => k.i));
+        const hurt = map.STATIC_SLOTS.some((s, i) => {
+          if (knownIdx.has(i)) return false;
+          const o = cap0Reads[i], r = r2 && r2[i];
+          const was = o && o.count, now = r && r.count;
+          if (was === now || (was == null && now == null)) return false;
+          if (o && o.short && now != null && String(now).length === o.short && String(now).startsWith(String(was))) return false;
+          return true;
+        });
+        if (hurt) {
+          saveLearnedTemplates(learnedSnapshot);
+          logToggle('stash-learn', `autotune ${tab}: learning taken back (${learned} count(s)) - it changed other slots' reads`);
+          learnedBack = learned; learned = 0;
+          result = await reread();
+        }
+      }
+      // every count must read as it should: a known one its value, any other slot what it
+      // read before the tune (measured: after learning, an unknown "25" read "2") - a slot
+      // that does not gets its previous settings back
+      reads = readsNow();
+      const cur = config.stashTuneBackup[tab] || {};
+      const knownAt = new Map(truth.map((k) => [k.i, k.value]));
+      const orig = cap0Reads;
+      map.STATIC_SLOTS.forEach((s, i) => {
+        const r = reads && reads[i];
+        const want = knownAt.has(i) ? knownAt.get(i) : (orig[i] && orig[i].count);
+        if ((r && r.count) === want || (want == null && (!r || r.count == null))) return;
+        const back = cur[s.apiId];
+        const now = config.stashSlotOverrides[tab][s.apiId];
+        if (JSON.stringify(back || null) === JSON.stringify(now || null)) return; // settings unchanged: nothing to restore
+        if (back) config.stashSlotOverrides[tab][s.apiId] = JSON.parse(JSON.stringify(back));
+        else delete config.stashSlotOverrides[tab][s.apiId];
+        restored++;
+      });
+      if (restored) { saveConfig(); result = await reread(); }
+      // still off after that (the newly learned digits read it differently): shown to check
+      reads = readsNow();
+      map.STATIC_SLOTS.forEach((s, i) => {
+        const r = reads && reads[i];
+        const want = knownAt.has(i) ? knownAt.get(i) : (orig[i] && orig[i].count);
+        if (want != null && (!r || r.count !== want)) changedNow.push(s.apiId);
+      });
+    }
+    let after = changed ? knownStats(readsNow()) : before;
+    // not better for the known counts (fewer right, or right but less sure - e.g. cleaner
+    // pictures whose digits could not be learned without hurting other slots): all back
+    let reverted = false;
+    if (changed && (after.right < before.right || (after.right === before.right && after.meanConf < before.meanConf - 0.005))) {
+      config.stashSlotOverrides[tab] = JSON.parse(JSON.stringify(config.stashTuneBackup[tab] || {}));
+      delete config.stashTuneBackup[tab];
+      saveConfig();
+      // the digits were learned from the tuned pictures and checked only with those
+      if (learned && learnedSnapshot) { saveLearnedTemplates(learnedSnapshot); learnedBack += learned; learned = 0; }
+      result = await reread();
+      after = knownStats(readsNow());
+      reverted = true;
+      changedNow.length = 0;
+    }
+    logToggle('stash-learn', `autotune ${tab}: ${truth.length} known (${nConfirmed} confirmed), clean ${out.before.meanConf.toFixed(3)}->${out.after.meanConf.toFixed(3)}, tab setting ${out.useTab ? JSON.stringify(out.settings) : 'no'}, own ${Object.keys(out.perSlot).length}, learned ${learned}${learnedBack ? ' (taken back ' + learnedBack + ')' : ''}, restored ${restored}${reverted ? ', ALL REVERTED (not better)' : ''}, right ${before.right}->${after.right}, conf ${before.meanConf.toFixed(3)}->${after.meanConf.toFixed(3)}, ${Date.now() - t0}ms`);
+    return { ok: true, changed: changed && !reverted, reverted, useTab: out.useTab, own: Object.keys(out.perSlot).length, stillBad: out.stillBad.concat(changedNow.filter((id) => !out.stillBad.includes(id))), before, after, clean: { before: out.before.meanConf, after: out.after.meanConf }, learned, learnedBack, restored, known: truth.length, confirmed: nConfirmed, result };
   } catch (err) {
     return { ok: false, error: String(err && err.message || err) };
   }

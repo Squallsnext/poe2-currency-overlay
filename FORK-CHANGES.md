@@ -1148,6 +1148,42 @@ hold (1080p, 1440p, 5K; reads at 85 %+):
 
 Auto-tune (4.20) no longer measures against reads flagged `short`.
 
+### 4.22 Auto-tune aims at a clean picture, then learns from it
+
+Reported with pictures after the first version (4.20): on the Abyss tab it turned the
+Jawbone's picture dirtier for "96 % -> 96 %". It scored the reader's confidence - but the
+confidence belongs to the digits learned so far, from the dirty pictures: the player's
+clean "20" (saturation 200, colour limit 5, brightness -20, specks 20) read "0" at 80 %
+because only one clean 2 had ever been learned. Now it works the player's way:
+
+- **Clean picture.** Fixed: saturation 200 %, colour limit 5, brightness -20 (the
+  player's settings); searched: specks 5-20 px, contrast, floor, a little brightness and
+  picture contrast. A slot scores `RP.pictureQuality`: the picture must show exactly the
+  digits of the known count (a thin 1 at 1080p that a speck filter eats fails - asked
+  for: "eine 1 zu erkennen ist schwer, vor allem bei 1080p"), then 1 minus the ink left
+  beside the number relative to the digits' own ink. A change needs a clear gain
+  (+0.03 for the tab, +0.06 for a slot's own) - an already clean tab stays untouched.
+- **Only where safe.** The tab setting goes to the known counts and to the slots that
+  read the SAME count with it (measured: on the 1080p essence tab the setting that cleaned
+  all known counts turned other slots' "12" into "2").
+- **Then learn** (`teachCount`, with its guards) the known counts not yet read right and
+  sure - at most 3 new copies of a digit per run.
+- **Then check everything.** New digits change every read: clean thin 1s learned on the
+  1440p essence tab made other slots read art edges as 1s ("61" -> "611"). If a slot
+  whose settings did not change now reads differently, this run's learning is taken back
+  - unless it fills a digit the read had dropped (a "4" whose picture shows 2 digits now
+  reading "42", which the other resolution reads too). A slot that reads differently
+  with its new settings gets its old ones. If the known counts do not end up better
+  (fewer right, or right but less sure), everything goes back.
+
+Also fixed on the way: since 4.12's fix (row tab passed along) teaching failed every
+time - the `tab` parameter and the `tab` of the found slot collided ("Cannot access
+'tab' before initialization"). Found by running the whole flow offline with the real
+`teachCount` on the captures we hold: 1080p currency 10/10 known right, avg 96.4 ->
+99.0 %, one dropped digit filled (4 -> 42); 1080p essence and 1440p essence learning
+taken back / everything reverted, no count changed; 1440p abyss already clean,
+untouched.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
