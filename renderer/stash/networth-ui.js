@@ -75,20 +75,52 @@
     render();
   }
   // the OCR panel's magnifier: the four pictures big and pixel-sharp
-  function openLoupe(imgs, note) {
-    const ov = el('div', 'nw-loupe');
+  // The magnifier: docked at the left, the sliders stay usable, and it follows every
+  // slider move (asked for: "nur Lupe an kann ich Regler nicht nutzen ... Lupe extra Bild
+  // und Regler zum Spielen"). `loupe.get` returns the current pictures of the slot it
+  // was opened for; a rebuilt panel for the same slot re-points it (loupeFollow).
+  let loupe = null; // { key, get, box }
+  function loupeDraw() {
+    if (!loupe) return;
+    const { imgs, note } = loupe.get();
     const labels = [t('networth.line.loupe_1'), t('networth.line.loupe_2'), t('networth.line.loupe_3'), t('networth.line.loupe_4'), t('networth.line.loupe_5'), t('networth.line.loupe_6')];
-    imgs.forEach((im) => {
+    const box = loupe.box;
+    box.innerHTML = '';
+    const bar = el('div', 'nw-loupe-bar');
+    bar.appendChild(el('span', 'nw-loupe-title', esc(t('networth.line.loupe_title'))));
+    // ⇆ moves it to the other side, so the sliders underneath come free (remembered)
+    const sw = el('button', 'nw-loupe-x', '⇆'); sw.title = t('networth.line.loupe_side');
+    sw.onclick = (e) => { e.stopPropagation(); box.classList.toggle('nw-loupe-right'); try { localStorage.setItem('nwLoupeSide', box.classList.contains('nw-loupe-right') ? 'r' : 'l'); } catch {} };
+    const x = el('button', 'nw-loupe-x', '✕'); x.title = t('networth.line.loupe_close');
+    x.onclick = (e) => { e.stopPropagation(); closeLoupe(); };
+    const btns = el('span', 'nw-loupe-btns'); btns.appendChild(sw); btns.appendChild(x);
+    bar.appendChild(btns);
+    box.appendChild(bar);
+    for (const im of imgs) {
       const row = el('div', 'nw-loupe-row');
       row.appendChild(el('div', 'nw-loupe-lab', esc(labels[im.i] || '')));
       const big = el('img', 'nw-loupe-img'); big.src = im.src; row.appendChild(big);
-      ov.appendChild(row);
-    });
-    if (note) ov.appendChild(el('div', 'nw-loupe-note', esc(note)));
-    ov.appendChild(el('div', 'nw-loupe-close', esc(t('networth.line.loupe_close'))));
-    ov.onclick = () => ov.remove();
-    document.body.appendChild(ov);
+      box.appendChild(row);
+    }
+    if (note) box.appendChild(el('div', 'nw-loupe-note', esc(note)));
   }
+  function openLoupe(key, get) {
+    if (!loupe) {
+      const box = el('div', 'nw-loupe nw-loupe-dock');
+      try { if (localStorage.getItem('nwLoupeSide') === 'r') box.classList.add('nw-loupe-right'); } catch {}
+      document.body.appendChild(box);
+      loupe = { key, get, box };
+      document.addEventListener('keydown', loupeEsc);
+    } else { loupe.key = key; loupe.get = get; }
+    loupeDraw();
+  }
+  function closeLoupe() {
+    if (!loupe) return;
+    loupe.box.remove(); loupe = null;
+    document.removeEventListener('keydown', loupeEsc);
+  }
+  function loupeEsc(e) { if (e.key === 'Escape') closeLoupe(); }
+  function loupeFollow(key, get) { if (loupe && loupe.key === key) { loupe.get = get; loupeDraw(); } }
   // Teaching (the row's ✓ and the panel's "learn from this image") only when the reader
   // reads the number right but UNSURE - below this confidence. A confident correct read
   // would only add a near-identical copy to the exemplar pool (the learned template is
@@ -1214,6 +1246,7 @@
               : '';
             if (r && r.grow) diffInfo.innerHTML = esc(t('networth.line.debug_grow_legend')) + ' (' + (r.rescued || 0) + ' px). ' + diffInfo.innerHTML;
             if (r && r.truth) diffInfo.innerHTML = '<b>' + esc(t('networth.line.debug_truth', { pct: Math.round(r.truth.fidelity * 100), miss: r.truth.miss, extra: r.truth.extra })) + '</b> ' + diffInfo.innerHTML;
+            if (loupe && loupe.key === slotKey(row.tab, ln.apiId)) setTimeout(loupeDraw, 0); // follows every slider move
           };
           showDiff(cached);
           // the magnifier (asked for: "mit einer Lupe am besten"): a click on any picture
@@ -1221,10 +1254,13 @@
           // order (asked for): 1 original, 2 grey, 3 the freed number on the original,
           // 4 the black/white picture the reader gets, 5 its comparison with the template
           const all5 = [rawImg, filtImg, overImg, binImg, diffImg, truthImg];
+          const loupeKey = slotKey(row.tab, ln.apiId);
+          const loupeGet = () => ({ imgs: all5.map((x, i) => ({ src: x.style.display !== 'none' ? x.src : '', i })).filter((x) => x.src), note: diffInfo.textContent });
           for (const im of all5) {
             im.style.cursor = 'zoom-in';
-            im.onclick = (e) => { e.stopPropagation(); openLoupe(all5.map((x, i) => ({ src: x.style.display !== 'none' ? x.src : '', i })).filter((x) => x.src), diffInfo.textContent); };
+            im.onclick = (e) => { e.stopPropagation(); openLoupe(loupeKey, loupeGet); };
           }
+          loupeFollow(loupeKey, loupeGet); // a rebuilt panel keeps an open magnifier on it
           for (const im of all5) imgs.appendChild(im);
           dbg.appendChild(imgs);
           dbg.appendChild(diffInfo);

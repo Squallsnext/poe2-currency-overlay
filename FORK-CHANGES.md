@@ -1361,6 +1361,14 @@ Measured on the player's 5K currency capture from a clean start: 92.1 -> 96.0 % 
 counts under 85 % 6 -> 3 (same capture the gallery came from); their old learned set
 88.6 -> 88.7 %. After "Approve" the gallery folds up and the result line stays.
 
+### 4.32 The magnifier follows the sliders
+
+Asked for: "nur Lupe an kann ich Regler nicht nutzen ... Lupe extra Bild und Regler zum
+Spielen". The magnifier is no longer a full-screen cover showing the moment it was opened:
+it docks at one side (⇆ moves it to the other, remembered), the rest of the window - the
+sliders - stays usable, and it redraws on every preview refresh (every slider move),
+including the fidelity line. A panel rebuilt for the same slot keeps it; ✕ or Esc closes it.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

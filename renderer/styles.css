@@ -2154,3 +2154,12 @@ footer {
 .nw-loupe-img { image-rendering: pixelated; height: calc((100vh - 140px) / 6); width: auto; max-width: 80vw; object-fit: contain; border: 1px solid var(--bd-09); background: #000; }
 .nw-loupe-note { font-size: 13px; color: var(--tx-body); max-width: 900px; text-align: center; }
 .nw-loupe-close { font-size: 12px; color: var(--tx-faint); }
+/* docked magnifier: left side, full height, the rest of the window (sliders) stays usable */
+.nw-loupe.nw-loupe-dock { inset: 0 auto 0 0; width: 52vw; cursor: default; justify-content: flex-start; background: rgba(10,9,8,.97); border-right: 1px solid var(--am); box-shadow: 4px 0 18px rgba(0,0,0,.5); }
+.nw-loupe-dock .nw-loupe-img { height: calc((100vh - 150px) / 6); max-width: 38vw; }
+.nw-loupe-bar { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.nw-loupe-title { font-size: 13px; color: var(--am-hi); font-weight: 600; }
+.nw-loupe-x { background: transparent; border: 1px solid var(--bd-09); color: var(--tx-body); border-radius: 5px; cursor: pointer; padding: 2px 8px; }
+.nw-loupe-x:hover { color: var(--red, #e05555); border-color: var(--red, #e05555); }
+.nw-loupe.nw-loupe-dock.nw-loupe-right { inset: 0 0 0 auto; border-right: none; border-left: 1px solid var(--am); box-shadow: -4px 0 18px rgba(0,0,0,.5); }
+.nw-loupe-btns { display: inline-flex; gap: 6px; }
