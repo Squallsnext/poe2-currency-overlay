@@ -82,7 +82,8 @@ HID reports instead (`node-hid`, new dependency), in `gamepad.js`.
   which the game uses to move its cursor to the next slot - also checks the item under
   the cursor once it has rested for 350 ms (walking over five slots is one search, not
   five); the right stick (past half its travel, so drift never fires it) or the bound
-  button closes it. An empty slot copies nothing and the last result stays; the same
+  button closes it (the stick close follows who OPENED the check, not the browse
+  setting: a controller-opened check always closes with the stick, an F6 one never). An empty slot copies nothing and the last result stays; the same
   item again is not searched again. The D-pad press reaches the game untouched (the app
   only listens to the HID reports); each press causes at most the one Ctrl+C the price
   check hotkey sends anyway. `gamepad.js` got `onStick`. Tested with synthetic DualSense

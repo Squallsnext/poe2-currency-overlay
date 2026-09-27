@@ -1234,9 +1234,14 @@ const GAMEPAD_ACTIONS = {
 const DPAD = [12, 13, 14, 15];
 const BROWSE_SETTLE_MS = 350;
 let itemBrowse = null; // 'pin' | 'temp' while active
+// Set whenever the CONTROLLER opened the price check - independent of the D-pad browse
+// setting (asked for: "wenn ich es mit controller aufrufe soll es auch mit controller zu
+// gehen"). The right stick closes such a check even with browsing switched off; a check
+// opened with F6 / Ctrl+F ignores the stick. Cleared when the overlay hides.
+let padOpened = false;
 let browseTimer = null;
-function startItemBrowse(mode) { itemBrowse = config.gamepadItemBrowse !== false ? mode : null; }
-function stopItemBrowse() { itemBrowse = null; clearTimeout(browseTimer); browseTimer = null; }
+function startItemBrowse(mode) { padOpened = true; itemBrowse = config.gamepadItemBrowse !== false ? mode : null; }
+function stopItemBrowse() { itemBrowse = null; padOpened = false; clearTimeout(browseTimer); browseTimer = null; }
 function scheduleBrowseCheck() {
   clearTimeout(browseTimer);
   browseTimer = setTimeout(function run() {
@@ -1293,7 +1298,7 @@ function startGamepadListener() {
       if (row && gamepadBindingFires(row.gamepad, btn, held, all) && isAllowedCommand(row.command)) sendChatCommand(row.command);
     }
   });
-  gamepad.onStick(() => { if (itemBrowse && overlayShown) hideOverlay(true); });
+  gamepad.onStick(() => { if (padOpened && overlayShown) hideOverlay(true); });
   gamepad.start();
 }
 
@@ -1756,7 +1761,7 @@ ipcMain.handle('log-parse-fail', (_e, { error, text } = {}) => {
 
 ipcMain.handle('set-gamepad-item-browse', (_e, on) => {
   config.gamepadItemBrowse = !!on;
-  if (!on) stopItemBrowse();
+  if (!on) { itemBrowse = null; clearTimeout(browseTimer); browseTimer = null; } // stick-close stays (padOpened)
   saveConfig();
   return config.gamepadItemBrowse;
 });

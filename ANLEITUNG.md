@@ -81,6 +81,9 @@ Gegenstände und die umbenannten Wiederbelebungs-Runen. Nichts einzustellen.
   **Steuerkreuz** zum nächsten Item – es wird geprüft, sobald der Cursor kurz steht.
   **Rechter Stick** oder die Taste nochmal schließt. Leeres Feld: das letzte Ergebnis
   bleibt stehen. Abschaltbar in Einstellungen → Allgemein.
+  **Mit dem Controller geöffnet = mit dem Controller zu**: PS (bzw. deine Taste) nochmal
+  oder den rechten Stick bewegen – das gilt auch, wenn das Blättern abgeschaltet ist.
+  Mit F6 / Strg+F geöffnet reagiert das Fenster nicht auf den Stick.
 - **PS allein und PS + Taste gleichzeitig belegt?** Geht: gibt es eine Kombination mit PS,
   löst PS allein erst beim **Loslassen** aus – und nur, wenn keine andere Taste dazu kam.
   Beispiel: PS = Preisprüfung, **PS + Mute = Item ins Tauschen**, Mute = Stash-Scan.
