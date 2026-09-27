@@ -1297,6 +1297,8 @@ read from the same capture the gallery came from - the next scan is the real tes
   picture - the original's cell, cut and shrunk exactly like the black/white one so they
   line up - with the number's pixels tinted: blue = the hard cut, green = what the edge
   rescue added, red = in the black/white picture but not part of the number (art).
+  Order of the pictures (asked for): 1 original, 2 grey, 3 the freed number on the
+  original, 4 the black/white picture the reader gets, 5 its comparison with the template.
 - **Magnifier** (asked for: "mit einer Lupe am besten"): a click on any of the four
   pictures shows all four big and pixel-sharp, one under the other; a click closes it.
 

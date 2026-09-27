@@ -1189,7 +1189,9 @@
           showDiff(cached);
           // the magnifier (asked for: "mit einer Lupe am besten"): a click on any picture
           // shows all four big and pixel-sharp, one under the other; a click closes it
-          const all5 = [rawImg, filtImg, binImg, diffImg, overImg];
+          // order (asked for): 1 original, 2 grey, 3 the freed number on the original,
+          // 4 the black/white picture the reader gets, 5 its comparison with the template
+          const all5 = [rawImg, filtImg, overImg, binImg, diffImg];
           for (const im of all5) {
             im.style.cursor = 'zoom-in';
             im.onclick = (e) => { e.stopPropagation(); openLoupe(all5.map((x, i) => ({ src: x.style.display !== 'none' ? x.src : '', i })).filter((x) => x.src), diffInfo.textContent); };
