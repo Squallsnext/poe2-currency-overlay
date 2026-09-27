@@ -2400,7 +2400,15 @@ function slotOverride(tab, apiId, scale) {
   if (config.stashHiRes && (!ov || ov.matchScale == null)) return Object.assign({}, ov, { matchScale: 2 });
   return ov;
 }
-function findTabSlot(apiId) {
+// `tab` given: that tab's capture only. The same item can sit in two tabs (reported:
+// "An Audience with the King" is in the ritual AND the fragment tab - the ritual row's
+// panel showed, and taught from, the fragment tab's picture: its 4 learned as a 2).
+function findTabSlot(apiId, tab) {
+  if (tab) {
+    const cap = lastCaptureByTab.get(tab), map = TAB_MAPS[tab];
+    const s = cap && map && map.STATIC_SLOTS && map.STATIC_SLOTS.find((x) => x.apiId === apiId);
+    return s ? { tab, slot: s, cap } : null;
+  }
   for (const [name, cap] of lastCaptureByTab) {
     const map = TAB_MAPS[name];
     const s = map && map.STATIC_SLOTS && map.STATIC_SLOTS.find((x) => x.apiId === apiId);
@@ -2408,11 +2416,11 @@ function findTabSlot(apiId) {
   }
   return null;
 }
-ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings } = {}) => {
+ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings, tab } = {}) => {
   try {
     value = String(value == null ? '' : value).replace(/[^0-9]/g, '');
     if (!value) return { ok: false, reason: 'empty' };
-    const found = findTabSlot(apiId);
+    const found = findTabSlot(apiId, tab);
     if (!found) return { ok: false, reason: 'no-recent-capture' };
     const { tab, slot, cap } = found;
     const DR = require('./renderer/stash/digit-reader.js');
@@ -2502,9 +2510,9 @@ ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings } = {}) => {
 // reader itself worked from (native, upscaled for visibility) and the binarized version
 // it actually template-matched against, so a problem slot can be judged by eye instead of
 // guessed at from the number alone.
-ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts) => {
+ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
   try {
-    const found = findTabSlot(apiId);
+    const found = findTabSlot(apiId, tabIn);
     if (!found) return { ok: false, reason: 'no-recent-capture' };
     const { tab, slot, cap } = found;
     const map = TAB_MAPS[tab];
@@ -2781,9 +2789,9 @@ ipcMain.handle('stash-adjust-save', (_e, { tab, deltas } = {}) => {
 //             ink = a thin stroke standing out this much from its surroundings
 // settings === null resets the slot to automatic (also clears an old right-edge trim from
 // the earlier per-slider version, which no longer has a control of its own).
-ipcMain.handle('stash-slot-save-read-settings', (_e, { apiId, settings } = {}) => {
+ipcMain.handle('stash-slot-save-read-settings', (_e, { apiId, settings, tab } = {}) => {
   try {
-    const found = findTabSlot(apiId);
+    const found = findTabSlot(apiId, tab);
     if (!found) return { ok: false, reason: 'no-recent-capture' };
     if (settings == null) {
       const cur = config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId];

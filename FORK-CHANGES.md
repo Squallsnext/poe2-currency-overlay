@@ -959,6 +959,17 @@ Registered like every tab (main.js `TAB_MAPS`, reader-worker `TABS`, Net Worth l
 stop of "scan tabs"). No shipped detection template: the tab tour (or "Wrong tab?") learns
 its fingerprint on the first capture, the first scan places the boxes on the cells.
 **Not yet tested on a real capture of the tab.**
+
+Fixed after it shipped: 12 of its items also sit in another tab (breach splinter,
+breachstone and breachlord sac in Breach; simulacrum, its splinter and Raven's Reflection
+in Delirium; the Triskelions in Expedition; Kulemak's Invitation in Abyss; the three
+King's items in Ritual). The slot tools looked an item up by name only, in whichever tab
+was captured first - reported: the ritual row's "An Audience with the King ×2" showed the
+fragment tab's picture with a 4, and ✓ / "learn" / a typed count would have taught that
+4 as a 2. Preview, teach and "save settings" now take the row's tab (`findTabSlot(apiId,
+tab)`; the panel caches key on tab + item). Tested in the browser with the same item in
+two tabs: each row's calls carry its own tab.
+
 ### 4.13 Tab builder ("Neues Fach anlegen")
 
 Asked for: a new stash tab should not have to wait for a release ("then 300 issues because

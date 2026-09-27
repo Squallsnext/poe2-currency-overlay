@@ -66,9 +66,12 @@
   let dbgClipboard = null;
   // Re-fetch one slot's debug preview and only then re-render - deleting the cache first
   // collapsed the panel to "…" for a moment, shifting everything below it
-  async function refreshDbgSlot(apiId) {
-    try { dbgImgCache[apiId] = (await window.api.stashSlotDebugImage(apiId)) || { ok: false }; }
-    catch { dbgImgCache[apiId] = { ok: false }; }
+  // keyed by tab AND item: the same item can sit in two tabs (ritual + fragments)
+  const slotKey = (tab, apiId) => tab + '|' + apiId;
+  async function refreshDbgSlot(tab, apiId) {
+    const k = slotKey(tab, apiId);
+    try { dbgImgCache[k] = (await window.api.stashSlotDebugImage(apiId, undefined, tab)) || { ok: false }; }
+    catch { dbgImgCache[k] = { ok: false }; }
     render();
   }
   // Teaching (the row's ✓ and the panel's "learn from this image") only when the reader
@@ -594,7 +597,7 @@
     bar.appendChild(el('div', 'nw-review-head', t('networth.review.head', { i: r.i + 1, n: r.ids.length, name: esc(name), pct })));
     bar.appendChild(el('div', 'nw-review-how', t('networth.review.how')));
     bar.appendChild(el('div', 'nw-review-how', t('networth.review.why_fail')));
-    if (learnNote[r.ids[r.i]]) bar.appendChild(el('div', 'nw-review-note', esc(learnNote[r.ids[r.i]])));
+    if (learnNote[slotKey(row.tab, r.ids[r.i])]) bar.appendChild(el('div', 'nw-review-note', esc(learnNote[slotKey(row.tab, r.ids[r.i])])));
     const btns = el('div', 'nw-review-btns');
     const go = (d) => { r.i = Math.max(0, Math.min(r.ids.length - 1, r.i + d)); state.dbgLine = r.ids[r.i]; render(); };
     const b = (label, fn, ghost, dis) => { const x = el('button', 'nw-set-btn' + (ghost ? ' nw-set-btn-ghost' : ''), esc(label)); x.disabled = !!dis; x.onclick = (e) => { e.stopPropagation(); fn(); }; btns.appendChild(x); };
@@ -848,10 +851,10 @@
             e.stopPropagation();
             okBtn.disabled = true;
             let res;
-            try { res = await window.api.stashTeachCount(ln.apiId, String(effCount(ln))); }
+            try { res = await window.api.stashTeachCount(ln.apiId, String(effCount(ln)), undefined, row.tab); }
             catch { res = { ok: false }; }
             if (res && res.ok) {
-              if (state.review) learnNote[ln.apiId] = t('networth.line.debug_learn_ok', { value: String(effCount(ln)) });
+              if (state.review) learnNote[slotKey(row.tab, ln.apiId)] = t('networth.line.debug_learn_ok', { value: String(effCount(ln)) });
               okBtn.classList.add('nw-conf-confirm-done');
               okBtn.textContent = '✓';
               okBtn.title = t('networth.line.confirm_done_title');
@@ -859,10 +862,10 @@
               // a scan, saved settings) so the percentage reflects the lesson now, not only
               // after the next scan
               try {
-                const rr = await window.api.stashSlotDebugImage(ln.apiId);
+                const rr = await window.api.stashSlotDebugImage(ln.apiId, undefined, row.tab);
                 if (rr && rr.ok && rr.preview && rr.preview.text === String(effCount(ln))) {
                   ln.conf = rr.preview.conf;
-                  dbgImgCache[ln.apiId] = rr; // the fresh read doubles as the panel's data
+                  dbgImgCache[slotKey(row.tab, ln.apiId)] = rr; // the fresh read doubles as the panel's data
                   render();
                 }
               } catch { /* keep the old percentage; the next scan updates it */ }
@@ -876,7 +879,7 @@
               okBtn.disabled = false;
               // during a check the reason goes into the bar, readable, not just a "!"
               if (state.review) {
-                learnNote[ln.apiId] = res && res.reason === 'segment-mismatch'
+                learnNote[slotKey(row.tab, ln.apiId)] = res && res.reason === 'segment-mismatch'
                   ? t('networth.line.debug_learn_parts', { found: res.found, want: res.want })
                   : t('networth.line.debug_learn_failed');
                 render();
@@ -888,7 +891,7 @@
       }
       const cnt = el('div', 'nw-cnt'); cnt.innerHTML = `<span class="nw-x">×</span>${esc(fmtCount(effCount(ln)))}`;
       cnt.title = t('networth.line.edit_count_title');
-      cnt.onclick = (e) => { e.stopPropagation(); startEdit(ln, cnt); };
+      cnt.onclick = (e) => { e.stopPropagation(); startEdit(ln, cnt, row); };
       line.appendChild(cnt);
       const valEl = el('div', 'nw-val nw-val-edit nw-val-cols', ln.price == null ? t('networth.line.no_price') : priceMark(ln.est) + unitCols(lineVal(ln), { div: r.divPrice, chaos: r.chaosPrice }));
       // why this price is not simply the feed's (main.js sanitizeThinPrices / applyPriceRules),
@@ -919,7 +922,7 @@
       // themselves seem to be the problem, forget them and let them rebuild from scratch.
       if (dbgActive(row) && state.dbgLine === ln.apiId && window.api.stashSlotDebugImage) {
         const dbg = el('div', 'nw-dbg');
-        const cached = dbgImgCache[ln.apiId];
+        const cached = dbgImgCache[slotKey(row.tab, ln.apiId)];
         if (cached === 'loading') {
           dbg.textContent = '…';
         } else if (cached && cached.ok === false) {
@@ -1031,7 +1034,7 @@
               // an untouched, unsaved floor previews the adaptive sweep, like the live read
               const v = values();
               if (!touched.has('floor') && saved.floor == null) v.floor = null;
-              const res = await window.api.stashSlotDebugImage(ln.apiId, v).catch(() => null);
+              const res = await window.api.stashSlotDebugImage(ln.apiId, v, row.tab).catch(() => null);
               if (!res || !res.ok) return;
               rawImg.src = res.rawUrl; filtImg.src = res.filtUrl; binImg.src = res.binUrl;
               showPreview(res.preview);
@@ -1051,14 +1054,14 @@
             saveBtn.disabled = true;
             const v = values(), out = {};
             for (const k of touched) out[k] = v[k];
-            try { await window.api.stashSlotSaveReadSettings(ln.apiId, out); } catch {}
-            await refreshDbgSlot(ln.apiId);
+            try { await window.api.stashSlotSaveReadSettings(ln.apiId, out, row.tab); } catch {}
+            await refreshDbgSlot(row.tab, ln.apiId);
           };
           resetBtn.onclick = async (e) => {
             e.stopPropagation();
             resetBtn.disabled = true;
-            try { await window.api.stashSlotSaveReadSettings(ln.apiId, null); } catch {}
-            await refreshDbgSlot(ln.apiId);
+            try { await window.api.stashSlotSaveReadSettings(ln.apiId, null, row.tab); } catch {}
+            await refreshDbgSlot(row.tab, ln.apiId);
           };
           // playground presets - they only move the sliders (preview), nothing is saved
           // until "Speichern": Standard = what automatic uses, Alle Filter aus = every
@@ -1102,8 +1105,8 @@
             pasteBtn.disabled = true;
             const out = Object.assign({}, dbgClipboard);
             if (!('floor' in out)) out.floor = null; // source floor was automatic: keep it so
-            try { await window.api.stashSlotSaveReadSettings(ln.apiId, out); } catch {}
-            await refreshDbgSlot(ln.apiId);
+            try { await window.api.stashSlotSaveReadSettings(ln.apiId, out, row.tab); } catch {}
+            await refreshDbgSlot(row.tab, ln.apiId);
           };
           presetRow.appendChild(stdBtn); presetRow.appendChild(offBtn);
           // always visible: preview, the open/close toggle and copy/paste (pasting onto
@@ -1134,8 +1137,8 @@
             const out = values();
             if (!touched.has('floor') && saved.floor == null) out.floor = null;
             for (const id of ids) {
-              try { await window.api.stashSlotSaveReadSettings(id, out); } catch {}
-              delete dbgImgCache[id];
+              try { await window.api.stashSlotSaveReadSettings(id, out, row.tab); } catch {}
+              delete dbgImgCache[slotKey(row.tab, id)];
             }
             state.notice = { kind: 'ok', msg: t('networth.line.debug_apply_tab_done', { n: ids.length, tab: tabName, hotkey: state.hotkey }) };
             render();
@@ -1163,7 +1166,7 @@
             learnIn.onclick = (e) => e.stopPropagation();
             const learnBtn = el('button', 'nw-dbg-pin', t('networth.line.debug_learn_button'));
             learnBtn.title = t('networth.line.debug_learn_title');
-            const learnMsg = el('span', 'nw-dbg-floor-val', esc(learnNote[ln.apiId] || '')); // survives the re-render the learn triggers
+            const learnMsg = el('span', 'nw-dbg-floor-val', esc(learnNote[slotKey(row.tab, ln.apiId)] || '')); // survives the re-render the learn triggers
             learnBtn.onclick = async (e) => {
               e.stopPropagation();
               const value = learnIn.value.replace(/[^0-9]/g, '');
@@ -1177,15 +1180,15 @@
               const v = values();
               if (!touched.has('floor') && saved.floor == null) v.floor = cached.floor; // the floor the preview used
               let res;
-              try { res = await window.api.stashTeachCount(ln.apiId, value, v); } catch { res = { ok: false }; }
+              try { res = await window.api.stashTeachCount(ln.apiId, value, v, row.tab); } catch { res = { ok: false }; }
               learnBtn.disabled = false;
               if (res && res.ok) {
-                learnMsg.textContent = learnNote[ln.apiId] = t('networth.line.debug_learn_ok', { value });
+                learnMsg.textContent = learnNote[slotKey(row.tab, ln.apiId)] = t('networth.line.debug_learn_ok', { value });
                 refreshPreview(); // the reader's answer with the newly learned digits
               } else if (res && res.reason === 'segment-mismatch') {
-                learnMsg.textContent = learnNote[ln.apiId] = t('networth.line.debug_learn_parts', { found: res.found, want: res.want });
+                learnMsg.textContent = learnNote[slotKey(row.tab, ln.apiId)] = t('networth.line.debug_learn_parts', { found: res.found, want: res.want });
               } else {
-                learnMsg.textContent = learnNote[ln.apiId] = t('networth.line.debug_learn_failed') + (res && res.error ? ' (' + res.error + ')' : '');
+                learnMsg.textContent = learnNote[slotKey(row.tab, ln.apiId)] = t('networth.line.debug_learn_failed') + (res && res.error ? ' (' + res.error + ')' : '');
               }
             };
             learnRow.appendChild(learnIn); learnRow.appendChild(learnBtn); learnRow.appendChild(learnMsg);
@@ -1198,18 +1201,18 @@
               e.stopPropagation();
               forget.disabled = true;
               try { await window.api.stashForgetDigits(String(ln.count)); } catch {}
-              await refreshDbgSlot(ln.apiId);
+              await refreshDbgSlot(row.tab, ln.apiId);
             };
             body.appendChild(forget);
           }
           dbg.appendChild(controls);
         } else {
           dbg.textContent = '…';
-          dbgImgCache[ln.apiId] = 'loading';
-          window.api.stashSlotDebugImage(ln.apiId).then((res) => {
-            dbgImgCache[ln.apiId] = res || { ok: false };
+          dbgImgCache[slotKey(row.tab, ln.apiId)] = 'loading';
+          window.api.stashSlotDebugImage(ln.apiId, undefined, row.tab).then((res) => {
+            dbgImgCache[slotKey(row.tab, ln.apiId)] = res || { ok: false };
             render();
-          }).catch(() => { dbgImgCache[ln.apiId] = { ok: false }; render(); });
+          }).catch(() => { dbgImgCache[slotKey(row.tab, ln.apiId)] = { ok: false }; render(); });
         }
         list.appendChild(dbg);
       }
@@ -1280,7 +1283,7 @@
     inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } else if (e.key === 'Escape') { done = true; render(); } };
   }
 
-  function startEdit(ln, cntEl) {
+  function startEdit(ln, cntEl, row) {
     const inp = el('input', 'nw-cnt-edit');
     inp.type = 'text'; inp.inputMode = 'numeric'; inp.value = String(effCount(ln));
     cntEl.replaceWith(inp); inp.focus(); inp.select();
@@ -1295,7 +1298,7 @@
       // Only when there's an actual digit string to learn from (not "correcting" to 0,
       // which usually just means "this slot is empty", not "here is what 0 looks like").
       if (corrected && v > 0 && window.api.stashTeachCount) {
-        window.api.stashTeachCount(ln.apiId, String(v)).catch(() => {});
+        window.api.stashTeachCount(ln.apiId, String(v), undefined, row && row.tab).catch(() => {});
       }
       render();
     };
