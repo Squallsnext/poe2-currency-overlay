@@ -224,6 +224,15 @@ rückgängig). Dann pro Fach die saubere Einstellung setzen („Auf ganzes Fach 
 oder „Automatisch einstellen“), scannen und Zahlen mit ✓ bestätigen – er lernt nur noch
 aus sauberen Bildern.
 
+**Ziffern-Rand retten & Ziffern-Tafel (Test):** Einstellungen → Vermögen → **„Ziffern-Rand
+retten“** an. Dann nimmt der Leser die Zahl aus dem Schwarz-Weiß-Bild als Kern und holt den
+Rand aus dem Original zurück. Im Filter-Panel gibt es dafür drei Regler: **wie weit** (0–4 px,
+mehr geht nicht), **ab welcher Helligkeit**, **wie farbig** ein Rand-Pixel sein darf. Beim
+Scannen sammelt das Programm deine Ziffern. **„Ziffern-Tafel“** (Einstellungen → Gelernte
+Ziffern) zeigt pro Ziffer 0–9 die, die am besten zu den anderen passt. Rot umrandet = zwei
+Ziffern sehen sich zu ähnlich (mit ✕ die falsche verwerfen). **„Übernehmen“** – ab dann
+liest er mit deinen eigenen Ziffern; die alten sind nur noch Rückfall.
+
 ### 3.3 Debug: eine Zahl sauber lesen
 
 **Einstellungen → „OCR-Debug-Bilder zeigen“** an, dann beim Fach **„Debug“** und in der

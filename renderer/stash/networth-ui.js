@@ -551,6 +551,63 @@
         return box;
       })(),
       (() => {
+        // the digit gallery ("Ziffern-Tafel", main.js stash-gallery): per digit the glyph
+        // that fits the others best, how many were collected and how well they agree -
+        // approved once, those become the learned digits
+        const box = el('div', 'nw-gal');
+        const b = mk(t('networth.gallery.open'), t('networth.gallery.open_title'), null, true);
+        const out = el('div', 'nw-gal-out');
+        const draw = (m) => {
+          const c = document.createElement('canvas'); const Z = Math.max(1, Math.floor(56 / Math.max(m.h, 1)));
+          c.width = m.w * Z; c.height = m.h * Z; const g = c.getContext('2d');
+          g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#fff';
+          for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) if (m.data[y * m.w + x]) g.fillRect(x * Z, y * Z, Z, Z);
+          c.className = 'nw-gal-img'; return c;
+        };
+        const show = async () => {
+          out.textContent = '…';
+          const r = await window.api.stashGallery().catch(() => null);
+          out.innerHTML = '';
+          if (!r || !r.ok) { out.textContent = t('networth.audit.failed'); return; }
+          const grid = el('div', 'nw-gal-grid');
+          let ready = 0;
+          const clashOf = (d) => r.clash.filter((c) => c.a === d || c.b === d);
+          for (let d = 0; d <= 9; d++) {
+            const info = r.digits[d] || { n: 0 };
+            const tile = el('div', 'nw-gal-tile' + (r.approved.includes(String(d)) ? ' nw-gal-ok' : '') + (clashOf(d).length ? ' nw-gal-clash' : ''));
+            tile.appendChild(el('div', 'nw-gal-d', String(d)));
+            if (info.medoid) tile.appendChild(draw(info.medoid)); else tile.appendChild(el('div', 'nw-gal-none', '–'));
+            tile.appendChild(el('div', 'nw-gal-meta', info.n ? esc(t('networth.gallery.meta', { n: info.n, pct: Math.round(info.agree * 100) })) : esc(t('networth.gallery.missing'))));
+            if (clashOf(d).length) tile.title = t('networth.gallery.clash', { list: clashOf(d).map((c) => (c.a === d ? c.b : c.a) + ' ' + Math.round(c.iou * 100) + ' %').join(', ') });
+            if (info.n) {
+              ready++;
+              const x = el('button', 'nw-gal-drop', '✕'); x.title = t('networth.gallery.drop_title');
+              x.onclick = async () => { await window.api.stashGalleryApprove(null, d).catch(() => null); show(); };
+              tile.appendChild(x);
+            }
+            grid.appendChild(tile);
+          }
+          out.appendChild(el('div', 'nw-gal-head', esc(t('networth.gallery.head', { n: ready, mode: t(r.grow ? 'networth.gallery.mode_grow' : 'networth.gallery.mode_hard'), ms: r.ms }))));
+          out.appendChild(grid);
+          if (r.clash.length) out.appendChild(el('div', 'nw-gal-warn', esc(t('networth.gallery.clash_head', { list: r.clash.map((c) => c.a + '↔' + c.b).join(', ') }))));
+          const approvable = [...Array(10).keys()].filter((d) => r.digits[d] && r.digits[d].n && !clashOf(d).length).length; // clashing ones stay out
+          const ok = mk(t('networth.gallery.approve', { n: approvable }), t('networth.gallery.approve_title'), async () => {
+            ok.disabled = true;
+            const ds = []; for (let d = 0; d <= 9; d++) if (r.digits[d] && r.digits[d].n && !clashOf(d).length) ds.push(d);
+            const res = await window.api.stashGalleryApprove(ds).catch(() => null);
+            for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
+            await show();
+            out.appendChild(el('div', 'nw-gal-head', esc(res && res.ok ? t('networth.gallery.approved', { list: res.approved.join(' ') }) : t('networth.audit.failed'))));
+            render();
+          });
+          if (!approvable) ok.disabled = true;
+          out.appendChild(ok);
+        };
+        b.onclick = show;
+        box.appendChild(b); box.appendChild(out);
+        return box;
+      })(),
+      (() => {
         // start over (backup first); two clicks, the first one asks
         const box = el('span', 'nw-audit');
         const out = el('span', 'nw-audit-out');
@@ -1160,6 +1217,14 @@
               ? t('networth.line.debug_res_unavailable') : t('networth.line.debug_res_val', { v })) },
             { key: 'minBlob', min: 0, max: 30, step: 1, fmt: (v) => t('networth.line.debug_blob_val', { v }) },
           ];
+          // "save the digits' edge" (switch in settings): how the extractor brings the
+          // edge back from the original - how far (capped), from which brightness, how
+          // coloured an edge pixel may be
+          if (state.growDigits) specs.push(
+            { key: 'growDepth', min: 0, max: 4, step: 1, fmt: (v) => t('networth.line.debug_growdepth_val', { v }) },
+            { key: 'growFloor', min: 60, max: 220, step: 5, fmt: (v) => t('networth.line.debug_growfloor_val', { v }) },
+            { key: 'growSat', min: 0, max: 150, step: 5, fmt: (v) => t('networth.line.debug_growsat_val', { v }) },
+          );
           const touched = new Set();
           const sliders = {};
           for (const sp of specs) {

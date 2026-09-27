@@ -1251,6 +1251,34 @@ every digit is the natural stop).
   delirium, "6", "2") - growing then joins them. That is for the filters (the
   extractor), not the reader: at 5K no digits joined on any capture we hold.
 
+### 4.26 Edge sliders and the digit gallery
+
+**Edge sliders** (asked for: "dafür sollen die Regler sein ... ein Regler Offset, wieviel
+weiter raus er wachsen darf ... weiter raus muss man verbieten"): with "save the edge" on,
+the OCR panel has three more per-slot sliders - how far the edge may grow (0-4 reference
+px, hard cap 4; `growDepth`), from which brightness an original pixel belongs to it
+(`growFloor`, default 120) and how coloured it may be (`growSat`, default 60). Saved and
+applied to a tab like the other filters; the defaults read exactly as before.
+
+**Digit gallery** ("Ziffern-Tafel", the player's idea: scan the tabs until every digit is
+there, approve them once, then those are the templates and the rest is fallback). Every
+scan hands over, per read whose picture shows exactly its digits, each digit cut the way
+teaching cuts it (grown when the edge switch is on) with the digit the reader saw
+(`RP.numberInPicture`); main.js `collectDigits` keeps up to 15 per digit per mode and
+resolution in `digit-gallery.json` - counts the player confirmed always, others from
+70 % (the gallery shows every digit before it is approved; at the start after a reset
+the shipped digits read clean 5K glyphs at ~70 %). The gallery (settings -> learned
+digits) shows per digit the glyph that fits the others best (medoid, `LA.maskIoU`),
+how many and how well they agree, and flags two digits whose best glyphs look alike
+(IoU >= 0.85) - those are not approved. "Approve" makes the medoid and the 4 fitting it
+best the learned digits of this mode and resolution (old ones of those digits replaced,
+backup first); ✕ drops a digit to collect it anew.
+Measured on the player's real 5K currency capture, from a clean start (nothing learned,
+edge on): one scan filled all ten digits, correctly labelled, no clash; approved, the
+same capture read at 91.6 % mean (today with the old learned digits: 88.6 %), 5 counts
+under 85 % (today 10), no dropped digit (today 1: great chaos "4" is now "45"). Caveat:
+read from the same capture the gallery came from - the next scan is the real test.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

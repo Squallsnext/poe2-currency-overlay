@@ -703,6 +703,7 @@
   // Measured on the player's 5K "545": +21 % digit pixels, all along the digit edges,
   // nothing from the icon. Templates learned in this mode are grown the same way.
   const GROW_FLOOR = 120;
+  const GROW_DEPTH = 2, GROW_DEPTH_MAX = 4; // reference px the edge may grow (the panel's slider), and its hard cap
   function cellBinary(sub, W, H, cx, cy, P, scale) {
     let bin = dropSmallBlobs(binarizeP(sub, P), P.minBlob);
     if (P.growV) {
@@ -713,7 +714,10 @@
         // swelled by 40-80 %, see FORK-CHANGES 4.25)
         const S = P.matchScale > 1 ? P.matchScale : 1;
         const seeds = numberPieces(components(bin, S), S);
-        if (seeds.length) bin = growInto(bin, g, P.growFloor != null ? P.growFloor : GROW_FLOOR, 2 * S + 1, seeds);
+        // how far the edge may grow: growDepth reference px (x S), capped - it must never
+        // reach past the digit's own outline (asked for: "weiter raus ... muss man verbieten")
+        const depth = Math.min(GROW_DEPTH_MAX, P.growDepth != null ? P.growDepth : GROW_DEPTH) * S + 1;
+        if (seeds.length) bin = growInto(bin, g, P.growFloor != null ? P.growFloor : GROW_FLOOR, depth, seeds);
       }
     }
     return bin;
@@ -1072,7 +1076,7 @@
 
   return {
     otsu, crop, binarize, binarizeLocal, binarizeP, dropSmallBlobs, components, iou, slideMatch, greyOpening, resampleRGBA, resample,
-    ADAPTIVE_FLOORS, GROW_FLOOR, cellWindow, cellBinary, numberPieces, extractTemplates, readCell, readCellEx, readCellAdaptive, valueChannelFromRGBA, valueChannelDesatMax, adjustRGBA,
+    ADAPTIVE_FLOORS, GROW_FLOOR, GROW_DEPTH, GROW_DEPTH_MAX, cellWindow, cellBinary, numberPieces, extractTemplates, readCell, readCellEx, readCellAdaptive, valueChannelFromRGBA, valueChannelDesatMax, adjustRGBA,
     templatesFromJSON, bankFromJSON, DEFAULTS, DESAT_SAT, contrastGate, CONTRAST_RADIUS, debugShrunkCell, detectDigitSpan,
     upscaleTemplate, upscaleTemplateBank,
   };

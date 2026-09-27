@@ -87,8 +87,14 @@ function readOneSlot(s, c) {
   const raw = r.text === '?' ? '?' : bk.unmap(r.text); // alt keys back to digits
   // more digits in the picture than read: flagged, so the check asks about it whatever
   // the percentage (a dropped thin 1 still scores 90 % on the digits it did read)
-  let short = null;
-  if (raw !== '?') { const n = RP.digitsInPicture(ch, pos, Pm, r.floor); if (n > raw.length) short = n; }
+  let short = null, pieces = null;
+  if (raw !== '?') {
+    const pic = RP.numberInPicture(ch, pos, Pm, r.floor);
+    if (pic.digits > raw.length) short = pic.digits;
+    // the digit gallery (main.js collectDigits): a sure read whose picture shows exactly
+    // its digits hands them over, each with the digit the reader saw
+    else if (pic.digits === raw.length && r.conf >= 0.5) pieces = { ms, masks: pic.masks().map((m, i) => Object.assign(m, { d: raw[i] })) }; // main decides (collectDigits)
+  }
   // pass the measured reliability of this slot through, so the UI can flag the
   // rows our own testing says to distrust rather than showing them all alike
   const rel = (c.map.SLOT_RELIABILITY && c.map.SLOT_RELIABILITY[s.apiId]) || null;
@@ -97,7 +103,7 @@ function readOneSlot(s, c) {
   const glyphs = (r.glyphs || []).map((g) => ({
     ch: bk.unmap(g.ch), source: bk.sourceOf(g.ch), score: g.score, gapFilled: g.gapFilled,
   }));
-  const rec = { apiId: s.apiId, priceAs: s.priceAs || null, suffix: s.suffix || null, count: raw === '?' ? null : parseInt(raw, 10), conf: raw === '?' ? null : r.conf, short, rel, glyphs };
+  const rec = { apiId: s.apiId, priceAs: s.priceAs || null, suffix: s.suffix || null, count: raw === '?' ? null : parseInt(raw, 10), conf: raw === '?' ? null : r.conf, short, pieces, rel, glyphs };
   if (c.inspect) Object.assign(rec, RP.pictureQuality(ch, pos, Pm, r.floor)); // auto-tune: how clean
   return rec;
 }

@@ -2433,6 +2433,107 @@ function recomputeLearnedTemplates(learned, digits) {
 }
 // "Gelernte Ziffern prüfen": every learned digit against the shipped ones
 // (learned-audit.js); apply = remove the suspicious ones
+// ---- The digit gallery ("Ziffern-Tafel", the player's idea): every sure read whose
+// picture shows exactly its digits hands them over (reader-worker `pieces`, cut the way
+// teaching cuts them, grown when "save the edge" is on). Per digit 0-9 up to 15 of them
+// are kept (the surest; near-identical copies skipped). The gallery shows per digit the
+// one that fits the others best (the medoid), how well they agree, and digits whose
+// best ones look alike (a swap). Approved once, those become the learned digits.
+const GALLERY_KEEP = 15;
+function galleryFile() { return path.join(app.getPath('userData'), 'digit-gallery.json'); }
+function loadGallery() { try { return JSON.parse(fs.readFileSync(galleryFile(), 'utf8')); } catch { return { sets: {} }; } }
+function saveGallery(g) { try { fs.writeFileSync(galleryFile(), JSON.stringify(g)); } catch {} }
+const gallerySetKey = (grow, ms) => (grow ? 'grow' : 'hard') + '@' + (ms || 1);
+function collectDigits(res) {
+  try {
+    const LA = require('./renderer/stash/learned-audit.js');
+    const g = loadGallery();
+    const grow = !!config.stashGrowDigits;
+    let added = 0;
+    // a count the player confirmed is right whatever its percentage (the start after
+    // "reset learned digits", when the shipped digits read a clean 5K glyph at ~70 %);
+    // otherwise 70 %+ - the gallery shows every digit before it is approved anyway
+    const confirmed = (config.stashConfirmed && config.stashConfirmed[res.tab]) || {};
+    for (const r of res.reads || []) {
+      if (!r || !r.pieces || !r.pieces.masks) continue;
+      if (!(r.conf >= 0.7 || (confirmed[r.apiId] > 0 && confirmed[r.apiId] === r.count))) continue;
+      const set = g.sets[gallerySetKey(grow, r.pieces.ms)] || (g.sets[gallerySetKey(grow, r.pieces.ms)] = {});
+      for (const m of r.pieces.masks) {
+        const list = set[m.d] || (set[m.d] = []);
+        const mask = { w: m.w, h: m.h, data: Uint8Array.from(m.data) };
+        if (list.some((e) => LA.maskIoU(mask, { w: e.w, h: e.h, data: Buffer.from(e.b, 'base64') }, r.pieces.ms) >= 0.985)) continue; // the same glyph again
+        list.push({ w: m.w, h: m.h, b: Buffer.from(mask.data).toString('base64'), conf: confirmed[r.apiId] === r.count ? 1 : +(r.conf || 0).toFixed(3), tab: res.tab, at: Date.now() }); // confirmed ranks first
+        list.sort((a, b) => b.conf - a.conf);
+        if (list.length > GALLERY_KEEP) list.length = GALLERY_KEEP;
+        added++;
+      }
+    }
+    if (added) saveGallery(g);
+  } catch (err) { logToggle('stash-learn', 'gallery collect failed: ' + (err && err.message || err)); }
+}
+function galleryView() {
+  const LA = require('./renderer/stash/learned-audit.js');
+  const g = loadGallery();
+  const grow = !!config.stashGrowDigits;
+  const ms = config.stashHiRes ? 2 : 1;
+  // the set this setup reads with: high-res when on (5K), else x1; fall back to any
+  const key = g.sets[gallerySetKey(grow, ms)] ? gallerySetKey(grow, ms) : Object.keys(g.sets).find((k) => k.startsWith(grow ? 'grow' : 'hard'));
+  const set = (key && g.sets[key]) || {};
+  const S = key ? +key.split('@')[1] : 1;
+  const unpack = (e) => ({ w: e.w, h: e.h, data: Buffer.from(e.b, 'base64') });
+  const digits = {};
+  for (let d = 0; d <= 9; d++) {
+    const list = (set[d] || []).map(unpack);
+    if (!list.length) { digits[d] = { n: 0 }; continue; }
+    let best = 0, bestMean = -1;
+    const mean = list.map((a, i) => { let s = 0; list.forEach((b, j) => { if (i !== j) s += LA.maskIoU(a, b, S); }); return list.length > 1 ? s / (list.length - 1) : 1; });
+    mean.forEach((m, i) => { if (m > bestMean) { bestMean = m; best = i; } });
+    digits[d] = { n: list.length, agree: +bestMean.toFixed(3), medoid: { w: list[best].w, h: list[best].h, data: Array.from(list[best].data) }, order: mean.map((m, i) => [m, i]).sort((a, b) => b[0] - a[0]).map((x) => x[1]) };
+  }
+  // a swap: two digits whose best glyphs look alike
+  const clash = [];
+  for (let a = 0; a <= 9; a++) for (let b = a + 1; b <= 9; b++) {
+    if (!digits[a].medoid || !digits[b].medoid) continue;
+    const v = LA.maskIoU(digits[a].medoid, digits[b].medoid, S);
+    if (v >= 0.85) clash.push({ a, b, iou: +v.toFixed(3) });
+  }
+  return { key, grow, ms: S, digits, clash, approved: (g.approved && g.approved[key]) || [] };
+}
+ipcMain.handle('stash-gallery', () => { try { const v = galleryView(); for (const d of Object.values(v.digits)) delete d.order; return Object.assign({ ok: true }, v); } catch (err) { return { ok: false, error: String(err && err.message || err) }; } });
+// approve: the digits' best glyphs (the medoid and the 4 that fit it best) become the
+// learned digits of this mode and resolution - the old ones of those digits go (backup
+// of the learned file first)
+ipcMain.handle('stash-gallery-approve', (_e, { digits, drop } = {}) => {
+  try {
+    const g = loadGallery();
+    const v = galleryView();
+    const set = (v.key && g.sets[v.key]) || {};
+    if (drop != null) { delete set[drop]; saveGallery(g); return { ok: true, dropped: drop }; } // "this digit is wrong": collect it anew
+    const learnedAll = loadLearnedTemplates();
+    const file = learnedTemplatesFile();
+    if (fs.existsSync(file)) fs.copyFileSync(file, path.join(path.dirname(file), `learned-digit-templates.backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`));
+    const root = v.grow ? (learnedAll.grow || (learnedAll.grow = { exemplars: {}, templates: {} })) : learnedAll;
+    let target = root;
+    if (v.ms > 1) { root.byScale = root.byScale || {}; target = root.byScale[v.ms] || (root.byScale[v.ms] = {}); }
+    target.exemplars = target.exemplars || {};
+    const done = [];
+    for (const d of digits || []) {
+      const info = galleryView().digits[d];
+      const list = set[d] || [];
+      if (!info || !info.n || !info.order) continue;
+      target.exemplars[d] = info.order.slice(0, 5).map((i) => ({ w: list[i].w, h: list[i].h, data: Array.from(Buffer.from(list[i].b, 'base64')) }));
+      done.push(String(d));
+    }
+    recomputeLearnedTemplates(target, done);
+    saveLearnedTemplates(learnedAll);
+    g.approved = g.approved || {};
+    g.approved[v.key] = Array.from(new Set([...(g.approved[v.key] || []), ...done]));
+    saveGallery(g);
+    logToggle('stash-learn', `gallery approved ${v.key}: ${done.join(',')}`);
+    return { ok: true, approved: done };
+  } catch (err) { return { ok: false, error: String(err && err.message || err) }; }
+});
+
 // "Start over" with the learned digits (asked for, to test from scratch: "alle Vorlagen
 // löschen ... und neu beginnen"): the file is copied to a dated backup first, then
 // emptied - the shipped digits stay. restore = the newest backup back in place.
@@ -2618,15 +2719,16 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
     const minBlob = pick('minBlob', DR.DEFAULTS.minBlob);
     const localThr = pick('localThr', 0);
     const matchScaleIn = pick('matchScale', 1);
+    const growFloor = pick('growFloor', DR.GROW_FLOOR), growDepth = pick('growDepth', DR.GROW_DEPTH), growSat = pick('growSat', RP.GROW_SAT);
     const floorIn = pick('floor', null);
     // exactly the live reader's path (read-pipeline.js): same regime, same position,
     // same params, same bank including learned corrections
     // only the window around this slot, not the whole screen (see cropAroundSlot)
     const cut = RP.cropAroundSlot(Buffer.from(cap.bitmap), cap.W, cap.H, cap.box, refBox, slot, ov);
     const grow = !!config.stashGrowDigits;
-    const ch = RP.buildChannel(cut.buf, cut.W, cut.H, cut.box, refBox, { sat: desatSat, contrast, bright, gain, satPct, grow });
+    const ch = RP.buildChannel(cut.buf, cut.W, cut.H, cut.box, refBox, { sat: desatSat, contrast, bright, gain, satPct, grow, growSat });
     const pos = RP.slotPos(ch, slot, ov, refBox, cut.box);
-    const P0 = Object.assign(RP.slotParams(map, ch.scale, ov), { minBlob, localThr, matchScale: matchScaleIn });
+    const P0 = Object.assign(RP.slotParams(map, ch.scale, ov), { minBlob, localThr, matchScale: matchScaleIn, growFloor, growDepth: Math.min(DR.GROW_DEPTH_MAX, growDepth) });
     // high-resolution matching where the regime allows it (see read-pipeline.js)
     const matchScale = RP.effectiveMatchScale(ch, P0);
     const P = RP.paramsAtScale(P0, matchScale);
@@ -2715,7 +2817,7 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
       filtUrl: toUrl(filtBuf, cw, chh, UPSCALE),
       binUrl: toUrl(binBuf, binarized.w, binarized.h, 6),
       diffUrl, diffGlyphs,
-      floor, effFloor, desatSat, contrast, minBlob, bright, gain, satPct, localThr,
+      floor, effFloor, desatSat, contrast, minBlob, bright, gain, satPct, localThr, growFloor, growDepth, growSat, grow,
       // matchScale as asked for (slider), effective one actually used, and the most
       // this capture allows (1 = not available in this regime)
       matchScale: matchScaleIn, matchScaleUsed: matchScale, matchScaleMax: ch.cellScale > 1 ? Math.max(1, Math.floor(ch.cellScale)) : 1,
@@ -2730,6 +2832,9 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
         gain: ov && ov.gain != null ? ov.gain : null,
         satPct: ov && ov.satPct != null ? ov.satPct : null,
         localThr: ov && ov.localThr != null ? ov.localThr : null,
+        growFloor: ov && ov.growFloor != null ? ov.growFloor : null,
+        growDepth: ov && ov.growDepth != null ? ov.growDepth : null,
+        growSat: ov && ov.growSat != null ? ov.growSat : null,
         matchScale: (() => { const own = config.stashSlotOverrides && config.stashSlotOverrides[tab] && config.stashSlotOverrides[tab][apiId]; return own && own.matchScale != null ? own.matchScale : null; })(),
       },
       preview: { text: previewText, conf: read.conf },
@@ -2748,7 +2853,7 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
       // "Standard" = what this slot reads with when nothing is saved: the reader's own
       // defaults under the shipped per-resolution filters (at 5K the player's
       // "Kieferknochen" setting, slot-defaults.js)
-      defaults: Object.assign({ matchScale: config.stashHiRes ? 2 : 1, localThr: 0, satPct: 100, bright: 0, gain: 100, desatSat: DR.DESAT_SAT, contrast: 0, minBlob: DR.DEFAULTS.minBlob },
+      defaults: Object.assign({ matchScale: config.stashHiRes ? 2 : 1, localThr: 0, satPct: 100, bright: 0, gain: 100, desatSat: DR.DESAT_SAT, contrast: 0, minBlob: DR.DEFAULTS.minBlob, growFloor: DR.GROW_FLOOR, growDepth: DR.GROW_DEPTH, growSat: RP.GROW_SAT },
         require('./renderer/stash/slot-defaults.js').filtersFor(cap.box && cap.box.h / refBox.h, tab, apiId) || {}),
     };
   } catch (err) {
@@ -2924,14 +3029,14 @@ ipcMain.handle('stash-slot-save-read-settings', (_e, { apiId, settings, tab } = 
     if (!found) return { ok: false, reason: 'no-recent-capture' };
     if (settings == null) {
       const cur = config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId];
-      if (cur) { delete cur.floor; delete cur.desatSat; delete cur.contrast; delete cur.minBlob; delete cur.bright; delete cur.gain; delete cur.satPct; delete cur.localThr; delete cur.matchScale; delete cur.stripRight; }
+      if (cur) { delete cur.floor; delete cur.desatSat; delete cur.contrast; delete cur.minBlob; delete cur.bright; delete cur.gain; delete cur.satPct; delete cur.localThr; delete cur.matchScale; delete cur.stripRight; delete cur.growFloor; delete cur.growDepth; delete cur.growSat; }
     } else {
       // only the keys sent are touched: a value set to null goes back to automatic, a key
       // left out keeps whatever is saved (so saving just the speck filter leaves floor on
       // the adaptive sweep)
       const delta = {};
       const cur = (config.stashSlotOverrides && config.stashSlotOverrides[found.tab] && config.stashSlotOverrides[found.tab][apiId]) || null;
-      for (const k of ['floor', 'desatSat', 'contrast', 'minBlob', 'bright', 'gain', 'satPct', 'localThr', 'matchScale']) {
+      for (const k of ['floor', 'desatSat', 'contrast', 'minBlob', 'bright', 'gain', 'satPct', 'localThr', 'matchScale', 'growFloor', 'growDepth', 'growSat']) {
         if (!(k in settings)) continue;
         if (settings[k] == null) { if (cur) delete cur[k]; } else delta[k] = Math.round(settings[k]);
       }
@@ -3230,6 +3335,7 @@ async function readStashFrame(shot, onDetected) {
     // stash-teach-count below) or an "align" session (see stash-adjust-open) can
     // re-extract the exact glyphs / rebuild the exact boxes the reader saw
     lastCaptureByTab.set(res.tab, { bitmap, W, H, box: res.box, res });
+    collectDigits(res); // the digit gallery
     // first scan of this tab on this setup: boxes onto the cells (rule), kept if not worse
     {
       const placed = await autoPlaceNewTab(res.tab, { bitmap, W, H, box: res.box, res }, res);

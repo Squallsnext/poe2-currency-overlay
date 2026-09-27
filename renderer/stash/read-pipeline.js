@@ -47,7 +47,7 @@
     // "save the digit's edge" (DR.cellBinary): the ORIGINAL's light, nearly colourless
     // pixels the grown digit may take - independent of the sliders, so the edge comes from
     // the real picture, not from how hard the filters cut it
-    const G = o.grow ? DR.valueChannelDesatMax(orig, W2, H2, GROW_SAT) : null;
+    const G = o.grow ? DR.valueChannelDesatMax(orig, W2, H2, o.growSat != null ? o.growSat : GROW_SAT) : null;
     return { V, G, src, orig, W2, H2, originX, originY, cellScale, px, scale };
   }
 
@@ -57,6 +57,7 @@
   function channelOpts(ov, grow) {
     return {
       grow: !!grow,
+      growSat: grow && ov && ov.growSat != null ? ov.growSat : GROW_SAT,
       sat: ov && ov.desatSat != null ? ov.desatSat : DR.DESAT_SAT,
       contrast: ov && ov.contrast ? ov.contrast : 0,
       bright: ov && ov.bright ? ov.bright : 0,
@@ -64,7 +65,7 @@
       satPct: ov && ov.satPct != null ? ov.satPct : 100,
     };
   }
-  function channelKey(o) { return [o.sat, o.contrast || 0, o.bright || 0, o.gain == null ? 100 : o.gain, o.satPct == null ? 100 : o.satPct, o.grow ? 1 : 0].join('|'); }
+  function channelKey(o) { return [o.sat, o.contrast || 0, o.bright || 0, o.gain == null ? 100 : o.gain, o.satPct == null ? 100 : o.satPct, o.grow ? 'g' + o.growSat : 0].join('|'); }
 
   // For ONE slot (debug preview, teach): cut the frame down to a window around that slot
   // before building the channel. buildChannel filters the whole buffer, which on a native-
@@ -111,6 +112,8 @@
     if (ov && ov.minBlob != null) P.minBlob = ov.minBlob;
     if (ov && ov.localThr) P.localThr = ov.localThr;
     if (ov && ov.matchScale > 1) P.matchScale = ov.matchScale;
+    if (ov && ov.growFloor != null) P.growFloor = ov.growFloor; // "save the edge" (DR.cellBinary)
+    if (ov && ov.growDepth != null) P.growDepth = ov.growDepth;
     if (!ov || (ov.stripWidth == null && ov.up == null && ov.dn == null && ov.stripLeft == null && ov.stripRight == null)) return P;
     return Object.assign({}, P, {
       stripWidth: ov.stripWidth != null ? ov.stripWidth : P.stripWidth,
@@ -272,11 +275,26 @@
     let own = 0; for (const c of chain) for (let i = 0; i < c.mask.data.length; i++) own += c.mask.data[i] ? 1 : 0;
     return { digits: chain.length, junk: own ? (all - own) / own : 1 };
   }
-  function digitsInPicture(ch, pos, P, floor) {
+  function digitsInPicture(ch, pos, P, floor) { return numberInPicture(ch, pos, P, floor).digits; }
+  // The number's digits as the picture shows them (for the digit gallery): each piece cut
+  // the way teaching cuts it - full strip height, centred on the strip's middle, so it
+  // lines up with dy=0 in the reader's search (see stash-teach-count).
+  function numberInPicture(ch, pos, P, floor) {
     const { binarized } = DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Object.assign({}, P, { floor }), ch.cellScale);
     const S = P.matchScale > 1 ? P.matchScale : 1;
-    return chainLength(DR.components(binarized, S), S);
+    const pieces = chainPieces(DR.components(binarized, S), S);
+    const Hd = binarized.h;
+    const masks = () => pieces.map((c) => {
+      const bw = c.mask.w, bh = c.mask.h, y0 = (Hd >> 1) - (bh >> 1);
+      const m = new Uint8Array(bw * bh);
+      for (let ty = 0; ty < bh; ty++) {
+        const sy = y0 + ty; if (sy < 0 || sy >= Hd) continue;
+        for (let tx = 0; tx < bw; tx++) m[ty * bw + tx] = binarized.data[sy * binarized.w + c.x + tx] ? 1 : 0;
+      }
+      return { w: bw, h: bh, data: m };
+    });
+    return { digits: pieces.length, masks };
   }
 
-  return { EXTREME_SCALE, MARGIN, teachCut, segmentDigits, digitsInPicture, pictureQuality, cropAroundSlot, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
+  return { EXTREME_SCALE, MARGIN, GROW_SAT, teachCut, segmentDigits, digitsInPicture, numberInPicture, pictureQuality, cropAroundSlot, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
 });

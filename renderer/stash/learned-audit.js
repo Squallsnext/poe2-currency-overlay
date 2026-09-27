@@ -71,5 +71,23 @@
     }
     return { checked, bad };
   }
-  return { MARGIN, MIN_OTHER, digitScores, check, audit };
+  // two glyph masks ({w,h,data} 0/1) laid on each other at the best small shift: the
+  // share of their white pixels that agree (the reader's own measure, IoU)
+  function maskIoU(a, b, S) {
+    const R = 2 * (S || 1);
+    let best = 0;
+    for (let sy = -R; sy <= R; sy++) for (let sx = -R; sx <= R; sx++) {
+      let I = 0, U = 0;
+      const x0 = Math.min(0, sx), y0 = Math.min(0, sy), x1 = Math.max(a.w, b.w + sx), y1 = Math.max(a.h, b.h + sy);
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        const A = x >= 0 && y >= 0 && x < a.w && y < a.h ? a.data[y * a.w + x] : 0;
+        const bx = x - sx, by = y - sy;
+        const B = bx >= 0 && by >= 0 && bx < b.w && by < b.h ? b.data[by * b.w + bx] : 0;
+        if (A && B) I++; if (A || B) U++;
+      }
+      if (U && I / U > best) best = I / U;
+    }
+    return best;
+  }
+  return { MARGIN, MIN_OTHER, digitScores, check, audit, maskIoU };
 });
