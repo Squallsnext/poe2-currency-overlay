@@ -2352,6 +2352,8 @@
       state.searchCtx = { queryId: d.id, ids: d.result || [], loaded: rawAll.length, rawAll, total: d.total, page: PAGE };
       learnRanges(rawAll);
       state.results = buildResults(rawAll, d.total);
+      // an empty result said nothing at all - just "—" and 0 listings (reported)
+      if (!rawAll.length) state.notice = t('itemtab.search.no_listings');
       pushHistory(rawAll, d.total);
     } catch (err) {
       state.notice = t('itemtab.search.failed', { error: err.message });
@@ -2688,7 +2690,8 @@
     if (sig && sig === lastAutoSig && now - lastAutoAt < 1000) return; // same item, just searched
     lastAutoAt = now;
     lastAutoSig = sig;
-    const hit = sig ? state.history.findIndex((r) => r.sig === sig && r.cachedRaw && now - r.ts < PRICE_CACHE_MS) : -1;
+    // an EMPTY saved result is never served: it would hide the item for 3 h (reported)
+    const hit = sig ? state.history.findIndex((r) => r.sig === sig && r.cachedRaw && r.cachedRaw.raw && r.cachedRaw.raw.length && now - r.ts < PRICE_CACHE_MS) : -1;
     if (hit >= 0) { handlers.onHistoryOpen(hit); return; }
     doSearch();
   }

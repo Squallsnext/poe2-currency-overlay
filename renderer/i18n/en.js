@@ -635,6 +635,7 @@ window.I18N_CATALOGS.en = {
   "itemtab.parse_fail.copy": "Copy item text",
   "itemtab.parse_fail.copied": "✓ copied",
   "itemtab.parse_fail.dismiss": "Dismiss",
+  "itemtab.search.no_listings": "No listings found.",
   "itemtab.notice.sample_item_loaded": "Sample item - explore the mods and comps, or paste your own to replace it.",
   "itemtab.notice.whisper_copied": "Whisper copied - paste it in the game chat to contact the seller.",
   "itemtab.property.armour": "Armour",

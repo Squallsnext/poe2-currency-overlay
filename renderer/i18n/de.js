@@ -630,6 +630,7 @@ window.I18N_CATALOGS.de = {
   "itemtab.parse_fail.copy": "Item-Text kopieren",
   "itemtab.parse_fail.copied": "✓ kopiert",
   "itemtab.parse_fail.dismiss": "Ausblenden",
+  "itemtab.search.no_listings": "Keine Angebote gefunden.",
   "itemtab.notice.sample_item_loaded": "Beispiel-Item - erkunde die Mods und Vergleiche, oder füg dein eigenes ein, um es zu ersetzen.",
   "itemtab.notice.whisper_copied": "Whisper kopiert - paste ihn im Spiel-Chat, um den Verkäufer zu kontaktieren.",
   "itemtab.property.armour": "Rüstung",
