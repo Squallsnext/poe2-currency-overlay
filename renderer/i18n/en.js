@@ -894,7 +894,7 @@ window.I18N_CATALOGS.en = {
   "networth.line.debug_img_diff": "Compared with the template exactly where it matched: white = agrees, RED = missing in the picture, BLUE = extra in the picture, grey = the rest outside the digits",
   "networth.line.debug_diff_legend": "5th picture: white = agrees, red = missing, blue = extra.",
   "networth.line.debug_diff_glyph": "{digit}: {pct} % against the {src} - {miss} red, {extra} blue",
-  "networth.line.debug_diff_src_learned": "learned template",
+  "networth.line.debug_diff_src_learned": "own template (from your original)",
   "networth.line.debug_diff_src_shipped": "shipped template",
   "networth.learned.reset": "Reset all learned digits",
   "networth.learned.reset_title": "Deletes all digits learned so far (the shipped ones stay) - a backup is made first, \"Restore backup\" undoes it. To start over with clean pictures.",
