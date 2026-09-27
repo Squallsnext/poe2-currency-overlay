@@ -900,6 +900,8 @@ window.I18N_CATALOGS.de = {
   "networth.learned.restore_done": "Sicherung zurückgeholt.",
   "networth.learned.restore_none": "Keine Sicherung gefunden.",
   "networth.learned.reset_failed": "Zurücksetzen ging nicht: {error}. Bitte Programm neu starten (npm start) und nochmal.",
+  "networth.settings.toggle_grow_label": "Ziffern-Rand retten (Test)",
+  "networth.settings.toggle_grow_sub": "Der Leser nimmt die Zahl aus dem Schwarz-Weiß-Bild als Kern und holt den Rand der Ziffern aus dem Original zurück (nur die Ziffern, keine Icon-Reste). Eigene Vorlagen dafür: nach dem Einschalten Fächer scannen und Zahlen mit ✓ bestätigen – er lernt die Ziffern neu. Ausschalten = alles wie vorher.",
   "networth.row.remove_title": "Diesen Tab entfernen",
   "networth.sample.answer_first": "Beantworte die Frage zu jedem Screenshot, bevor du sendest.",
   "networth.sample.capture_black": "Das Spielfenster kam schwarz zurück. Das ist exklusiver Vollbildmodus. Wechsle zu Fenster oder Randlos und versuche es erneut.",

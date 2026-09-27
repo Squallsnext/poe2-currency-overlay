@@ -65,7 +65,7 @@ function readOneSlot(s, c) {
   let ch, pos;
   if (c.perSlot) {
     const cut = RP.cropAroundSlot(c.buf, c.W, c.H, c.box, c.refBox, s, ov);
-    ch = RP.buildChannel(cut.buf, cut.W, cut.H, cut.box, c.refBox, RP.channelOpts(ov));
+    ch = RP.buildChannel(cut.buf, cut.W, cut.H, cut.box, c.refBox, RP.channelOpts(ov, c.grow));
     pos = RP.slotPos(ch, s, ov, c.refBox, cut.box);
   } else {
     ch = c.chFor(ov);
@@ -82,6 +82,7 @@ function readOneSlot(s, c) {
   const ms = RP.effectiveMatchScale(ch, Ps);
   const bk = c.bankFor(ms);
   const Pm = RP.paramsAtScale(Ps, ms);
+  if (ch.G) Pm.growV = ch.G; // "save the digit's edge" (DR.cellBinary)
   const r = RP.readSlot(ch, pos, bk.bank, Pm, ov && ov.floor != null ? ov.floor : null);
   const raw = r.text === '?' ? '?' : bk.unmap(r.text); // alt keys back to digits
   // more digits in the picture than read: flagged, so the check asks about it whatever
@@ -100,10 +101,10 @@ function readOneSlot(s, c) {
   if (c.inspect) Object.assign(rec, RP.pictureQuality(ch, pos, Pm, r.floor)); // auto-tune: how clean
   return rec;
 }
-const makeBankFor = (learnedTemplates) => {
+const makeBankFor = (learnedTemplates, grow) => {
   const cache = new Map();
   return (ms) => {
-    if (!cache.has(ms)) cache.set(ms, RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates, ms > 1 ? ms : undefined));
+    if (!cache.has(ms)) cache.set(ms, RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates, ms > 1 ? ms : undefined, grow));
     return cache.get(ms);
   };
 };
@@ -124,7 +125,7 @@ function readSlotsParallel(slots, c, msg) {
     const w = new Worker(__filename);
     w.once('message', (m) => { w.terminate(); if (m && m.reads) { m.reads.forEach((rec, k) => { out[idx[k]] = rec; }); resolve(); } else reject(new Error((m && m.error) || 'helper failed')); });
     w.once('error', (e) => { w.terminate(); reject(e); });
-    w.postMessage({ mode: 'slots', shared, W: c.W, H: c.H, box: c.box, tab: c.tab, idx, learnedTemplates: msg.learnedTemplates, tabOverrides: c.tabOverrides, hiRes: c.hiRes, userTabMaps: msg.userTabMaps || null });
+    w.postMessage({ mode: 'slots', shared, W: c.W, H: c.H, box: c.box, tab: c.tab, idx, learnedTemplates: msg.learnedTemplates, tabOverrides: c.tabOverrides, hiRes: c.hiRes, growDigits: !!c.grow, userTabMaps: msg.userTabMaps || null });
   }))).then(() => out);
 }
 
@@ -141,11 +142,11 @@ function makeTuneCtx(m) {
   const perSlot = RP.cropAroundSlot(buf, m.W, m.H, m.box, refBox, map.STATIC_SLOTS[0], null).buf !== buf;
   const chCache = new Map();
   const chFor = (ov) => {
-    const o = RP.channelOpts(ov), key = RP.channelKey(o);
+    const o = RP.channelOpts(ov, m.growDigits), key = RP.channelKey(o);
     if (!chCache.has(key)) { if (chCache.size > 6) chCache.clear(); chCache.set(key, RP.buildChannel(buf, m.W, m.H, m.box, refBox, o)); }
     return chCache.get(key);
   };
-  return { tab: m.tab, buf, W: m.W, H: m.H, box: m.box, refBox, map, scale: m.box.h / refBox.h, hiRes: m.hiRes, base: m.tabOverrides || {}, perSlot, chFor, bankFor: makeBankFor(m.learnedTemplates) };
+  return { tab: m.tab, buf, W: m.W, H: m.H, box: m.box, refBox, map, scale: m.box.h / refBox.h, hiRes: m.hiRes, grow: !!m.growDigits, base: m.tabOverrides || {}, perSlot, chFor, bankFor: makeBankFor(m.learnedTemplates, m.growDigits) };
 }
 // S = the filter keys to try on every slot in idxs (null = each slot as saved now)
 function tuneRead(ctx, S, idxs) {
@@ -160,7 +161,7 @@ function tuneRead(ctx, S, idxs) {
 async function runTune(msg) {
   const shared = new SharedArrayBuffer(msg.bitmap.byteLength);
   new Uint8Array(shared).set(new Uint8Array(msg.bitmap));
-  const base = { shared, W: msg.W, H: msg.H, box: msg.box, tab: msg.tab, learnedTemplates: msg.learnedTemplates, hiRes: msg.hiRes, userTabMaps: msg.userTabMaps || null, tabOverrides: msg.tabOverrides || null };
+  const base = { shared, W: msg.W, H: msg.H, box: msg.box, tab: msg.tab, learnedTemplates: msg.learnedTemplates, hiRes: msg.hiRes, growDigits: !!msg.growDigits, userTabMaps: msg.userTabMaps || null, tabOverrides: msg.tabOverrides || null };
   const ctx = makeTuneCtx(base);
   let helpers = [];
   if (ctx.perSlot && HELPERS > 1) {
@@ -257,7 +258,7 @@ parentPort.on('message', (msg) => {
     try {
       installUserTabs(msg.userTabMaps);
       const map = TABS[msg.tab], refBox = TAB_TEMPLATES.box;
-      const c = { tab: msg.tab, buf: Buffer.from(msg.shared), W: msg.W, H: msg.H, box: msg.box, refBox, map, scale: msg.box.h / refBox.h, hiRes: msg.hiRes, tabOverrides: msg.tabOverrides, perSlot: true, bankFor: makeBankFor(msg.learnedTemplates) };
+      const c = { tab: msg.tab, buf: Buffer.from(msg.shared), W: msg.W, H: msg.H, box: msg.box, refBox, map, scale: msg.box.h / refBox.h, hiRes: msg.hiRes, grow: !!msg.growDigits, tabOverrides: msg.tabOverrides, perSlot: true, bankFor: makeBankFor(msg.learnedTemplates, msg.growDigits) };
       parentPort.postMessage({ reads: msg.idx.map((i) => readOneSlot(map.STATIC_SLOTS[i], c)) });
     } catch (err) { parentPort.postMessage({ error: String(err && err.message || err) }); }
     return;
@@ -267,6 +268,7 @@ parentPort.on('message', (msg) => {
 async function readFrame(msg) {
   try {
     const { bitmap, W, H, calBox, learnedTemplates, slotOverrides, hiRes, userTabSigs } = msg;
+    const grow = !!msg.growDigits;
     installUserTabs(msg.userTabMaps);
     // baked fingerprints plus the ones the player taught via "wrong tab?" (main.js
     // stash-correct-tab), as extra keys "tab@u0".. that map back to their tab
@@ -287,12 +289,12 @@ async function readFrame(msg) {
     // bank for just this one read - a fresh Worker per capture means no caching to worry
     // about, so the very next F7 press already benefits from a correction made seconds
     // earlier.
-    const liveBank = RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates);
+    const liveBank = RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates, undefined, grow);
     // high-resolution slots (matchScale 2, see read-pipeline.js) need the bank at that
     // scale - built once per scale, only if some slot asks for it
     const bankCache = new Map([[1, liveBank]]);
     const bankFor = (ms) => {
-      if (!bankCache.has(ms)) bankCache.set(ms, RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates, ms));
+      if (!bankCache.has(ms)) bankCache.set(ms, RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates, ms, grow));
       return bankCache.get(ms);
     };
     // Find the panel by its coloured frame, which is what makes calibration optional: the
@@ -395,13 +397,13 @@ async function readFrame(msg) {
     // (reported: "1-2 s at 1080p, why not at 5K"). The normalised regime (1.15-1.5x)
     // resamples just the panel once and keeps the shared channel below.
     const perSlot = RP.cropAroundSlot(buf, W, H, box, refBox, map.STATIC_SLOTS[0], null).buf !== buf;
-    const ch0 = perSlot ? null : RP.buildChannel(buf, W, H, box, refBox, RP.channelOpts(null));
+    const ch0 = perSlot ? null : RP.buildChannel(buf, W, H, box, refBox, RP.channelOpts(null, grow));
     // A per-slot override of the channel (saturation/contrast/brightness, see the OCR
     // debug panel) needs it built again - only paid for slots that have one, and shared
     // between slots with identical settings.
-    const chCache = new Map([[RP.channelKey(RP.channelOpts(null)), ch0]]);
+    const chCache = new Map([[RP.channelKey(RP.channelOpts(null, grow)), ch0]]);
     function chFor(ov) {
-      const o = RP.channelOpts(ov), key = RP.channelKey(o);
+      const o = RP.channelOpts(ov, grow), key = RP.channelKey(o);
       if (!chCache.has(key)) chCache.set(key, RP.buildChannel(buf, W, H, box, refBox, o));
       return chCache.get(key);
     }
@@ -410,7 +412,7 @@ async function readFrame(msg) {
     // setup. Coordinates are reference-space, same system map.STATIC_SLOTS uses, so they
     // drop straight in ahead of the scale/origin math below.
     const tabOverrides = (slotOverrides && slotOverrides[tab]) || null;
-    const c = { buf, W, H, box, refBox, map, scale, hiRes, tabOverrides, perSlot, chFor, bankFor, tab };
+    const c = { buf, W, H, box, refBox, map, scale, hiRes, grow, tabOverrides, perSlot, chFor, bankFor, tab };
     let reads = null;
     if (perSlot && HELPERS > 1 && map.STATIC_SLOTS.length >= 12) {
       try { reads = await readSlotsParallel(map.STATIC_SLOTS, c, msg); } catch { reads = null; } // helpers failed: read here

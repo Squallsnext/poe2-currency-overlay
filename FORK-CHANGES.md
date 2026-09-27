@@ -1223,6 +1223,34 @@ digits back (1 -> 51, 1 -> 15, 18 -> 185). 1080p/1440p unchanged (to be tested w
 smaller digits). The OCR panel's "Standard" button now sets exactly these shipped values
 for the slot instead of the reader's bare defaults.
 
+### 4.25 "Save the digits' edge" (test switch)
+
+The player's idea: the reader should always get the scanned number the way it really
+is - freed from the black/white picture, then brought back towards the original ("Bild
+freigestellt, dann sukzessive Approximation ans Originale") - and the templates be built
+the same way. Demonstrated on their 5K "545" first: the hard cut's digits as the core,
+grown into the original's light, nearly colourless pixels connected to them: +21 %
+digit pixels, all along the edges, nothing from the icon (the game's dark outline around
+every digit is the natural stop).
+
+- `DR.cellBinary` (shared by reader, debug view, teaching): the hard cut as before;
+  with `P.growV` set, the NUMBER's pieces (`DR.numberPieces`, the chain rule of 4.21)
+  grow up to 2*S+1 px into pixels of `G` = the original's max(R,G,B) where the colour
+  spread is <= 60 (`RP.buildChannel` with `grow`) and the value >= 120. Growing from
+  every white piece (first try) swelled art remnants beside a "41" or a "1" by 40-80 %;
+  from the number only, the largest growth left is the digits' own edge.
+- Learned digits of this mode live apart (`learned.grow`, own `byScale`), never mixed
+  with hard-cut ones; `RP.buildBank(..., grow)`, teaching, the OCR panel, auto-tune and
+  "check learned digits" all follow the switch.
+- Setting `stashGrowDigits` (default off): "Ziffern-Rand retten (Test)".
+- Measured: off, all 1706 reads identical. On, with no grown digits learned yet, 45 of
+  849 reads differ - expected, both sides must be made the same way: after switching on,
+  the digits are collected anew (scan + ✓ now; the gallery is the next step).
+- Where extraction fails (asked for: "das Bild will ich sehen, wo es nicht mehr klappt"):
+  when a digit already touches item art in the HARD cut (1080p/1440p essence and
+  delirium, "6", "2") - growing then joins them. That is for the filters (the
+  extractor), not the reader: at 5K no digits joined on any capture we hold.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
@@ -1236,6 +1264,7 @@ for the slot instead of the reader's bare defaults.
 | `stashShowReliability` | `false` | "Often misread" row tints |
 | `stashSkipGroups` | `[]` | "Don't count" lists `[{ id, name, on, items }]` |
 | `arbVendorSplit` | `false` | Arbitrage also considers vendor splits (Greater → 3 normal) |
+| `stashGrowDigits` | `false` | Reader and learning grow the digits from the hard cut into the original's edge (own learned set) |
 | `stashConfirmed` | `{}` | Per tab and slot: the count the player confirmed; not asked about again while read the same |
 | `stashTuneBackup` | `{}` | Per tab: slot settings from before the last auto-tune (Undo) |
 | `showSwapTab` | `true` | Swap tab visible |

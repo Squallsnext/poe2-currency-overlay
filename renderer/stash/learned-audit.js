@@ -52,16 +52,20 @@
   }
   // every learned exemplar: [{ ms, digit, index, own, other, otherScore }] of the suspicious
   function audit(learned, raw) {
-    const sets = [{ ms: 1, set: learned }];
-    for (const k of Object.keys((learned && learned.byScale) || {})) sets.push({ ms: +k, set: learned.byScale[k] });
+    const sets = [];
+    for (const [grow, root] of [[false, learned], [true, learned && learned.grow]]) {
+      if (!root) continue;
+      sets.push({ ms: 1, set: root, grow });
+      for (const k of Object.keys(root.byScale || {})) sets.push({ ms: +k, set: root.byScale[k], grow });
+    }
     const bad = [];
     let checked = 0;
-    for (const { ms, set } of sets) {
+    for (const { ms, set, grow } of sets) {
       for (const [digit, list] of Object.entries((set && set.exemplars) || {})) {
         (list || []).forEach((e, index) => {
           checked++;
           const r = check({ w: e.w, h: e.h, data: e.data }, digit, raw, ms);
-          if (!r.ok) bad.push({ ms, digit, index, own: r.own, other: r.other, otherScore: r.otherScore });
+          if (!r.ok) bad.push({ ms, grow, digit, index, own: r.own, other: r.other, otherScore: r.otherScore });
         });
       }
     }

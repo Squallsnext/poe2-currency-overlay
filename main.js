@@ -279,6 +279,7 @@ const DEFAULT_CONFIG = {
   priceOverrides: {}, // apiId -> {ex, at}: the user's own price for an item, wins over every feed (see applyPriceRules)
   commandHotkeys: [], // Hotkeys settings: [{command:'/hideout', accelerator:'F8'}] - whitelist-only safe chat commands, one key = one manual command
   stashCalibration: null, // Net Worth: {x,y,w,h} panel box from one-time calibration; null = assume reference res
+  stashGrowDigits: false, // "save the digit's edge": the digit grows from the hard cut into the original's light edge (reader + learning, own learned set)
   stashConfirmed: {}, // per-tab, per-apiId count the player confirmed (✓ / typed / learned) - not asked about again while the scan reads that count
   stashTuneBackup: {}, // per-tab slot settings from before the last "Automatisch einstellen" (undo)
   stashSlotOverrides: {}, // per-tab, per-apiId {cx,cy,stripWidth,up,dn} from the in-app "align" tool; overrides the shipped map for slots a user's setup misreads
@@ -2077,7 +2078,7 @@ function runReaderWorker(bitmap, W, H, onDetected, opts) {
     const slotOverrides = config.stashSlotOverrides || null;
     // opts.calBox: a panel box to use instead of the calibration (tab tour: where the
     // panel was found for an earlier tab of the same run)
-    w.postMessage({ bitmap: ab, W, H, calBox: (opts && opts.calBox) || config.stashCalibration || null, learnedTemplates, slotOverrides, hiRes: !!config.stashHiRes, userTabSigs: config.stashUserTabSigs || null, userTabMaps: config.stashUserTabMaps || null }, [ab]); // transfer the ~8MB frame, no copy
+    w.postMessage({ bitmap: ab, W, H, calBox: (opts && opts.calBox) || config.stashCalibration || null, learnedTemplates, slotOverrides, hiRes: !!config.stashHiRes, growDigits: !!config.stashGrowDigits, userTabSigs: config.stashUserTabSigs || null, userTabMaps: config.stashUserTabMaps || null }, [ab]); // transfer the ~8MB frame, no copy
   });
 }
 
@@ -2468,7 +2469,8 @@ ipcMain.handle('stash-audit-learned', (_e, { apply } = {}) => {
     if (apply && r.bad.length) {
       const bySet = new Map();
       for (const b of r.bad) {
-        const set = b.ms > 1 ? learned.byScale[b.ms] : learned;
+        const root = b.grow ? learned.grow : learned;
+        const set = b.ms > 1 ? root.byScale[b.ms] : root;
         if (!bySet.has(set)) bySet.set(set, []);
         bySet.get(set).push(b);
       }
@@ -2503,16 +2505,18 @@ function teachCount({ apiId, value, settings, tab: tabIn } = {}) {
     const saved = slotOverride(tab, apiId, cap.box && cap.box.h / require('./renderer/stash/tab-templates.json').box.h);
     const ov = settings ? Object.assign({}, saved, settings) : saved;
     const cut = RP.cropAroundSlot(Buffer.from(cap.bitmap), cap.W, cap.H, cap.box, refBox, slot, ov);
-    const ch = RP.buildChannel(cut.buf, cut.W, cut.H, cut.box, refBox, RP.channelOpts(ov));
+    const grow = !!config.stashGrowDigits;
+    const ch = RP.buildChannel(cut.buf, cut.W, cut.H, cut.box, refBox, RP.channelOpts(ov, grow));
     const pos = RP.slotPos(ch, slot, ov, refBox, cut.box);
     const P0 = RP.slotParams(TAB_MAPS[tab], ch.scale, ov);
     const ms = RP.effectiveMatchScale(ch, P0);
     const P = RP.paramsAtScale(P0, ms);
+    if (ch.G) P.growV = ch.G; // learned the way it will be read
     // the floor: one the player set (panel slider / saved) as is, else the live read's own
     // winning floor, then its neighbours, until each digit is one piece (RP.teachCut)
     let learnedNow = null;
     try { learnedNow = loadLearnedTemplates(); } catch { /* none yet */ }
-    const bank = RP.buildBank(require('./renderer/stash/digit-templates.json'), learnedNow, ms).bank;
+    const bank = RP.buildBank(require('./renderer/stash/digit-templates.json'), learnedNow, ms, grow).bank;
     const cutT = RP.teachCut(ch, pos, P, bank, value, ov && ov.floor != null ? ov.floor : null);
     const { binarized, comps } = cutT;
     if (cutT.more && !(settings && settings.force)) {
@@ -2539,12 +2543,14 @@ function teachCount({ apiId, value, settings, tab: tabIn } = {}) {
     }
 
     const learnedAll = loadLearnedTemplates();
+    // "save the edge" digits go to their own set (learnedAll.grow), never mixed with hard-cut ones
+    const root = grow ? (learnedAll.grow || (learnedAll.grow = { exemplars: {}, templates: {} })) : learnedAll;
     // a glyph cut at matchScale 2 is twice the size of a reference one - it goes to its
     // own set (byScale[ms]) that only high-resolution reads use
-    let learned = learnedAll;
+    let learned = root;
     if (ms > 1) {
-      learnedAll.byScale = learnedAll.byScale || {};
-      learned = learnedAll.byScale[ms] || (learnedAll.byScale[ms] = {});
+      root.byScale = root.byScale || {};
+      learned = root.byScale[ms] || (root.byScale[ms] = {});
     }
     learned.exemplars = learned.exemplars || {};
     // Re-crop each glyph centred on the strip's own vertical middle, NOT on the
@@ -2617,15 +2623,17 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
     // same params, same bank including learned corrections
     // only the window around this slot, not the whole screen (see cropAroundSlot)
     const cut = RP.cropAroundSlot(Buffer.from(cap.bitmap), cap.W, cap.H, cap.box, refBox, slot, ov);
-    const ch = RP.buildChannel(cut.buf, cut.W, cut.H, cut.box, refBox, { sat: desatSat, contrast, bright, gain, satPct });
+    const grow = !!config.stashGrowDigits;
+    const ch = RP.buildChannel(cut.buf, cut.W, cut.H, cut.box, refBox, { sat: desatSat, contrast, bright, gain, satPct, grow });
     const pos = RP.slotPos(ch, slot, ov, refBox, cut.box);
     const P0 = Object.assign(RP.slotParams(map, ch.scale, ov), { minBlob, localThr, matchScale: matchScaleIn });
     // high-resolution matching where the regime allows it (see read-pipeline.js)
     const matchScale = RP.effectiveMatchScale(ch, P0);
     const P = RP.paramsAtScale(P0, matchScale);
+    if (ch.G) P.growV = ch.G;
     let learned = null;
     try { learned = loadLearnedTemplates(); } catch { /* none yet */ }
-    const bankInfo = RP.buildBank(require('./renderer/stash/digit-templates.json'), learned, matchScale);
+    const bankInfo = RP.buildBank(require('./renderer/stash/digit-templates.json'), learned, matchScale, grow);
     const read = RP.readSlot(ch, pos, bankInfo.bank, P, floorIn);
     const floor = read.floor;
     const previewText = read.text === '?' ? '?' : bankInfo.unmap(read.text);
@@ -2729,7 +2737,8 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
       // taught (per digit, at this matching scale) - the bank holds ONE representative
       // per digit per source, the learned one being the median of up to 30 exemplars
       templates: (() => {
-        const set = matchScale > 1 ? (learned && learned.byScale && learned.byScale[matchScale]) : learned;
+        const rootSet = grow ? learned && learned.grow : learned;
+        const set = matchScale > 1 ? (rootSet && rootSet.byScale && rootSet.byScale[matchScale]) : rootSet;
         const ex = (set && set.exemplars) || {};
         const perDigit = {};
         for (const d of Object.keys(ex).sort()) if (ex[d].length) perDigit[d] = ex[d].length;
@@ -2945,6 +2954,11 @@ ipcMain.handle('stash-slot-save-read-settings', (_e, { apiId, settings, tab } = 
 // that slot, it is not asked about again - whatever its percentage (asked for: "wenn ich
 // dauernd neu lerne ist das dumm"). A different count is checked again. They are also
 // what "Automatisch einstellen" measures against (the counts known to be right).
+ipcMain.handle('set-stash-grow-digits', (_e, on) => {
+  config.stashGrowDigits = !!on;
+  saveConfig();
+  return config.stashGrowDigits;
+});
 ipcMain.handle('stash-confirm-count', (_e, { tab, apiId, count } = {}) => {
   try {
     if (!tab || !apiId) return { ok: false };
@@ -2990,7 +3004,7 @@ ipcMain.handle('stash-autotune', async (_e, { tab } = {}) => {
       try { learnedTemplates = loadLearnedTemplates(); } catch {}
       const bm = cap.bitmap;
       const ab = bm.buffer.slice(bm.byteOffset, bm.byteOffset + bm.byteLength);
-      w.postMessage({ mode: 'tune', bitmap: ab, W: cap.W, H: cap.H, box: cap.box, tab, truth, learnedTemplates, hiRes: !!config.stashHiRes,
+      w.postMessage({ mode: 'tune', bitmap: ab, W: cap.W, H: cap.H, box: cap.box, tab, truth, learnedTemplates, hiRes: !!config.stashHiRes, growDigits: !!config.stashGrowDigits,
         tabOverrides: (config.stashSlotOverrides && config.stashSlotOverrides[tab]) || null, userTabMaps: config.stashUserTabMaps || null }, [ab]);
     });
     if (!out || !out.ok) return out || { ok: false, error: 'tune failed' };

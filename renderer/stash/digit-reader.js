@@ -277,7 +277,7 @@
         for (let yy = yMin; yy <= yMax; yy++)
           for (let xx = xMin; xx <= xMax; xx++)
             if (lbl[yy * w + xx] === n) mask[(yy - yMin) * bw + (xx - xMin)] = 1;
-        comps.push({ mask: { data: mask, w: bw, h: bh }, x: xMin, area });
+        comps.push({ mask: { data: mask, w: bw, h: bh }, x: xMin, y: yMin, area });
       }
     }
     return comps;
@@ -487,26 +487,9 @@
     // because the two aren't separable by brightness alone at that point (see the OCR
     // debug panel's discussion). Narrowing stripRight removes that art from the search
     // entirely rather than hoping a threshold or a post-hoc filter catches it.
-    const stripL = P.stripLeft != null ? P.stripLeft : P.stripWidth;
-    const stripR = P.stripRight != null ? P.stripRight : P.stripWidth;
-    let sub;
-    if (scale !== 1) {
-      // calibrated non-reference resolution: crop the scaled window, then resample
-      // back to reference size so the fixed 0-9 templates + reference P still apply.
-      // P.matchScale (default 1, EXPERIMENTAL): shrink less aggressively - to
-      // matchScale x reference size instead of 1x - for a sharper glyph at the cost of
-      // a bigger sliding-match window. templates must be pre-scaled by the same factor
-      // (see upscaleTemplate) or the sizes won't line up.
-      const targetScale = scale / (P.matchScale || 1);
-      const swL = Math.round(stripL * scale), swR = Math.round(stripR * scale), up = Math.round(P.up * scale), dn = Math.round(P.dn * scale);
-      const raw = crop(V, W, H, cx - swL, cy - up, cx + swR, cy + dn);
-      if (!raw.w || !raw.h) return { text: '?', conf: 0, glyphs: [] };
-      sub = resample(raw, Math.max(1, Math.round(raw.w / targetScale)), Math.max(1, Math.round(raw.h / targetScale)));
-    } else {
-      sub = crop(V, W, H, cx - stripL, cy - P.up, cx + stripR, cy + P.dn);
-    }
-    if (!sub.w || !sub.h) return { text: '?', conf: 0, glyphs: [] };
-    const bin = dropSmallBlobs(binarizeP(sub, P), P.minBlob);
+    const sub = cellWindow(V, W, H, cx, cy, P, scale);
+    if (!sub || !sub.w || !sub.h) return { text: '?', conf: 0, glyphs: [] };
+    const bin = cellBinary(sub, W, H, cx, cy, P, scale);
     // cell scale vs reference (matchScale): the pixel limits below were measured on
     // reference-size digits and grow with it
     const S = P.matchScale > 1 ? P.matchScale : 1;
@@ -687,21 +670,94 @@
   // binarized result - so a misread can be inspected visually instead of guessed at.
   // Not used by the live reader; see main.js's stash-debug-live tooling.
   function debugShrunkCell(V, W, H, cx, cy, P, scale) {
+    const sub = cellWindow(V, W, H, cx, cy, P, scale) || { data: new Uint8Array(0), w: 0, h: 0 };
+    return { shrunk: sub, binarized: cellBinary(sub, W, H, cx, cy, P, scale) };
+  }
+
+  // The cell window readCellEx matches in: at a non-reference resolution the scaled
+  // window, shrunk back to (matchScale x) reference size so the fixed templates apply.
+  // Shared by the reader, the debug view and teaching, so all see the same pixels.
+  function cellWindow(V, W, H, cx, cy, P, scale) {
     scale = scale && scale > 0 ? scale : 1;
     const stripL = P.stripLeft != null ? P.stripLeft : P.stripWidth;
     const stripR = P.stripRight != null ? P.stripRight : P.stripWidth;
-    let sub;
     if (scale !== 1) {
-      // same shrink as readCellEx, matchScale included, so the view/teach cell IS the
-      // cell that gets matched
+      // P.matchScale: shrink to matchScale x reference size instead of 1x - a sharper
+      // glyph for a bigger sliding window (templates pre-scaled to match, upscaleTemplate)
       const targetScale = scale / (P.matchScale || 1);
       const swL = Math.round(stripL * scale), swR = Math.round(stripR * scale), up = Math.round(P.up * scale), dn = Math.round(P.dn * scale);
       const raw = crop(V, W, H, cx - swL, cy - up, cx + swR, cy + dn);
-      sub = resample(raw, Math.max(1, Math.round(raw.w / targetScale)), Math.max(1, Math.round(raw.h / targetScale)));
-    } else {
-      sub = crop(V, W, H, cx - stripL, cy - P.up, cx + stripR, cy + P.dn);
+      if (!raw.w || !raw.h) return null;
+      return resample(raw, Math.max(1, Math.round(raw.w / targetScale)), Math.max(1, Math.round(raw.h / targetScale)));
     }
-    return { shrunk: sub, binarized: dropSmallBlobs(binarizeP(sub, P), P.minBlob) };
+    return crop(V, W, H, cx - stripL, cy - P.up, cx + stripR, cy + P.dn);
+  }
+
+  // The black/white cell: the cut at the floor, specks dropped - and with "save the
+  // digit's edge" on (P.growV, the player's idea: "Bild freigestellt, dann sukzessive
+  // Approximation ans Original"), the sure cut is only the CORE: from it the digit grows
+  // into the neighbouring pixels of the ORIGINAL that are still light and nearly
+  // colourless (P.growV, read-pipeline.js buildChannel), a few px at most - so the edge
+  // the hard cut shaves off comes back, while loose art that never touched the core
+  // stays out (the game's dark outline around every digit is the natural stop).
+  // Measured on the player's 5K "545": +21 % digit pixels, all along the digit edges,
+  // nothing from the icon. Templates learned in this mode are grown the same way.
+  const GROW_FLOOR = 120;
+  function cellBinary(sub, W, H, cx, cy, P, scale) {
+    let bin = dropSmallBlobs(binarizeP(sub, P), P.minBlob);
+    if (P.growV) {
+      const g = cellWindow(P.growV, W, H, cx, cy, P, scale);
+      if (g && g.w === bin.w && g.h === bin.h) {
+        // only the NUMBER's pieces grow - item art the hard cut left in the cell must not
+        // (measured: grown from every white piece, art remnants beside a "41" or a "1"
+        // swelled by 40-80 %, see FORK-CHANGES 4.25)
+        const S = P.matchScale > 1 ? P.matchScale : 1;
+        const seeds = numberPieces(components(bin, S), S);
+        if (seeds.length) bin = growInto(bin, g, P.growFloor != null ? P.growFloor : GROW_FLOOR, 2 * S + 1, seeds);
+      }
+    }
+    return bin;
+  }
+  // The number's pieces, left to right: a piece joins when it sits tight to the one
+  // before (<= 4 px), is digit-wide (<= 10 px) and digit-tall (0.8-1.25 x the chain's
+  // height). Item art next to a short number sits further off or is wider/taller.
+  function numberPieces(pieces, S) {
+    const top = Math.max(0, ...pieces.map((c) => c.mask.h));
+    const list = pieces.filter((c) => c.mask.h >= top * 0.7).sort((a, b) => a.x - b.x);
+    if (!list.length) return [];
+    const chain = [list[0]];
+    for (let i = 1; i < list.length; i++) {
+      const prev = chain[chain.length - 1], c = list[i];
+      const gap = c.x - (prev.x + prev.mask.w);
+      const hs = chain.map((p) => p.mask.h).sort((a, b) => a - b), h = hs[hs.length >> 1];
+      if (gap <= 4 * S && c.mask.w <= 10 * S && c.mask.h >= 0.8 * h && c.mask.h <= 1.25 * h) chain.push(c);
+      else break;
+    }
+    return chain;
+  }
+  function growInto(bin, g, floor, depth, seeds) {
+    const { w, h } = bin;
+    const out = Uint8Array.from(bin.data);
+    let front = [];
+    for (const c of seeds) {
+      for (let yy = 0; yy < c.mask.h; yy++) for (let xx = 0; xx < c.mask.w; xx++) {
+        if (c.mask.data[yy * c.mask.w + xx]) front.push((c.y + yy) * w + c.x + xx);
+      }
+    }
+    for (let d = 0; d < depth && front.length; d++) {
+      const next = [];
+      for (const q of front) {
+        const qx = q % w, qy = (q / w) | 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const nx = qx + dx, ny = qy + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const k = ny * w + nx;
+          if (!out[k] && g.data[k] >= floor) { out[k] = 1; next.push(k); }
+        }
+      }
+      front = next;
+    }
+    return { data: out, w, h };
   }
 
   // Binarisation floors tried per cell by readCellAdaptive, spanning "dim glyph on bright
@@ -1016,7 +1072,7 @@
 
   return {
     otsu, crop, binarize, binarizeLocal, binarizeP, dropSmallBlobs, components, iou, slideMatch, greyOpening, resampleRGBA, resample,
-    ADAPTIVE_FLOORS, extractTemplates, readCell, readCellEx, readCellAdaptive, valueChannelFromRGBA, valueChannelDesatMax, adjustRGBA,
+    ADAPTIVE_FLOORS, GROW_FLOOR, cellWindow, cellBinary, numberPieces, extractTemplates, readCell, readCellEx, readCellAdaptive, valueChannelFromRGBA, valueChannelDesatMax, adjustRGBA,
     templatesFromJSON, bankFromJSON, DEFAULTS, DESAT_SAT, contrastGate, CONTRAST_RADIUS, debugShrunkCell, detectDigitSpan,
     upscaleTemplate, upscaleTemplateBank,
   };

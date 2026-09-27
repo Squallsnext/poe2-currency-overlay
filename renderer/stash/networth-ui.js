@@ -89,7 +89,7 @@
   const TAB_LABEL = { currency: t('networth.tab.currency'), abyss: t('networth.tab.abyss'), essence: t('networth.tab.essence'), runes: t('networth.tab.runes'), 'runes-kalguuran': t('networth.tab.runes_kalguuran'), ritual: t('networth.tab.ritual'), soulcore: t('networth.tab.soulcore'), idol: t('networth.tab.idol'), 'ancient-augment': t('networth.tab.ancient_augment'), delirium: t('networth.tab.delirium'), breach: t('networth.tab.breach'), expedition: t('networth.tab.expedition'), fragment: t('networth.tab.fragment') };
   const MIRROR_ICON = 'https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lEdXBsaWNhdGUiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/26bc31680e/CurrencyDuplicate.png';
 
-  if (window.api && window.api.getConfig) window.api.getConfig().then((c) => { state.dup = !!(c && c.stashDupTabs); state.sortLayout = !!(c && c.stashSortLayout); state.showMissing = !!(c && c.stashShowMissing); state.showConfidence = !!(c && c.stashShowConfidence); state.showOcrDebug = !!(c && c.stashShowOcrDebug); state.units = Array.isArray(c && c.stashUnits) && c.stashUnits.length ? c.stashUnits : ['ex', 'div']; state.hiRes = !!(c && c.stashHiRes); state.showRel = !!(c && c.stashShowReliability); state.calibrated = !!(c && c.stashCalibration); state.hotkey = (c && c.stashHotkey) || 'F7'; state.bannerHidden = !!(c && c.stashBannerHidden); state.confirmed = (c && c.stashConfirmed) || {}; render(); }).catch(() => {});
+  if (window.api && window.api.getConfig) window.api.getConfig().then((c) => { state.dup = !!(c && c.stashDupTabs); state.sortLayout = !!(c && c.stashSortLayout); state.showMissing = !!(c && c.stashShowMissing); state.showConfidence = !!(c && c.stashShowConfidence); state.showOcrDebug = !!(c && c.stashShowOcrDebug); state.units = Array.isArray(c && c.stashUnits) && c.stashUnits.length ? c.stashUnits : ['ex', 'div']; state.hiRes = !!(c && c.stashHiRes); state.showRel = !!(c && c.stashShowReliability); state.calibrated = !!(c && c.stashCalibration); state.hotkey = (c && c.stashHotkey) || 'F7'; state.bannerHidden = !!(c && c.stashBannerHidden); state.confirmed = (c && c.stashConfirmed) || {}; state.growDigits = !!(c && c.stashGrowDigits); render(); }).catch(() => {});
 
   const rowsOfType = (tab) => state.rows.filter((r) => r.tab === tab);
   // The debug panel of a row: with the OCR-debug switch, or during a check the scan
@@ -399,6 +399,16 @@
         state.hiRes = v;
         try { window.api.setStashHiRes(v); } catch {}
         for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k]; // previews re-read with the new default
+      }));
+    // "save the digit's edge": reader and learning both grow the digit from the hard cut
+    // into the original - own learned set, so switching back loses nothing
+    toggles.appendChild(mkToggle(state.growDigits, t('networth.settings.toggle_grow_label'),
+      t('networth.settings.toggle_grow_sub'),
+      (v) => {
+        state.growDigits = v;
+        try { window.api.setStashGrowDigits(v); } catch {}
+        for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
+        render();
       }));
     root.appendChild(toggles);
     if (window.NwSkipGroups) window.NwSkipGroups.renderSettingsSection(root, render);

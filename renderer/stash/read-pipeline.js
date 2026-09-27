@@ -44,13 +44,19 @@
     src = DR.adjustRGBA(src, W2, H2, o.bright, o.gain, o.satPct);
     let V = DR.valueChannelDesatMax(src, W2, H2, o.sat == null ? DR.DESAT_SAT : o.sat);
     if (o.contrast) V = DR.contrastGate(V, src, W2, H2, o.contrast, DR.CONTRAST_RADIUS * px);
-    return { V, src, orig, W2, H2, originX, originY, cellScale, px, scale };
+    // "save the digit's edge" (DR.cellBinary): the ORIGINAL's light, nearly colourless
+    // pixels the grown digit may take - independent of the sliders, so the edge comes from
+    // the real picture, not from how hard the filters cut it
+    const G = o.grow ? DR.valueChannelDesatMax(orig, W2, H2, GROW_SAT) : null;
+    return { V, G, src, orig, W2, H2, originX, originY, cellScale, px, scale };
   }
 
   // The channel options a slot's saved override asks for (defaults where it has none),
   // and a cache key for them - slots that share settings share one channel.
-  function channelOpts(ov) {
+  const GROW_SAT = 60; // colour spread (max-min of R,G,B) still counted as the digit's white edge
+  function channelOpts(ov, grow) {
     return {
+      grow: !!grow,
       sat: ov && ov.desatSat != null ? ov.desatSat : DR.DESAT_SAT,
       contrast: ov && ov.contrast ? ov.contrast : 0,
       bright: ov && ov.bright ? ov.bright : 0,
@@ -58,7 +64,7 @@
       satPct: ov && ov.satPct != null ? ov.satPct : 100,
     };
   }
-  function channelKey(o) { return [o.sat, o.contrast || 0, o.bright || 0, o.gain == null ? 100 : o.gain, o.satPct == null ? 100 : o.satPct].join('|'); }
+  function channelKey(o) { return [o.sat, o.contrast || 0, o.bright || 0, o.gain == null ? 100 : o.gain, o.satPct == null ? 100 : o.satPct, o.grow ? 1 : 0].join('|'); }
 
   // For ONE slot (debug preview, teach): cut the frame down to a window around that slot
   // before building the channel. buildChannel filters the whole buffer, which on a native-
@@ -149,7 +155,10 @@
     }
     return out.filter(Boolean);
   }
-  function buildBank(rawTemplates, learned, matchScale) {
+  // grow: the learned digits of the "save the edge" mode, kept apart (learned.grow) - a
+  // grown digit is fuller than a hard-cut one, the two sets must not mix
+  function buildBank(rawTemplates, learnedAll, matchScale, grow) {
+    const learned = grow ? (learnedAll && learnedAll.grow) || null : learnedAll;
     const ms = matchScale > 1 ? Math.round(matchScale) : 1;
     const variants = (rawTemplates.variants || []).slice();
     variants.push(...learnedVariants(learned, 'user-corrections'));
@@ -225,20 +234,7 @@
     return out;
   }
   function chainLength(pieces, S) { return chainPieces(pieces, S).length; }
-  function chainPieces(pieces, S) {
-    const top = Math.max(0, ...pieces.map((c) => c.mask.h));
-    const list = pieces.filter((c) => c.mask.h >= top * 0.7).sort((a, b) => a.x - b.x);
-    if (!list.length) return [];
-    const chain = [list[0]];
-    for (let i = 1; i < list.length; i++) {
-      const prev = chain[chain.length - 1], c = list[i];
-      const gap = c.x - (prev.x + prev.mask.w);
-      const hs = chain.map((p) => p.mask.h).sort((a, b) => a - b), h = hs[hs.length >> 1];
-      if (gap <= 4 * S && c.mask.w <= 10 * S && c.mask.h >= 0.8 * h && c.mask.h <= 1.25 * h) chain.push(c);
-      else break;
-    }
-    return chain;
-  }
+  function chainPieces(pieces, S) { return DR.numberPieces(pieces, S); } // one rule, shared with the edge growing
   function teachCut(ch, pos, P, bank, value, fixedFloor) {
     let floors;
     let liveFloor = null;
