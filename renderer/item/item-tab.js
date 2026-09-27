@@ -2311,6 +2311,7 @@
     if (state.item.currencyTag) return doCurrencyPrice(); // exchange-value lookup, not a whisper search
     state.searching = true; // keep previous results visible (dimmed) while updating
     state.notice = null;
+    if (state.parseFail && state.parseFail.kind === 'search') state.parseFail = null; // a new try
     clearWait();
     render();
     try {
@@ -2355,6 +2356,15 @@
     } catch (err) {
       state.notice = t('itemtab.search.failed', { error: err.message });
       if (window.logAction) window.logAction('item-search-error', String(err.message));
+      // The trade site not knowing the item (Byrnabas: the data's English name was
+      // misspelt) is a data bug like a failed parse, not a passing network hiccup - same
+      // card, same log and report, so it reaches a fix instead of scrolling away.
+      const raw = state.item && state.item.rawText;
+      if (raw && /\(400\)/.test(err.message) && /unknown item/i.test(err.message)) {
+        state.parseFail = { kind: 'search', error: String(err.message), text: raw, name: itemNameOf(raw) };
+        state.notice = null;
+        if (window.api.logParseFail) window.api.logParseFail({ error: String(err.message), text: raw });
+      }
     }
     state.searching = false;
     state.stale = false; // results now reflect the current filters

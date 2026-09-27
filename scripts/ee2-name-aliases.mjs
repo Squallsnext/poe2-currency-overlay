@@ -10,8 +10,8 @@
 // shows it is not broken. Idempotent - running it twice adds nothing.
 //
 // Usage (after this, and after every re-vendor of EE2 data):
-//   node scripts/ee2-name-aliases.mjs        # all languages listed below
-//   node scripts/gen-ee2-index.mjs de        # rebuild that language's lookup index
+//   node scripts/ee2-name-aliases.mjs        # all languages listed below + REF_FIXES
+//   node scripts/gen-ee2-index.mjs <lang>    # rebuild the index of every changed language
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,6 +28,17 @@ const ALIASES = {
     { refName: "Perfect Rebirth Rune", name: "Perfekte Wiederbelebungsrune" },
   ],
 };
+
+// English names the vendored data spells differently from the game and the trade site.
+// The trade search sends refName, so a wrong one fails with "Unknown item name" although
+// the item parses fine. Fixed IN PLACE in every language (the record keeps its line), so
+// every index must be rebuilt afterwards (gen-ee2-index.mjs <lang> for each).
+const REF_FIXES = [
+  // Reported (German client): Byrnabas price check -> trade2 400 "Unknown item name".
+  // The data says "Brynabas"; the game, its icon file (Byrnabas.png) and poe2db say
+  // "Byrnabas" (poe2db.tw/us/Byrnabas exists, /Brynabas is a 404).
+  { namespace: "UNIQUE", from: "Brynabas", to: "Byrnabas" },
+];
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "renderer", "vendor", "ee2", "data");
 
@@ -51,4 +62,23 @@ for (const [lang, list] of Object.entries(ALIASES)) {
   }
   fs.writeFileSync(file, text);
   console.log(`[${lang}] ${added} alias record(s) added`);
+}
+
+// refName fixes, all languages. The data is written as '"refName": "X"' (space after the
+// colon); the replacement keeps that form and touches only records of that namespace.
+for (const lang of fs.readdirSync(ROOT)) {
+  const file = path.join(ROOT, lang, "items.ndjson");
+  if (!fs.existsSync(file)) continue;
+  const lines = fs.readFileSync(file, "utf8").split("\n");
+  let fixed = 0;
+  for (let i = 0; i < lines.length; i++) {
+    for (const f of REF_FIXES) {
+      const from = `"refName": ${JSON.stringify(f.from)}`;
+      if (!lines[i].includes(from) || !lines[i].includes(`"namespace": ${JSON.stringify(f.namespace)}`)) continue;
+      lines[i] = lines[i].replace(from, `"refName": ${JSON.stringify(f.to)}`);
+      fixed++;
+    }
+  }
+  if (fixed) fs.writeFileSync(file, lines.join("\n"));
+  console.log(`[${lang}] ${fixed} refName fix(es)`);
 }

@@ -625,6 +625,8 @@ window.I18N_CATALOGS.de = {
   "itemtab.notice.parse_failed": "Konnte dieses Item nicht lesen: {error}",
   "itemtab.parse_fail.title": "Dieses Item konnte nicht gelesen werden",
   "itemtab.parse_fail.why": "Fehler: {error}. Für dieses Item wurde nichts gesucht.",
+  "itemtab.parse_fail.title_search": "Die Handelsseite kennt dieses Item nicht",
+  "itemtab.parse_fail.why_search": "Fehler: {error}. Gelesen wurde es, aber der Name, den das Programm sucht, ist falsch – ein Datenfehler.",
   "itemtab.parse_fail.copy": "Item-Text kopieren",
   "itemtab.parse_fail.copied": "✓ kopiert",
   "itemtab.parse_fail.dismiss": "Ausblenden",

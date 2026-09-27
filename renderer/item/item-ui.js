@@ -1226,9 +1226,9 @@
   // an item that could not be read: which one, why, its text - on top of any view
   function parseFailCard(pf, h) {
     const card = el('div', 'parse-fail');
-    card.appendChild(el('div', 'parse-fail-head', '⚠ ' + t('itemtab.parse_fail.title')));
+    card.appendChild(el('div', 'parse-fail-head', '⚠ ' + t(pf.kind === 'search' ? 'itemtab.parse_fail.title_search' : 'itemtab.parse_fail.title')));
     if (pf.name) card.appendChild(el('div', 'parse-fail-name', esc(pf.name)));
-    card.appendChild(el('div', 'parse-fail-why', t('itemtab.parse_fail.why', { error: esc(pf.error) })));
+    card.appendChild(el('div', 'parse-fail-why', t(pf.kind === 'search' ? 'itemtab.parse_fail.why_search' : 'itemtab.parse_fail.why', { error: esc(pf.error) })));
     const acts = el('div', 'parse-fail-acts');
     const cp = el('button', 'parse-fail-btn', t('itemtab.parse_fail.copy'));
     cp.onclick = () => { h.onParseFailCopy && h.onParseFailCopy(); cp.textContent = t('itemtab.parse_fail.copied'); };

@@ -26,6 +26,7 @@ below).
 | German "Außergewöhnlich…" (exceptional) items not parsed | Missing `ITEM_EXCEPTIONAL` pattern | Added `^Außergewöhnlich(?:e\|er\|es\|en) (.*)$` | `renderer/vendor/ee2/data/de/client_strings.js` |
 | Lesser/Greater/Perfect **Rebirth Rune** not recognised (no price check, no search) | GGG renamed them in German to "Kleine/Große/Perfekte Wiederbelebungsrune"; the vendored EE2 data (and poe2db) still say "…Wiedergeburt-Rune" | New `scripts/ee2-name-aliases.mjs`: a commented list of renamed items, appended as extra name records (old names keep working); index rebuilt with `gen-ee2-index.mjs de` (ref/stat indexes byte-identical); display names regenerated | `scripts/ee2-name-aliases.mjs`, `renderer/vendor/ee2/data/de/items.ndjson`, `items-name.index.bin`, `renderer/i18n/game-names.js` |
 | Uniques on a base whose translated name stands for several English bases fail to parse ("item.parse_error"): German *Trephina* (Ambosshammer = Anvil Maul **and** Forge Maul), *Volls Protektor*, *Wylunds Pfahl*; 3 in French, 7 in Spanish, 3 in Portuguese, 1 in Russian | `findInDatabase` filtered the unique's variants by the FIRST English base of that name only; for a unique on the second one nothing was left, `info[0]` was undefined and the parse threw | Match any English base of the name, and never filter down to nothing | `renderer/vendor/ee2/src/parser/Parser.ts` |
+| **Byrnabas** (unique belt) price check: trade2 400 "Unknown item name" | The vendored data's English name is misspelt "Brynabas" (every language); the trade search sends that name. The game, the icon file and poe2db say "Byrnabas" | `REF_FIXES` in `scripts/ee2-name-aliases.mjs` corrects refNames in place in all languages; item-ref indexes rebuilt (name/stat indexes unchanged) | `scripts/ee2-name-aliases.mjs`, `renderer/vendor/ee2/data/*/items.ndjson`, `items-ref.index.bin` |
 | German requirement line not parsed for Dexterity | `REQUIRES_LINE` expected `Geschick ` / `Ges ` with a trailing space | Removed the stray spaces | same |
 
 The tablet fix was confirmed against the live trade API (`Aufseher-Tafel` → 400,
@@ -809,7 +810,9 @@ back out on a click. Same config as before (`stashSkipGroups`).
 overlay showed nothing at all). The parse-error notice only rendered inside an item's
 panel; with no item open there was none, and with one open the old item's result stayed
 as if it were the answer. Now a card on top names the item, the error and offers "copy
-item text"; the view goes back to the landing page. Each failed item is also appended
+item text"; the view goes back to the landing page. A trade search the site rejects with "Unknown
+item ..." (400) gets the same card ("the trade site does not know this item") - that is a
+data bug, not a network hiccup. Each failed item is also appended
 to `item-parse-errors.log` in the support folder.
 
 **Price check: the same item again shows the saved result for 3 hours** (asked for:

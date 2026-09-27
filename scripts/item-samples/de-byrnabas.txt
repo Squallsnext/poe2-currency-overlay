@@ -1,0 +1,24 @@
+Gegenstandsklasse: Gürtel
+Seltenheit: Einzigartig
+Byrnabas
+Breiter Gürtel
+--------
+Erfordert: Stufe 14
+--------
+Gegenstandsstufe: 80
+--------
+{ Impliziter Modifikator }
+28(20-30)% erhöhte erhaltene Fläschchenfüllungen
+{ Impliziter Modifikator — Phiole }
+Hat 2(1-3) Phiolen-Plätze
+--------
+{ Einzigartiger Modifikator — Mana }
++49(40-60) zu maximalem Mana
+{ Einzigartiger Modifikator — Leben }
+Regeneriert 10.3(7-12) Leben pro Sekunde
+{ Einzigartiger Modifikator — Elementar, Blitz, Widerstand }
++40(30-40)% zu Blitzwiderstand
+{ Einzigartiger Modifikator }
+Kann nicht geschockt werden — Nicht skalierbarer Wert
+--------
+Gischtfäulnis-Mitglieder segeln ohne Angst vor Stürmen.

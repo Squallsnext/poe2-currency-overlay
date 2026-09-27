@@ -630,6 +630,8 @@ window.I18N_CATALOGS.en = {
   "itemtab.notice.parse_failed": "Couldn't read that item: {error}",
   "itemtab.parse_fail.title": "This item could not be read",
   "itemtab.parse_fail.why": "Error: {error}. Nothing was searched for this item.",
+  "itemtab.parse_fail.title_search": "The trade site does not know this item",
+  "itemtab.parse_fail.why_search": "Error: {error}. It was read, but the name the app searches for is wrong - a data bug.",
   "itemtab.parse_fail.copy": "Copy item text",
   "itemtab.parse_fail.copied": "✓ copied",
   "itemtab.parse_fail.dismiss": "Dismiss",
