@@ -38,7 +38,18 @@ const REF_FIXES = [
   // The data says "Brynabas"; the game, its icon file (Byrnabas.png) and poe2db say
   // "Byrnabas" (poe2db.tw/us/Byrnabas exists, /Brynabas is a 404).
   { namespace: "UNIQUE", from: "Brynabas", to: "Byrnabas" },
+  // Reported (German client): Splitter von Lorrata. The data's own English name says
+  // "Splinter of Lorrata", its refName "Loratta" (poe2db: /Splinter_of_Lorrata exists,
+  // /Splinter_of_Loratta is a 404). Found with the check below, which lists every unique
+  // whose English name and refName disagree - it also turned up:
+  { namespace: "UNIQUE", from: "Splinter of Loratta", to: "Splinter of Lorrata" },
+  // renamed unique: the data still searches the old name (poe2db: /The_Road_Warrior
+  // exists, /The_Immortan is a 404)
+  { namespace: "UNIQUE", from: "The Immortan", to: "The Road Warrior" },
 ];
+// To find more: every UNIQUE record in data/en/items.ndjson whose "name" differs from
+// its "refName" is suspect (after these fixes: none).
+
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "renderer", "vendor", "ee2", "data");
 

@@ -1,0 +1,25 @@
+Gegenstandsklasse: Speere
+Seltenheit: Einzigartig
+Splitter von Lorrata
+Hartholz-Speer
+--------
+Physischer Schaden: 7-16 (augmented)
+Kritische Trefferchance: 5.00%
+Angriffe pro Sekunde: 1.60
+--------
+Gegenstandsstufe: 81
+--------
+Gewährt Fertigkeit: Speerwurf
+--------
+{ Einzigartiger Modifikator — Schaden, Physisch, Angriff }
+Fügt 2(2-3) bis 7(6-8) physischen Schaden hinzu
+{ Einzigartiger Modifikator — Schaden, Elementar }
+Verursacht keinen Elementarschaden — Nicht skalierbarer Wert
+{ Einzigartiger Modifikator — Angriff }
+20% erhöhte Nahkampfschlagreichweite mit dieser Waffe
+{ Einzigartiger Modifikator }
+Eine beliebige Anzahl von Giften dieser Waffe kann ein Ziel gleichzeitig beeinflussen — Nicht skalierbarer Wert
+{ Einzigartiger Modifikator — Chaos, Angriff, Beeinträchtigung }
+Vergiftet immer bei Treffer mit dieser Waffe
+--------
+Die Verderbtheit der unheilvollen Gemme liegt noch immer in der Luft ...
