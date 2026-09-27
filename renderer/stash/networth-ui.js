@@ -158,6 +158,15 @@
   }
 
   const learnNote = {}; // last "learn from this image" result per slot, shown in its debug panel
+  // a teach the guards stopped (more digits in the picture than typed / a digit that looks
+  // like another one): the next press on the same slot insists (main.js force)
+  const teachForce = new Set();
+  function teachWhy(res, value) {
+    if (!res) return null;
+    if (res.reason === 'more-digits') return t('networth.line.teach_more', { found: res.found, value: String(value) });
+    if (res.reason === 'looks-like') return t('networth.line.teach_looks', { pos: res.pos, other: res.other, want: res.want, otherPct: Math.round(res.otherScore * 100), ownPct: Math.round(res.own * 100) });
+    return null;
+  }
 
   // ---------- test read right after a calibration ----------
   // The calibration says how it was measured (from the currency tab's cells, or the box
@@ -504,6 +513,33 @@
         })(),
       ]);
     }
+    group(t('networth.audit.group'), [
+      (() => {
+        // every learned digit against the shipped ones (main.js stash-audit-learned)
+        const box = el('span', 'nw-audit');
+        const b = mk(t('networth.audit.button'), t('networth.audit.title'), null, true);
+        const out = el('span', 'nw-audit-out');
+        b.onclick = async () => {
+          if (!window.api.stashAuditLearned) return;
+          b.disabled = true; out.textContent = '…';
+          const r = await window.api.stashAuditLearned(false).catch(() => null);
+          b.disabled = false; out.innerHTML = '';
+          if (!r || !r.ok) { out.textContent = t('networth.audit.failed'); return; }
+          if (!r.bad.length) { out.textContent = t('networth.audit.none', { n: r.checked }); return; }
+          const list = r.bad.slice(0, 6).map((x) => t('networth.audit.item', { digit: x.digit, other: x.other })).join(', ') + (r.bad.length > 6 ? ' …' : '');
+          out.appendChild(el('span', null, esc(t('networth.audit.found', { n: r.checked, k: r.bad.length, list }))));
+          const rm = mk(t('networth.audit.remove'), null, async () => {
+            rm.disabled = true;
+            const r2 = await window.api.stashAuditLearned(true).catch(() => null);
+            out.textContent = r2 && r2.ok ? t('networth.audit.removed', { k: r2.removed }) : t('networth.audit.failed');
+            for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
+          });
+          out.appendChild(rm);
+        };
+        box.appendChild(b); box.appendChild(out);
+        return box;
+      })(),
+    ]);
     group(t('networth.settings.cal_group_support'), [
       mk(t('networth.tour.support_start'), t('networth.tour.support_start_title'), () => startTour(true), true),
       mk(t('networth.tour.export'), t('networth.tour.export_title'), () => { window.api.stashExportSettings().catch(() => {}); }, true),
@@ -549,8 +585,8 @@
   }
   function weakLines(row) {
     return ((row.result && row.result.lines) || [])
-      .filter((ln) => !ln.missing && ln.userCount == null && ln.conf != null && ln.conf < LEARN_BELOW && !isConfirmed(row, ln))
-      .sort((a, b) => a.conf - b.conf);
+      .filter((ln) => !ln.missing && ln.userCount == null && ln.conf != null && (ln.conf < LEARN_BELOW || ln.short) && !isConfirmed(row, ln))
+      .sort((a, b) => (b.short ? 1 : 0) - (a.short ? 1 : 0) || a.conf - b.conf);
   }
   // A) a count the player confirmed for this slot, read again the same: not asked about
   // again, whatever its percentage (main.js stash-confirm-count)
@@ -653,6 +689,7 @@
     const name = ln ? window.gameName(ln.name) : r.ids[r.i];
     const pct = ln && ln.conf != null ? Math.round(ln.conf * 100) + ' %' : '';
     bar.appendChild(el('div', 'nw-review-head', t('networth.review.head', { i: r.i + 1, n: r.ids.length, name: esc(name), pct })));
+    if (ln && ln.short) bar.appendChild(el('div', 'nw-review-note', t('networth.review.short', { n: ln.short, m: String(ln.count).length, count: ln.count })));
     bar.appendChild(el('div', 'nw-review-how', t('networth.review.how')));
     bar.appendChild(el('div', 'nw-review-how', t('networth.review.why_fail')));
     if (learnNote[slotKey(row.tab, r.ids[r.i])]) bar.appendChild(el('div', 'nw-review-note', esc(learnNote[slotKey(row.tab, r.ids[r.i])])));
@@ -876,9 +913,9 @@
       else line.appendChild(el('div', 'nw-ic nw-ic-none'));
       line.appendChild(el('div', 'nw-name', esc(window.gameName(ln.name) + (ln.suffix || '')))); // feed is English; show the client's own name (+ "#2" for an extra slot of the same currency)
       // unsure read, even with the percentages hidden: a "?" that opens its check
-      if (!ln.missing && ln.userCount == null && ln.conf != null && ln.conf < LEARN_BELOW && !isConfirmed(row, ln) && !state.showConfidence && !dbgActive(row)) {
+      if (!ln.missing && ln.userCount == null && ln.conf != null && (ln.conf < LEARN_BELOW || ln.short) && !isConfirmed(row, ln) && !state.showConfidence && !dbgActive(row)) {
         const q = el('button', 'nw-weak' + (ln.conf < 0.65 ? ' nw-weak-bad' : ''), '?');
-        q.title = t('networth.review.weak_title', { pct: Math.round(ln.conf * 100) });
+        q.title = ln.short ? t('networth.line.short_title', { n: ln.short }) : t('networth.review.weak_title', { pct: Math.round(ln.conf * 100) });
         q.onclick = (e) => { e.stopPropagation(); startReview(row, [ln.apiId]); };
         line.appendChild(q);
       }
@@ -910,15 +947,17 @@
         // from an idle click that never checked the number.
         // below LEARN_BELOW only: a read the reader is already sure of adds nothing but
         // near-identical copies to the exemplar pool
-        if (pct < LEARN_BELOW * 100 && effCount(ln) > 0 && !conf && window.api.stashTeachCount) {
+        if ((pct < LEARN_BELOW * 100 || ln.short) && effCount(ln) > 0 && !conf && window.api.stashTeachCount) {
           const okBtn = el('button', 'nw-conf-confirm', '✓');
           okBtn.title = t('networth.line.confirm_title');
           okBtn.onclick = async (e) => {
             e.stopPropagation();
             okBtn.disabled = true;
             confirmCount(row, ln.apiId, effCount(ln)); // right is right, even if learning fails
+            const sk = slotKey(row.tab, ln.apiId);
+            const force = teachForce.has(sk); teachForce.delete(sk);
             let res;
-            try { res = await window.api.stashTeachCount(ln.apiId, String(effCount(ln)), undefined, row.tab); }
+            try { res = await window.api.stashTeachCount(ln.apiId, String(effCount(ln)), force ? { force: true } : undefined, row.tab); }
             catch { res = { ok: false }; }
             if (res && res.ok) {
               if (state.review) learnNote[slotKey(row.tab, ln.apiId)] = t('networth.line.debug_learn_ok', { value: String(effCount(ln)) });
@@ -945,8 +984,19 @@
               okBtn.textContent = '!';
               okBtn.title = t('networth.line.confirm_failed_title');
               okBtn.disabled = false;
+              // the guards (more digits in the picture / a digit that looks like another):
+              // not confirmed, the reason shown; a second press insists
+              const why = teachWhy(res, effCount(ln));
+              if (why) {
+                confirmCount(row, ln.apiId, null);
+                teachForce.add(sk);
+                okBtn.title = why;
+                learnNote[sk] = why; // shown in the check bar
+                if (!state.review) state.notice = { kind: 'warn', msg: esc(window.gameName(ln.name)) + ': ' + esc(why) };
+                render();
+              }
               // during a check the reason goes into the bar, readable, not just a "!"
-              if (state.review) {
+              if (state.review && !why) {
                 learnNote[slotKey(row.tab, ln.apiId)] = res && res.reason === 'segment-mismatch'
                   ? t('networth.line.debug_learn_parts', { found: res.found, want: res.want })
                   : t('networth.line.debug_learn_failed');
@@ -1247,13 +1297,19 @@
               learnBtn.disabled = true;
               const v = values();
               if (!touched.has('floor') && saved.floor == null) v.floor = cached.floor; // the floor the preview used
+              const sk = slotKey(row.tab, ln.apiId);
+              if (teachForce.has(sk + '|' + value)) { v.force = true; teachForce.delete(sk + '|' + value); }
               let res;
               try { res = await window.api.stashTeachCount(ln.apiId, value, v, row.tab); } catch { res = { ok: false }; }
+              const why = res && !res.ok ? teachWhy(res, value) : null;
               learnBtn.disabled = false;
               if (res && res.ok) {
                 confirmCount(row, ln.apiId, parseInt(value, 10));
                 learnMsg.textContent = learnNote[slotKey(row.tab, ln.apiId)] = t('networth.line.debug_learn_ok', { value });
                 refreshPreview(); // the reader's answer with the newly learned digits
+              } else if (why) {
+                teachForce.add(sk + '|' + value);
+                learnMsg.textContent = learnNote[sk] = why;
               } else if (res && res.reason === 'segment-mismatch') {
                 learnMsg.textContent = learnNote[slotKey(row.tab, ln.apiId)] = t('networth.line.debug_learn_parts', { found: res.found, want: res.want });
               } else {

@@ -213,7 +213,30 @@
     const tries = [DR.components(binarized, ms), DR.components(binarized, ms, true)];
     tries.push(dropShort(tries[0]), dropShort(tries[1]));
     const hit = tries.find((list) => list.length === want);
-    return (hit || tries[0]).sort((a, b) => a.x - b.x);
+    const out = (hit || tries[0]).sort((a, b) => a.x - b.x);
+    // how many digits the picture really shows: the number's chain of pieces from the
+    // left - a piece joins when it sits tight to the one before (<= 4 px gap), is digit-
+    // wide (<= 10 px) and digit-tall (0.8-1.25 x the chain's height). Item art next to a
+    // short number sits further off or is wider/taller; a digit the reader dropped (the
+    // thin 1 of "61", the 3 of "13") sits right against the others. Measured on the
+    // captures we hold: every "extra digit" this finds on a sure read is a slot the other
+    // resolution's capture reads with that digit.
+    out.tall = chainLength(tries[0], ms);
+    return out;
+  }
+  function chainLength(pieces, S) {
+    const top = Math.max(0, ...pieces.map((c) => c.mask.h));
+    const list = pieces.filter((c) => c.mask.h >= top * 0.7).sort((a, b) => a.x - b.x);
+    if (!list.length) return 0;
+    const chain = [list[0]];
+    for (let i = 1; i < list.length; i++) {
+      const prev = chain[chain.length - 1], c = list[i];
+      const gap = c.x - (prev.x + prev.mask.w);
+      const hs = chain.map((p) => p.mask.h).sort((a, b) => a - b), h = hs[hs.length >> 1];
+      if (gap <= 4 * S && c.mask.w <= 10 * S && c.mask.h >= 0.8 * h && c.mask.h <= 1.25 * h) chain.push(c);
+      else break;
+    }
+    return chain.length;
   }
   function teachCut(ch, pos, P, bank, value, fixedFloor) {
     let floors;
@@ -228,11 +251,23 @@
       const { binarized } = DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Object.assign({}, P, { floor }), ch.cellScale);
       const comps = segmentDigits(binarized, P.matchScale > 1 ? P.matchScale : 1, value.length);
       const r = { floor, binarized, comps, liveFloor, tried: floors.indexOf(floor) + 1 };
+      // the picture the reader uses shows MORE digit-tall pieces than digits typed: do not
+      // go looking for a floor where the extra one vanishes - reported: "61" read as "6"
+      // at 90 %, and a higher floor that loses the thin 1 would have taught it as a 6
+      if (!first && comps.tall > value.length) return Object.assign(r, { more: true });
       if (comps.length === value.length) return r;
       if (!first) first = r;
     }
     return first;
   }
 
-  return { EXTREME_SCALE, MARGIN, teachCut, segmentDigits, cropAroundSlot, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
+  // digits the picture shows at a read's floor (the chain above) - a read shorter than
+  // this likely dropped one (reported: "61" read as "6" at 90 %)
+  function digitsInPicture(ch, pos, P, floor) {
+    const { binarized } = DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Object.assign({}, P, { floor }), ch.cellScale);
+    const S = P.matchScale > 1 ? P.matchScale : 1;
+    return chainLength(DR.components(binarized, S), S);
+  }
+
+  return { EXTREME_SCALE, MARGIN, teachCut, segmentDigits, digitsInPicture, cropAroundSlot, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
 });

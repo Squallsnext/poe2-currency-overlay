@@ -81,8 +81,13 @@ function readOneSlot(s, c) {
   const Ps = RP.slotParams(c.map, c.scale, ov);
   const ms = RP.effectiveMatchScale(ch, Ps);
   const bk = c.bankFor(ms);
-  const r = RP.readSlot(ch, pos, bk.bank, RP.paramsAtScale(Ps, ms), ov && ov.floor != null ? ov.floor : null);
+  const Pm = RP.paramsAtScale(Ps, ms);
+  const r = RP.readSlot(ch, pos, bk.bank, Pm, ov && ov.floor != null ? ov.floor : null);
   const raw = r.text === '?' ? '?' : bk.unmap(r.text); // alt keys back to digits
+  // more digits in the picture than read: flagged, so the check asks about it whatever
+  // the percentage (a dropped thin 1 still scores 90 % on the digits it did read)
+  let short = null;
+  if (raw !== '?') { const n = RP.digitsInPicture(ch, pos, Pm, r.floor); if (n > raw.length) short = n; }
   // pass the measured reliability of this slot through, so the UI can flag the
   // rows our own testing says to distrust rather than showing them all alike
   const rel = (c.map.SLOT_RELIABILITY && c.map.SLOT_RELIABILITY[s.apiId]) || null;
@@ -91,7 +96,7 @@ function readOneSlot(s, c) {
   const glyphs = (r.glyphs || []).map((g) => ({
     ch: bk.unmap(g.ch), source: bk.sourceOf(g.ch), score: g.score, gapFilled: g.gapFilled,
   }));
-  return { apiId: s.apiId, priceAs: s.priceAs || null, suffix: s.suffix || null, count: raw === '?' ? null : parseInt(raw, 10), conf: raw === '?' ? null : r.conf, rel, glyphs };
+  return { apiId: s.apiId, priceAs: s.priceAs || null, suffix: s.suffix || null, count: raw === '?' ? null : parseInt(raw, 10), conf: raw === '?' ? null : r.conf, short, rel, glyphs };
 }
 const makeBankFor = (learnedTemplates) => {
   const cache = new Map();

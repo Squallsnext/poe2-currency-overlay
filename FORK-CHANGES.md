@@ -1117,6 +1117,37 @@ on a 4-core test box (2 helper threads); a 6-helper machine is roughly three tim
 faster. Browser-tested: confirm -> green, same count rescanned -> no question, tune
 progress / result / undo.
 
+### 4.21 Guards against teaching a wrong count
+
+Reported: a count read as "6" at 90 % was really "61" - the thin 1 lost - and the player
+only noticed right before pressing learn. Three guards, all measured on the captures we
+hold (1080p, 1440p, 5K; reads at 85 %+):
+
+- **At the scan: a digit the reader dropped.** `RP.digitsInPicture` counts the number's
+  chain of pieces in the black/white picture at the read's own floor: from the left, a
+  piece joins when it sits tight to the one before (<= 4 px), is digit-wide (<= 10 px)
+  and digit-tall (0.8-1.25 x). Item art beside a short number sits further off or is
+  wider/taller. More pieces than digits read -> the read carries `short` and counts as
+  unsure whatever its percentage ("Careful: the picture shows 2 digits, 6 was read").
+  Every count and percentage stayed identical (1706 reads); the flags found e.g.
+  whetstone "1" at 100 % where the other resolution reads 138, chaos 111 vs 1193,
+  artificer's 12 at 95 % vs 123, and the ritual omens "1" vs 13 - about 45 flags, 2-3 of
+  them doubtful (a crest read 4 at both resolutions).
+- **At teaching: more digits than typed.** When that picture shows more digits than the
+  value being taught, teaching stops (`more-digits`) instead of searching for a floor
+  where the extra one vanishes (which the floor search of 4.19 would otherwise find).
+- **At teaching: a digit that looks like another.** Each glyph is compared with the
+  SHIPPED digits only (`renderer/stash/learned-audit.js`, independent of anything
+  learned): another digit fitting clearly better (+0.08 and 0.6+) stops it
+  (`looks-like`, "digit 2 clearly looks like a 4 (74 %), not a 1 (66 %)"). No false
+  alarm on any sure read. Both stops un-confirm the count and show why; a second press
+  insists (`force`).
+- **"Check learned digits"** (settings) runs the same comparison over every learned
+  exemplar and removes the suspicious ones on request. On the player's learned file
+  (117 digits): one "1" that is plainly a 4.
+
+Auto-tune (4.20) no longer measures against reads flagged `short`.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

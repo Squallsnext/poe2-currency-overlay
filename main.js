@@ -2418,6 +2418,45 @@ function findTabSlot(apiId, tab) {
   }
   return null;
 }
+// each touched digit's representative, the same way extractTemplates picks one: the
+// median-ink exemplar, so one odd/noisy correction can't dominate the template
+function recomputeLearnedTemplates(learned, digits) {
+  learned.templates = learned.templates || {};
+  for (const ch of new Set(digits)) {
+    const glyphs = (learned.exemplars && learned.exemplars[ch]) || [];
+    if (!glyphs.length) { delete learned.templates[ch]; continue; }
+    const inks = glyphs.map((g, i) => ({ ink: g.data.reduce((a, b) => a + b, 0), i }));
+    inks.sort((a, b) => (a.ink - b.ink) || (a.i - b.i));
+    learned.templates[ch] = glyphs[inks[Math.floor(glyphs.length / 2)].i];
+  }
+}
+// "Gelernte Ziffern prüfen": every learned digit against the shipped ones
+// (learned-audit.js); apply = remove the suspicious ones
+ipcMain.handle('stash-audit-learned', (_e, { apply } = {}) => {
+  try {
+    const LA = require('./renderer/stash/learned-audit.js');
+    const RAW = require('./renderer/stash/digit-templates.json');
+    const learned = loadLearnedTemplates();
+    const r = LA.audit(learned, RAW);
+    if (apply && r.bad.length) {
+      const bySet = new Map();
+      for (const b of r.bad) {
+        const set = b.ms > 1 ? learned.byScale[b.ms] : learned;
+        if (!bySet.has(set)) bySet.set(set, []);
+        bySet.get(set).push(b);
+      }
+      for (const [set, list] of bySet) {
+        list.sort((a, b) => b.index - a.index); // from the back, so indices stay valid
+        for (const b of list) set.exemplars[b.digit].splice(b.index, 1);
+        recomputeLearnedTemplates(set, list.map((b) => b.digit));
+      }
+      saveLearnedTemplates(learned);
+      logToggle('stash-learn', `audit: removed ${r.bad.length} of ${r.checked} learned digit(s): ` + r.bad.map((b) => `${b.digit}~${b.other}`).join(' '));
+    }
+    return { ok: true, checked: r.checked, bad: r.bad, removed: apply ? r.bad.length : 0 };
+  } catch (err) { return { ok: false, error: String(err && err.message || err) }; }
+});
+
 ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings, tab } = {}) => {
   try {
     value = String(value == null ? '' : value).replace(/[^0-9]/g, '');
@@ -2449,9 +2488,27 @@ ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings, tab } = {}) =
     const bank = RP.buildBank(require('./renderer/stash/digit-templates.json'), learnedNow, ms).bank;
     const cutT = RP.teachCut(ch, pos, P, bank, value, ov && ov.floor != null ? ov.floor : null);
     const { binarized, comps } = cutT;
+    if (cutT.more && !(settings && settings.force)) {
+      logToggle('stash-learn', `skip "${value}" for ${apiId}: the picture shows ${comps.tall} digit(s), ${value.length} typed`);
+      return { ok: false, reason: 'more-digits', found: comps.tall, want: value.length };
+    }
     if (comps.length !== value.length) {
       logToggle('stash-learn', `skip "${value}" for ${apiId}: found ${comps.length} glyph(s), expected ${value.length} (${cutT.tried} floor(s) tried)`);
       return { ok: false, reason: 'segment-mismatch', found: comps.length, want: value.length };
+    }
+
+    // each glyph against the SHIPPED digits (learned-audit.js): one that clearly looks like
+    // another digit is not taught unless the player insists (a second press sends force)
+    if (!(settings && settings.force)) {
+      const LA = require('./renderer/stash/learned-audit.js');
+      const RAW = require('./renderer/stash/digit-templates.json');
+      for (let i = 0; i < comps.length; i++) {
+        const chk = LA.check(comps[i].mask, value[i], RAW, ms);
+        if (!chk.ok) {
+          logToggle('stash-learn', `skip "${value}" for ${apiId}: digit ${i + 1} looks like ${chk.other} (${chk.otherScore}) not ${value[i]} (${chk.own})`);
+          return { ok: false, reason: 'looks-like', pos: i + 1, want: value[i], other: chk.other, own: chk.own, otherScore: chk.otherScore };
+        }
+      }
     }
 
     const learnedAll = loadLearnedTemplates();
@@ -2490,15 +2547,7 @@ ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings, tab } = {}) =
       arr.push({ w: bw, h: bh, data: Array.from(mask) });
       if (arr.length > MAX_EXEMPLARS_PER_DIGIT) arr.shift(); // oldest out, so it keeps drifting with reality
     });
-    // recompute each touched digit's representative the same way extractTemplates does:
-    // the median-ink exemplar, so one odd/noisy correction can't dominate the template
-    learned.templates = learned.templates || {};
-    for (const ch of new Set(value.split(''))) {
-      const glyphs = learned.exemplars[ch];
-      const inks = glyphs.map((g, i) => ({ ink: g.data.reduce((a, b) => a + b, 0), i }));
-      inks.sort((a, b) => (a.ink - b.ink) || (a.i - b.i));
-      learned.templates[ch] = glyphs[inks[Math.floor(glyphs.length / 2)].i];
-    }
+    recomputeLearnedTemplates(learned, value.split(''));
     saveLearnedTemplates(learnedAll);
     logToggle('stash-learn', `taught "${value}" for ${apiId} (${tab}) at x${ms}, floor ${cutT.floor}${cutT.liveFloor != null && cutT.floor !== cutT.liveFloor ? ' (live ' + cutT.liveFloor + ')' : ''} - ${comps.length} glyph(s), ${Object.keys(learned.templates).length} digit(s) known`);
     return { ok: true, digits: comps.length, floor: cutT.floor };
@@ -2855,7 +2904,7 @@ ipcMain.handle('stash-autotune', async (_e, { tab } = {}) => {
       const r = cap.res.reads[i] || {};
       const c = confirmed[s.apiId];
       if (c > 0) truth.push({ i, apiId: s.apiId, value: c, confirmed: true });
-      else if (r.count > 0 && r.conf >= TUNE_SURE) truth.push({ i, apiId: s.apiId, value: r.count });
+      else if (r.count > 0 && r.conf >= TUNE_SURE && !r.short) truth.push({ i, apiId: s.apiId, value: r.count }); // not one missing a digit
     });
     const nConfirmed = truth.filter((x) => x.confirmed).length;
     if (truth.length < 3) return { ok: false, reason: 'few-truth', n: truth.length };
@@ -2967,7 +3016,7 @@ async function stashResultWithPrices(res, W, H) {
     }
     const valueEx = price != null ? r.count * price : null;
     if (valueEx != null) total += valueEx;
-    lines.push({ apiId: r.apiId, priceId, name, suffix, icon, count: r.count, price, est, valueEx, slot: i, conf: typeof r.conf === 'number' ? r.conf : null, rel: r.rel || null });
+    lines.push({ apiId: r.apiId, priceId, name, suffix, icon, count: r.count, price, est, valueEx, slot: i, conf: typeof r.conf === 'number' ? r.conf : null, short: r.short || null, rel: r.rel || null });
   });
   lines.sort((a, b) => (b.valueEx || 0) - (a.valueEx || 0));
   return {

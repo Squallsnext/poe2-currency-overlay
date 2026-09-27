@@ -192,6 +192,14 @@ sich das Programm: *in diesem Feld steht diese Zahl*. Liest der nächste Scan do
 Zahl, wird **nicht mehr gefragt** – egal ob 78 % oder 88 %. Die Prozentzahl steht dann grün
 mit ✓. Erst wenn sich die Zahl ändert, wird wieder geprüft.
 
+**Verschluckte Ziffer:** Sieht das Programm im Bild mehr Ziffern, als es gelesen hat
+(„61“ gelesen als „6“), fragt es nach – auch bei 90 %: „Achtung: Im Bild stehen 2 Ziffern,
+gelesen wurde 6“. Beim Lernen passt es doppelt auf: Stehen im Bild mehr Ziffern als du
+sagst, oder sieht eine Ziffer klar wie eine andere aus, lernt es **nicht** und sagt dir
+warum. Stimmt es trotzdem: nochmal drücken. **Einstellungen → „Gelernte Ziffern prüfen“**
+vergleicht alle schon gelernten Ziffern mit den mitgelieferten und zeigt verdächtige (z. B.
+eine als „1“ gelernte 4) zum Entfernen.
+
 **Automatisch einstellen** (⚙ am Fach oder in der Prüf-Leiste): Das Programm dreht die
 Regler selbst – so wie du: Sättigung hoch, Farb-Grenze runter, Kontrast hoch, Flecken weg,
 dann Helligkeit, Bild-Kontrast, floor. Gemessen wird an den Zahlen, die sicher stimmen
