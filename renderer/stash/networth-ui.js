@@ -630,7 +630,8 @@
             const ds = []; for (let d = 0; d <= 9; d++) if (r.digits[d] && r.digits[d].n && !clashOf(d).length) ds.push(d);
             const res = await window.api.stashGalleryApprove(ds).catch(() => null);
             for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
-            await show();
+            // approved: the gallery folds up, the result stays (reported: it stayed open)
+            out.innerHTML = '';
             out.appendChild(el('div', 'nw-gal-head', esc(res && res.ok ? t('networth.gallery.approved', { list: res.approved.join(' ') }) : t('networth.audit.failed'))));
             render();
           });

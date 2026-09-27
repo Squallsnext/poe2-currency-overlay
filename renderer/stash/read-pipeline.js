@@ -137,6 +137,7 @@
   // currency tuned to > 80 %, then ritual taught, and currency dropped again; abyss
   // added, everything ~70 %). Sets without exemplars keep their single template.
   const LEARNED_GROUPS = 4;
+  const INDIVIDUAL_MAX = 8;
   function learnedVariants(set, source) {
     if (!set) return [];
     const ex = set.exemplars || {};
@@ -148,6 +149,18 @@
     const out = set.templates && Object.keys(set.templates).length ? [{ source: source + '#all', templates: set.templates }] : [];
     const base = out.length;
     for (const d of Object.keys(ex)) {
+      // few exemplars (the digit gallery's approved ones): every one is its own template -
+      // a thin 1 at 5K is ~4 px wide, half a pixel of shift turns a whole edge column, so
+      // one representative per size fits no single 1 exactly (reported: a clean 1 at 80 %,
+      // one red column along the template). Up to INDIVIDUAL_MAX, within the stand-in
+      // characters the bank has (digit-reader.js ALT_POOL, 104 beyond the shipped).
+      if ((ex[d] || []).length <= INDIVIDUAL_MAX) {
+        ex[d].forEach((g, i) => {
+          out[base + i] = out[base + i] || { source: source + '#' + i, templates: {} };
+          out[base + i].templates[d] = g;
+        });
+        continue;
+      }
       const groups = new Map();
       for (const g of ex[d] || []) { const k = g.w + 'x' + g.h; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(g); }
       [...groups.values()].sort((a, b) => b.length - a.length).slice(0, LEARNED_GROUPS).forEach((list, i) => {

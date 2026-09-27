@@ -2578,7 +2578,7 @@ ipcMain.handle('stash-gallery-approve', (_e, { digits, drop } = {}) => {
       const info = galleryView().digits[d];
       const list = set[d] || [];
       if (!info || !info.n || !info.order) continue;
-      target.exemplars[d] = info.order.slice(0, 5).map((i) => ({ w: list[i].w, h: list[i].h, data: Array.from(Buffer.from(list[i].b, 'base64')) }));
+      target.exemplars[d] = info.order.slice(0, 8).map((i) => ({ w: list[i].w, h: list[i].h, data: Array.from(Buffer.from(list[i].b, 'base64')) })); // each its own template (RP learnedVariants)
       done.push(String(d));
     }
     recomputeLearnedTemplates(target, done);

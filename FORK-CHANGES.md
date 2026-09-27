@@ -1349,6 +1349,18 @@ confirmed, 37 pictures kept): with every learned digit deliberately swapped for 
 37 of 38 reads came back wrong without the memory, 1 with it (the slot whose picture
 could not be kept); a capture with different counts: no memory hit at all.
 
+### 4.31 Every approved digit its own template; the gallery folds up after approving
+
+Reported: after approving the gallery a clean "1" read at 80 %, picture 5 one red column
+along the template. A 1 at 5K is ~4 px wide; half a pixel of shift turns a whole edge
+column, and learned digits were bundled into one representative per size group - a
+single 1 that fits no particular 1 exactly. Now a digit with up to 8 exemplars uses every
+one as its own template (`INDIVIDUAL_MAX`, within the bank's 104 free stand-in
+characters); more than 8 keep the size groups. The gallery approves the best 8 (was 5).
+Measured on the player's 5K currency capture from a clean start: 92.1 -> 96.0 % mean,
+counts under 85 % 6 -> 3 (same capture the gallery came from); their old learned set
+88.6 -> 88.7 %. After "Approve" the gallery folds up and the result line stays.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
