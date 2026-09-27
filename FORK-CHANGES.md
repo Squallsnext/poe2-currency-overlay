@@ -1209,6 +1209,20 @@ clean 5K glyph can never agree fully with them.
   second start, and saturation 100/200, brightness up to +20, contrast up to 145 and
   floor 60 as stops.
 
+### 4.24 The player's "Jawbone" setting is the 5K default
+
+Reported after testing it across the hard backgrounds (annulment, fracturing orb,
+armourer's scrap, essences): saturation 100 %, brightness +20, picture contrast 90 %,
+colour limit 5, contrast 145, floor 60, specks under 12 px is the best everywhere, and on
+a perfect essence it turned a read "3" into the real "13". It is now the 'hi' (4K/5K)
+fallback in slot-defaults.js (`FILTERS.hi['*']['*']`) for every tab and slot without its
+own shipped entry; the shipped per-slot entries (currency, runes) and the player's own
+saved settings still win. Measured on the player's real 5K currency capture with their
+learned digits, applied to every slot: mean 78.1 -> 80.8 %, unsure 25 -> 23, dropped
+digits back (1 -> 51, 1 -> 15, 18 -> 185). 1080p/1440p unchanged (to be tested with
+smaller digits). The OCR panel's "Standard" button now sets exactly these shipped values
+for the slot instead of the reader's bare defaults.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

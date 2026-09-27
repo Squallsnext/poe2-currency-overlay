@@ -2733,7 +2733,11 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
         return { total: Object.keys(bankInfo.bank).length, learned: perDigit };
       })(),
       // what "automatic" means for each slider, for the panel's "Standard" button
-      defaults: { matchScale: config.stashHiRes ? 2 : 1, localThr: 0, satPct: 100, bright: 0, gain: 100, desatSat: DR.DESAT_SAT, contrast: 0, minBlob: DR.DEFAULTS.minBlob },
+      // "Standard" = what this slot reads with when nothing is saved: the reader's own
+      // defaults under the shipped per-resolution filters (at 5K the player's
+      // "Kieferknochen" setting, slot-defaults.js)
+      defaults: Object.assign({ matchScale: config.stashHiRes ? 2 : 1, localThr: 0, satPct: 100, bright: 0, gain: 100, desatSat: DR.DESAT_SAT, contrast: 0, minBlob: DR.DEFAULTS.minBlob },
+        require('./renderer/stash/slot-defaults.js').filtersFor(cap.box && cap.box.h / refBox.h, tab, apiId) || {}),
     };
   } catch (err) {
     return { ok: false, reason: 'error', error: String(err && err.message || err) };

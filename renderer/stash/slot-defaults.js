@@ -18,8 +18,17 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else (root.Stash = root.Stash || {}).slotDefaults = api;
 })(typeof self !== 'undefined' ? self : this, function () {
+  // 'hi' fallback for every tab and slot without its own entry below: the player's
+  // "Kieferknochen" setting, found by hand on the Abyss tab and then tested across the
+  // hard backgrounds (annulment, fracturing orb, armourer's scrap, essences - reported:
+  // "egal wo ich sie teste ... am besten", and on a perfect essence it turned a read "3"
+  // into the real "13"). Measured on the player's real 5K currency capture with their
+  // learned digits: mean 78.1 -> 80.8 %, and dropped digits come back (1 -> 51, 1 -> 15,
+  // 18 -> 185). The player's own saved settings still win value by value.
+  const HI_DEFAULT = { satPct: 100, bright: 20, gain: 90, desatSat: 5, contrast: 145, floor: 60, minBlob: 12, localThr: 0 };
   const FILTERS = {
     hi: {
+      '*': { '*': HI_DEFAULT },
       "currency": {
         "transmute": {"floor": 75, "desatSat": 40, "contrast": 0, "minBlob": 5, "bright": -25, "gain": 100, "satPct": 100, "localThr": 0},
         "greater-orb-of-transmutation": {"floor": 75, "desatSat": 40, "contrast": 0, "minBlob": 5, "bright": -25, "gain": 100, "satPct": 100, "localThr": 0},
@@ -316,7 +325,8 @@
   function filtersFor(scale, tab, apiId) {
     const c = classOf(scale);
     const t = c && FILTERS[c][tab];
-    return (t && (t[apiId] || t['*'])) || null;
+    const any = c && FILTERS[c]['*'];
+    return (t && (t[apiId] || t['*'])) || (any && any['*']) || null;
   }
   // the player's own override with the shipped filters under it (theirs win per value)
   function withDefaults(ov, scale, tab, apiId) {
