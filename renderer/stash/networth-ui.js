@@ -564,7 +564,20 @@
       if (ln.icon) { const img = el('img', 'nw-ic'); img.src = ln.icon; img.onerror = () => img.remove(); line.appendChild(img); }
       else line.appendChild(el('div', 'nw-ic nw-ic-none'));
       line.appendChild(el('div', 'nw-name', esc(window.gameName(ln.name) + (ln.suffix || '')))); // feed is English; show the client's own name (+ "#2" for an extra slot of the same currency)
-      if (sg) { const tag = el('span', 'nw-skip-tag', '⊘ ' + esc(sg.name)); tag.title = t('networth.skip.line_title', { name: sg.name }); line.appendChild(tag); }
+      const skipKey = ln.priceId || ln.apiId;
+      if (sg) {
+        // click the tag = take it back out of that list (counts again)
+        const tag = el('button', 'nw-skip-tag', '⊘ ' + esc(sg.name) + ' ✕');
+        tag.title = t('networth.skip.line_title', { name: sg.name }) + ' ' + t('networth.skip.quick_undo_title');
+        tag.onclick = (e) => { e.stopPropagation(); window.NwSkipGroups.removeFrom(sg, skipKey); render(); };
+        line.appendChild(tag);
+      } else if (window.NwSkipGroups && !ln.missing) {
+        // one click: leave this item out (skip-groups.js quickSkip)
+        const qb = el('button', 'nw-skip-quick', '⊘');
+        qb.title = t('networth.skip.quick_title');
+        qb.onclick = (e) => { e.stopPropagation(); window.NwSkipGroups.quickSkip(skipKey, qb, render); };
+        line.appendChild(qb);
+      }
       if (state.showConfidence && ln.conf != null) {
         const pct = Math.round(ln.conf * 100);
         const cl = pct >= 88 ? 'ok' : (pct >= 80 ? 'mid' : 'low');

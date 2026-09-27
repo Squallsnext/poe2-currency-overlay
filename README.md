@@ -35,26 +35,65 @@ Windows, built with Electron. It reads public data only — no game memory hooks
 
 ## What this fork adds
 
-Built and tested by one player (German client, 5K / 1440p / 1080p, DualSense controller).
-Full change log with the reasons and measurements: [FORK-CHANGES.md](FORK-CHANGES.md).
-German step-by-step guide: [ANLEITUNG.md](ANLEITUNG.md).
+Built and tested by one player: German client; 1080p, 1440p and 5K; DualSense and keyboard.
+Everything runs on a key press of the player; nothing sends input to the game.
+Reasons and measurements for every change: [FORK-CHANGES.md](FORK-CHANGES.md).
+German guide: [ANLEITUNG.md](ANLEITUNG.md).
 
-- **German client fixes** – price checks for rare tablets, uniques, exceptional items and
-  renamed runes work from a German client.
-- **Controller support (DualSense, USB)** – every hotkey action can be bound to a button
-  or a combo (e.g. PS + L2, the mic mute button too); "open overlay in front".
-- **Net Worth (stash) reader, reworked**
-  - automatic calibration from the currency tab's cells (keyboard or controller UI, any
-    position, 1080p to 5K), with a test read right after;
-  - tab tour ("scan tabs") with the scan key, boxes placed onto the cells automatically;
-  - align tool (drag, mark, row/column, snap to frame, place by rule, undo, help);
-  - OCR debug panel with per-slot filters, live preview, teaching digits, and a guide;
-  - read filters shipped per resolution (1080p, 1440p, 4K/5K); faster 5K scans;
-  - own prices per item, "don't count" lists, reset with backup, support pictures and
-    settings export.
-- **Currency tab** – rate editor ("fix rate") in the arbitrage tooltip, every way to get
-  the base currency, optional vendor splits, a pinned route window that stays up.
-- **Recipes tab** – combine / split recipes with profit per round, pinnable.
+Each area lives mostly in its own files (see "Where things live" in FORK-CHANGES.md), so
+it can be taken on its own.
+
+### Net Worth – a stash reader that sets itself up
+
+- **Finds the stash by itself.** One click on *Calibrate* with the currency tab open:
+  keyboard or controller UI, wherever the stash sits, 1080p to 5K. Dragging a rough box by
+  hand is only the fallback.
+- **Guided setup.** Progress on screen, a test read, then "scan the other tabs?". The tab
+  tour names the tab to open; the scan key (or a controller button) takes its picture.
+- **Box templates per tab, placed automatically.** Every tab map carries measured cell
+  corners; the read boxes are set onto each cell's inner frame by a fixed rule. The align
+  tool adjusts anything by hand (drag, lasso, row/column, snap to frame, undo, help).
+- **See what the reader sees.** The OCR debug panel shows original · reader input ·
+  black/white for one slot, with adjustable filters (colour limit, specks, brightness,
+  contrast, local threshold), a live "would read", copy/paste and apply-to-tab, and a
+  folded guide.
+- **Self-learning.** Confirm a right count with ✓ or type the right number: the reader
+  learns those digits (per glyph size, so tabs and resolutions do not push each other
+  out). Correcting a count teaches it too.
+- **Reliable at every size.** Read filters shipped for 1080p, 1440p and 4K/5K; a
+  high-resolution switch for 4K/5K; a 5K scan takes about 4 s instead of 17 s.
+- **"Don't count" lists.** Leave items out of the total (e.g. lesser runes); switch a list
+  on or off at the top. ⊘ on a line puts the item into a list with one click.
+- **Prices you can check.** Own price per item; implausible thin-market prices replaced by
+  GGG's exchange rate, poe.ninja as a second opinion, all sources on hover.
+- "Wrong tab?" correction, the list kept across restarts, reset with backup, support
+  pictures and settings export.
+
+### Currency tab
+
+- **Fix a rate** in the arbitrage tooltip, typed the way the game shows it ("22.5 : 1");
+  kept across restarts. The pinned tooltip no longer closes while typing (bug fix).
+- **Every way to get the base currency**, cheapest first, with cost per unit and a plain
+  "why".
+- **Vendor splits in the arbitrage loop** (a Greater orb into 3 normal ones at a vendor),
+  switchable, off by default.
+- **📌 Pin a route**: its own small window that stays open when the overlay closes.
+
+### Recipes tab (new)
+
+Is it worth buying parts, combining them (or splitting at a vendor) and selling? Profit
+per round, gold fee, number of rounds, rates shared with the currency tab, pinnable. The
+tab can be hidden.
+
+### Controller (DualSense, USB)
+
+Every hotkey action on a button or a combo (PS + L2, the mic mute button too): price
+check of the hovered item, stash scan, reprice read, chat commands, "open overlay in
+front".
+
+### German client
+
+Price checks for rare tablets, uniques, exceptional items and the renamed runes.
 
 ## Net Worth (stash) – setting it up
 
@@ -100,11 +139,11 @@ npm start
 
 ## Data sources
 
-Currency rates come from GGG's official Currency Exchange data (real executed trades), topped with the live trade-site order book for the pairs on screen. Item price checks search the official trade site. [poe2scout.com](https://poe2scout.com) supplies item icons, price history, and fallback rates.
+Currency rates come from GGG's official Currency Exchange data (real executed trades), topped with the live trade-site order book for the pairs on screen. Item price checks search the official trade site. [poe2scout.com](https://poe2scout.com) supplies item icons, price history, and fallback rates. Net Worth also compares against [poe.ninja](https://poe.ninja) (read-only, public price data; can be switched off in the config with `"ninjaCheck": false`).
 
 ## Privacy & data
 
-No analytics, no telemetry, no usage tracking, no background phone-home. The app runs on your PC and only reaches the internet to fetch currency prices (poe2scout), run price checks against the official trade site using your own pathofexile.com login (which stays on your PC and is never sent to us), check for updates (GitHub), and send a Bug or Feedback report when you submit the in-app form. The only data we receive is the reports you choose to send. Full detail: [PRIVACY.md](PRIVACY.md).
+No analytics, no telemetry, no usage tracking, no background phone-home. The app runs on your PC and only reaches the internet to fetch currency prices (poe2scout, poe.ninja), run price checks against the official trade site using your own pathofexile.com login (which stays on your PC and is never sent to us), check for updates (GitHub), and send a Bug or Feedback report when you submit the in-app form. The only data we receive is the reports you choose to send. Full detail: [PRIVACY.md](PRIVACY.md).
 
 ## Credits
 

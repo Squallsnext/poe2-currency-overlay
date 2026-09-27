@@ -1982,7 +1982,16 @@ footer {
 .nw-skip-chips-lab { font-size: 11px; color: var(--tx-faint); }
 .nw-skip-chip { font-size: 11px; padding: 3px 9px; border-radius: 12px; border: 1px solid var(--in-bd); background: var(--in-bg); color: var(--tx-body); cursor: pointer; }
 .nw-skip-chip-on { border-color: var(--am); color: var(--am-hi); }
-.nw-skip-tag { font-size: 10.5px; color: var(--am-hi); margin-left: 6px; white-space: nowrap; }
+.nw-skip-tag { font-size: 10.5px; color: var(--am-hi); margin-left: 6px; white-space: nowrap; background: transparent; border: none; padding: 0; cursor: pointer; }
+.nw-skip-tag:hover { text-decoration: line-through; }
+/* one-click "leave out": faint until the line is hovered, so the list stays calm */
+.nw-skip-quick { background: transparent; border: none; color: var(--tx-faint); cursor: pointer; font-size: 12px; padding: 0 3px; margin-left: 4px; line-height: 1; opacity: 0; flex: 0 0 auto; }
+.nw-line:hover .nw-skip-quick, .nw-skip-quick:focus { opacity: 1; }
+.nw-skip-quick:hover { color: var(--am-hi); }
+.nw-skip-menu { position: fixed; z-index: 1000; min-width: 180px; max-width: 226px; background: var(--s-card); border: 1px solid var(--am); border-radius: 6px; padding: 4px; box-shadow: 0 4px 14px rgba(0,0,0,.45); display: flex; flex-direction: column; gap: 2px; }
+.nw-skip-menu-head { font-size: 10.5px; color: var(--tx-faint); padding: 2px 6px 4px; }
+.nw-skip-menu-item { text-align: left; background: transparent; border: none; color: var(--tx-body); font-size: 12px; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
+.nw-skip-menu-item:hover { background: var(--in-bd); color: var(--tx-hi); }
 
 /* ---------- Recipes tab (recipes/recipes-tab.js) ---------- */
 #recipes-root { overflow-y: auto; }

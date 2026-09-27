@@ -9,6 +9,50 @@ mit DualSense-Controller und mit Maus/Tastatur.
 
 ---
 
+## Was dieser Fork kann – auf einen Blick
+
+Alles läuft nur auf deinen Tastendruck; das Programm steuert das Spiel nie.
+
+**Vermögen (Stash lesen) – richtet sich selbst ein**
+- **Findet den Stash selbst**: ein Klick auf „Kalibrieren“ bei offenem Währungs-Fach –
+  Controller- oder Tastatur-Ansicht, egal wo, 1080p bis 5K. Rahmen von Hand ziehen nur
+  als Notlösung.
+- **Führung durch die Einrichtung**: Meldungen, Testlesung, dann „andere Fächer scannen?“.
+  Die Fächer-Tour sagt, welches Fach dran ist; die Scan-Taste (auch am Controller) nimmt
+  das Bild.
+- **Vorlagen für jedes Fach, automatisch ausgerichtet**: die Kästchen springen von selbst
+  auf die Zellen; mit „Ausrichten“ jederzeit von Hand anpassbar.
+- **Sehen, was der Leser sieht**: der Debug-Modus zeigt Original · Leser-Bild ·
+  Schwarz/Weiß und hat einstellbare Filter – so sieht man, warum eine Zahl falsch
+  gelesen wird, und behebt es (Anleitung in 3.3).
+- **Lernt selbst dazu**: richtige Zahl mit ✓ bestätigen oder die richtige eintragen – der
+  Leser lernt die Ziffern.
+- **Zuverlässig in jeder Auflösung**: Filter für 1080p, 1440p und 4K/5K eingebaut,
+  Schalter für hohe Auflösung (4K/5K), 5K-Scan in etwa 4 statt 17 Sekunden.
+- **„Nicht mitzählen“-Listen**: Items aus der Summe nehmen, oben an-/ausschalten; mit ⊘
+  in der Zeile per Klick.
+- **Preise mit Gegenprüfung**: eigener Preis pro Item; unplausible Preise werden durch den
+  Kurs von GGGs Währungsmarkt ersetzt, poe.ninja als zweite Meinung.
+
+**Währung**
+- **Kurs fixieren** so, wie das Spiel ihn zeigt; das angepinnte Fenster geht beim
+  Tippen nicht mehr zu (Fehler behoben).
+- **Alle Wege zur Basiswährung**, günstigster zuerst, mit „Warum“.
+- **Entzaubern/Aufteilen beim Händler im Arbitrage-Kreislauf** (Große → 3 normale),
+  an- und ausschaltbar.
+- **📌 Anpinnen** als eigenes Fenster, bleibt offen, wenn das Overlay zu ist.
+
+**Rezepte** (neuer Reiter): lohnt sich Kaufen, Kombinieren und Verkaufen? Gewinn pro
+Runde, Gold, Anpinnen.
+
+**Controller**: jede Hotkey-Aktion auf eine Taste oder Kombination – Preis prüfen,
+Stash scannen, Overlay im Vordergrund usw.
+
+**Deutscher Client**: Preisabfragen für Tafeln, Unikate, Außergewöhnliche Items und
+umbenannte Runen.
+
+---
+
 ## 1. Deutscher Client
 
 Preisabfragen funktionieren jetzt auch für Dinge, die vorher am deutschen Namen
@@ -101,6 +145,10 @@ Einstellungen haben immer Vorrang.
   eigener Preis gewinnt immer.
 - **„Nicht mitzählen“**: Listen von Items, die nicht in die Summe sollen (z. B. „Kleine
   & normale Runen“), oben im Vermögen an- und ausschaltbar.
+  **Mit einem Klick**: in der Zeile auf **⊘** (erscheint beim Drüberfahren) – das Item
+  kommt in die Liste „Aussortiert“ (wird beim ersten Mal angelegt und ist an). Gibt es
+  mehrere Listen, fragt ein kleines Menü, in welche. Zurückholen: auf das **⊘ Name ✕**
+  in der Zeile klicken.
 - **Anzahl korrigieren**: auf die Anzahl klicken – eine echte Korrektur lehrt den Leser.
 - **„Falsches Fach?“**: wenn ein Fach als ein anderes erkannt wurde – das Programm merkt
   sich das für deinen Bildschirm.

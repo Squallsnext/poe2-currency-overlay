@@ -7,6 +7,7 @@ The POE2 Currency Overlay runs on your PC. It has **no analytics, no telemetry, 
 ## Where the app connects
 
 - **poe2scout.com** - live currency rates and item icons and price history. Ordinary web requests (poe2scout sees your IP, as any website does).
+- **poe.ninja** - public price overviews per league, fetched by Net Worth as a second price check (at most every 15 minutes). The request carries only the league name and item category, never your items or counts. Ordinary web requests (poe.ninja sees your IP). Off with `"ninjaCheck": false` in the config.
 - **Path of Exile official trade site (pathofexile.com)** - price checks and the currency exchange. These use your own pathofexile.com login, which is stored on your PC and used to talk to GGG directly. We never see your login, your searches, or your items.
 - **GitHub** - checking for app updates and fetching the currency feed file.
 - **Google (script.google.com)** - only when you submit the in-app Bug or Feedback form.

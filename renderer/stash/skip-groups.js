@@ -208,5 +208,49 @@
     return bar;
   }
 
-  window.NwSkipGroups = { skippedBy, renderSettingsSection, chips, onChange: (f) => listeners.add(f) };
+  // ---- one click from a Net Worth line: "leave this out" ----
+  // Reported: building a list in the settings first is a detour when a scan shows one
+  // thing that plainly should not count. The ⊘ on the line puts it into a list right there:
+  // - no list yet: one is made ("Aussortiert", switched on) and the item goes in - one click;
+  // - exactly one list that is on: straight in - one click;
+  // - otherwise a small menu picks the list (an off list says so: the item would still count).
+  // Clicking the ⊘ tag of a line already left out takes it back out of that list.
+  const DEFAULT_NAME = () => t('networth.skip.quick_list_name');
+  function addTo(g, id) { if (!g.items.includes(id)) g.items.push(id); changed(true); }
+  function removeFrom(g, id) { g.items = g.items.filter((x) => x !== id); changed(true); }
+  function closeMenu() { const m = document.querySelector('.nw-skip-menu'); if (m) m.remove(); document.removeEventListener('mousedown', outside, true); }
+  function outside(e) { const m = document.querySelector('.nw-skip-menu'); if (m && !m.contains(e.target)) closeMenu(); }
+  function quickSkip(id, anchor, done) {
+    closeMenu();
+    const on = groups.filter((g) => g.on);
+    if (!groups.length) {
+      const g = { id: newId(), name: DEFAULT_NAME(), on: true, items: [] };
+      groups.push(g); addTo(g, id); if (done) done(); return;
+    }
+    if (groups.length === 1 && on.length === 1) { addTo(on[0], id); if (done) done(); return; }
+    const menu = el('div', 'nw-skip-menu');
+    menu.appendChild(el('div', 'nw-skip-menu-head', t('networth.skip.quick_menu_head')));
+    const pick = (g) => { closeMenu(); addTo(g, id); if (done) done(); };
+    for (const g of groups) {
+      const b = el('button', 'nw-skip-menu-item', esc(g.name) + (g.on ? '' : ' <span class="set-sub">' + t('networth.skip.quick_off') + '</span>'));
+      b.onclick = (e) => { e.stopPropagation(); pick(g); };
+      menu.appendChild(b);
+    }
+    if (!groups.some((x) => x.name === DEFAULT_NAME())) {
+      const nb = el('button', 'nw-skip-menu-item', t('networth.skip.quick_new', { name: esc(DEFAULT_NAME()) }));
+      nb.onclick = (e) => {
+        e.stopPropagation();
+        const g = { id: newId(), name: DEFAULT_NAME(), on: true, items: [] };
+        groups.push(g); pick(g);
+      };
+      menu.appendChild(nb);
+    }
+    const r = anchor.getBoundingClientRect();
+    menu.style.left = Math.max(4, Math.min(r.left, window.innerWidth - 230)) + 'px';
+    menu.style.top = (r.bottom + 2) + 'px';
+    document.body.appendChild(menu);
+    setTimeout(() => document.addEventListener('mousedown', outside, true), 0);
+  }
+
+  window.NwSkipGroups = { skippedBy, renderSettingsSection, chips, quickSkip, removeFrom, onChange: (f) => listeners.add(f) };
 })();

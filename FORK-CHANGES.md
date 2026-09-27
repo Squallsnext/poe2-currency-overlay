@@ -784,6 +784,14 @@ Live check (Forbidden Rites): transmute 0.85 -> 0.34 (exchange), breach splinter
 (exchange; poe.ninja 3.69), alch 3.0 / chance 9.5 / greater transmutation 0.90 unchanged
 (sources within 1.5x).
 
+**"Leave out" with one click** (`skip-groups.js` `quickSkip`; asked for: building a list in
+the settings first is a detour when a scan shows one thing that plainly should not count).
+⊘ on a Net Worth line (shown on hover) puts the item into a "Nicht mitzählen" list right
+there: with no list yet, one named "Aussortiert" is made, switched on, and the item goes
+in; with exactly one list that is on, straight in; otherwise a small menu picks the list
+(an off list is marked "still counts"). The ⊘ tag of a line already left out takes it
+back out on a click. Same config as before (`stashSkipGroups`).
+
 ### 4.8 Setup-specific parts – already removed from this branch
 
 These existed in the player's own build and were **deliberately left out** here:
