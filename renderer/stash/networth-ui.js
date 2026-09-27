@@ -16,10 +16,16 @@
     }
     return name;
   };
-  const fmtEx = (n) => n == null ? t('networth.value.none') : Math.round(n).toLocaleString('en-US') + ' ' + unit(t('networth.unit.ex_label'), 'exalted');
-  const fmtDiv = (n) => n == null ? null : (n >= 100 ? Math.round(n) : n.toFixed(1)).toLocaleString('en-US') + ' ' + unit(t('networth.unit.div_label'), 'divine');
-  const fmtCount = (n) => Number(n).toLocaleString('en-US');
-  const fmtChaos = (n) => n == null ? null : (n >= 100 ? Math.round(n) : n.toFixed(1)).toLocaleString('en-US') + ' ' + unit(t('networth.unit.chaos_label'), 'chaos');
+  // Numbers the way the player's language writes them (asked for: German "1.596" and
+  // "3,0", not "1,596" and "3.0"). The UI language, not the OS: an English UI keeps
+  // English numbers. `dec` fixes the decimals, so 3.0 stays "3,0" and not "3".
+  const NUM_LOCALE = { de: 'de-DE', fr: 'fr-FR', es: 'es-ES', pt: 'pt-BR', ru: 'ru-RU' };
+  const numLoc = () => NUM_LOCALE[window.I18N && window.I18N.lang && window.I18N.lang()] || 'en-US';
+  const fmtNum = (n, dec) => Number(n).toLocaleString(numLoc(), { minimumFractionDigits: dec || 0, maximumFractionDigits: dec || 0 });
+  const fmtEx = (n) => n == null ? t('networth.value.none') : fmtNum(Math.round(n)) + ' ' + unit(t('networth.unit.ex_label'), 'exalted');
+  const fmtDiv = (n) => n == null ? null : fmtNum(n, n >= 100 ? 0 : 1) + ' ' + unit(t('networth.unit.div_label'), 'divine');
+  const fmtCount = (n) => fmtNum(n);
+  const fmtChaos = (n) => n == null ? null : fmtNum(n, n >= 100 ? 0 : 1) + ' ' + unit(t('networth.unit.chaos_label'), 'chaos');
   // A value in the currencies the player picked (Settings -> Net Worth: Ex / Div / Chaos,
   // any of them - asked for: "some want only Ex, or Chaos, I want all three"). The first
   // picked one is the main figure; a currency without a known rate is left out.
@@ -1101,7 +1107,7 @@
     if (est.uncertain) return '⚠ ';
     return est.src ? '≈ ' : '';
   }
-  const fmtUnit = (n) => (n >= 100 ? Math.round(n).toLocaleString('en-US') : n >= 10 ? n.toFixed(1) : n.toFixed(2)) + ' ' + t('networth.unit.ex_label');
+  const fmtUnit = (n) => fmtNum(n, n >= 100 ? 0 : n >= 10 ? 1 : 2) + ' ' + t('networth.unit.ex_label');
   function priceTitle(ln) {
     const est = ln.est, out = [];
     if (ln.price != null) out.push(t('networth.line.price_unit', { v: fmtUnit(ln.price) }));
@@ -1129,7 +1135,9 @@
     let done = false;
     const commit = async () => {
       if (done) return; done = true;
-      const txt = String(inp.value).trim().replace(',', '.');
+      // German input: "1.000,5" = 1000.5 (dots group thousands when a comma is there)
+      let txt = String(inp.value).trim();
+      txt = txt.includes(',') ? txt.replace(/\./g, '').replace(',', '.') : txt;
       const frac = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/.exec(txt);
       const v = frac ? (+frac[1]) / (+frac[2]) : (txt === '' ? null : parseFloat(txt));
       if (txt !== '' && !(v > 0 && Number.isFinite(v))) { render(); return; }
@@ -1689,7 +1697,7 @@
     gline.appendChild(el('span', 'nw-total-lab', t('networth.header.total_label')));
     gline.insertAdjacentHTML('beforeend', unitsHtml(rows ? gt.ex : null, gt.prices));
     if (rows && gt.mirrors != null) gline.appendChild(el('span', 'nw-mirror',
-      `(${gt.mirrors.toLocaleString('en-US')}<img class="nw-mirror-ic" src="${MIRROR_ICON}" alt="${t('networth.grand.mirror_alt')}">)`));
+      `(${fmtNum(gt.mirrors)}<img class="nw-mirror-ic" src="${MIRROR_ICON}" alt="${t('networth.grand.mirror_alt')}">)`));
     totBox.appendChild(gline);
     header.appendChild(totBox);
     const controls = el('div', 'nw-controls');

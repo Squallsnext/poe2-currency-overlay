@@ -20,7 +20,10 @@
     return c && c.icon ? `<img class="rc-ic" src="${esc(c.icon)}" alt="">` : '<span class="rc-ic"></span>';
   };
   const num = (s) => { const v = parseFloat(String(s || '').replace(',', '.')); return Number.isFinite(v) && v > 0 ? v : null; };
-  const fmtN = (v) => (v >= 100 ? Math.round(v).toLocaleString() : v >= 10 ? (Math.round(v * 10) / 10).toLocaleString() : (Math.round(v * 100) / 100).toLocaleString());
+  // numbers in the UI language's own way (German 5.388 / 7,5)
+  const NUM_LOCALE = { de: 'de-DE', fr: 'fr-FR', es: 'es-ES', pt: 'pt-BR', ru: 'ru-RU' };
+  const numLoc = () => NUM_LOCALE[window.I18N && window.I18N.lang && window.I18N.lang()] || 'en-US';
+  const fmtN = (v) => v.toLocaleString(numLoc(), { maximumFractionDigits: v >= 100 ? 0 : v >= 10 ? 1 : 2 });
 
   // every currency that trades against at least one major, majors first, then by name
   function currencies() {
