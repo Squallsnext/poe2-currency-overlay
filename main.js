@@ -2432,19 +2432,15 @@ ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings } = {}) => {
     const P0 = RP.slotParams(TAB_MAPS[tab], ch.scale, ov);
     const ms = RP.effectiveMatchScale(ch, P0);
     const P = RP.paramsAtScale(P0, ms);
-    const Pt = ov && ov.floor != null ? Object.assign({}, P, { floor: ov.floor }) : P;
-    const { binarized } = DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Pt, ch.cellScale);
-    // one piece per digit: plain, else with diagonal neighbours joined (thin strokes at
-    // 1080p), else without pieces much shorter than the tallest (a speck or a bit of
-    // item art next to the count) - reported: a clean 7 that could not be learned
-    const pick = (list) => list.sort((a, b) => a.x - b.x);
-    const dropShort = (list) => { const top = Math.max(0, ...list.map((c) => c.mask.h)); return list.filter((c) => c.mask.h >= top * 0.7); };
-    const tries = [DR.components(binarized, ms), DR.components(binarized, ms, true)];
-    tries.push(dropShort(tries[0]), dropShort(tries[1]));
-    const hit = tries.find((list) => list.length === value.length);
-    const comps = pick(hit || tries[0]);
+    // the floor: one the player set (panel slider / saved) as is, else the live read's own
+    // winning floor, then its neighbours, until each digit is one piece (RP.teachCut)
+    let learnedNow = null;
+    try { learnedNow = loadLearnedTemplates(); } catch { /* none yet */ }
+    const bank = RP.buildBank(require('./renderer/stash/digit-templates.json'), learnedNow, ms).bank;
+    const cutT = RP.teachCut(ch, pos, P, bank, value, ov && ov.floor != null ? ov.floor : null);
+    const { binarized, comps } = cutT;
     if (comps.length !== value.length) {
-      logToggle('stash-learn', `skip "${value}" for ${apiId}: found ${comps.length} glyph(s), expected ${value.length}`);
+      logToggle('stash-learn', `skip "${value}" for ${apiId}: found ${comps.length} glyph(s), expected ${value.length} (${cutT.tried} floor(s) tried)`);
       return { ok: false, reason: 'segment-mismatch', found: comps.length, want: value.length };
     }
 
@@ -2494,8 +2490,8 @@ ipcMain.handle('stash-teach-count', (_e, { apiId, value, settings } = {}) => {
       learned.templates[ch] = glyphs[inks[Math.floor(glyphs.length / 2)].i];
     }
     saveLearnedTemplates(learnedAll);
-    logToggle('stash-learn', `taught "${value}" for ${apiId} (${tab}) at x${ms} - ${comps.length} glyph(s), ${Object.keys(learned.templates).length} digit(s) known`);
-    return { ok: true, digits: comps.length };
+    logToggle('stash-learn', `taught "${value}" for ${apiId} (${tab}) at x${ms}, floor ${cutT.floor}${cutT.liveFloor != null && cutT.floor !== cutT.liveFloor ? ' (live ' + cutT.liveFloor + ')' : ''} - ${comps.length} glyph(s), ${Object.keys(learned.templates).length} digit(s) known`);
+    return { ok: true, digits: comps.length, floor: cutT.floor };
   } catch (err) {
     logToggle('stash-learn', 'ERROR ' + (err && err.message || err));
     return { ok: false, reason: 'error', error: String(err && err.message || err) };

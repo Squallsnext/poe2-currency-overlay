@@ -1016,7 +1016,7 @@
 
   return {
     otsu, crop, binarize, binarizeLocal, binarizeP, dropSmallBlobs, components, iou, slideMatch, greyOpening, resampleRGBA, resample,
-    extractTemplates, readCell, readCellEx, readCellAdaptive, valueChannelFromRGBA, valueChannelDesatMax, adjustRGBA,
+    ADAPTIVE_FLOORS, extractTemplates, readCell, readCellEx, readCellAdaptive, valueChannelFromRGBA, valueChannelDesatMax, adjustRGBA,
     templatesFromJSON, bankFromJSON, DEFAULTS, DESAT_SAT, contrastGate, CONTRAST_RADIUS, debugShrunkCell, detectDigitSpan,
     upscaleTemplate, upscaleTemplateBank,
   };

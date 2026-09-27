@@ -1057,6 +1057,21 @@ Each card now carries its scan time ("✓ 23:41", full time on hover, kept with 
 rows), and for 4 s after a scan the header shows a green "✓ Essences · 23:41:05" and
 that card's time lights up green. Tested in the browser (four scans, stamp, fade).
 
+### 4.19 Teaching learns from the picture the reader actually used
+
+Reported: a clean "3" could not be taught with ✓, after nudging a slider it suddenly
+could, and a digit taught that way was unsure again on the next scan. Cause: the live read
+sweeps its black/white floor per cell (readCellAdaptive) and matches at whichever floor
+wins, but teaching cut the digits at the slot's saved floor or else the fixed default
+(122) - a different picture, often broken into the wrong number of pieces, and when it did
+split, a template the live read never sees. `RP.teachCut` (read-pipeline.js) now uses a
+floor the player set as is; otherwise the live read's own winning floor first, then the
+other sweep floors nearest to it, until the picture splits into one piece per digit.
+Measured over the captures we hold (reads at 60 %+ taken as the value to teach):
+5K essence 33 -> 45 of 45 teachable, 1080p essence 32 -> 49 of 53, 1080p ritual
+12 -> 15 of 19, 1440p essence 34 -> 45 of 45; slots with a fixed floor unchanged. The
+learn log names the floor used.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

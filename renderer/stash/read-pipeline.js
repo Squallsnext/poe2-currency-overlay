@@ -198,5 +198,41 @@
     return Object.assign({}, r, { floor: r.floor != null ? r.floor : P.floor });
   }
 
-  return { EXTREME_SCALE, MARGIN, cropAroundSlot, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
+  // The black/white cut a confirmed count is LEARNED from (main.js stash-teach-count).
+  // It used to be binarised at the slot's saved floor or else the fixed default (122) -
+  // while the live read sweeps its floors (readCellAdaptive) and matches at whichever
+  // wins. So ✓ on a read taken at floor 80 learned from a different, often broken, image
+  // (reported: "lernt nicht", and after nudging a slider it suddenly did - and a digit
+  // learned that way still did not fit the next scan). Now: a floor the player set is
+  // used as is; otherwise the live read's own winning floor first, then the other sweep
+  // floors nearest to it, until the picture splits into exactly one piece per digit.
+  // One piece per digit: plain, else with diagonal neighbours joined (thin strokes at
+  // 1080p), else without pieces much shorter than the tallest (a speck or item art).
+  function segmentDigits(binarized, ms, want) {
+    const dropShort = (list) => { const top = Math.max(0, ...list.map((c) => c.mask.h)); return list.filter((c) => c.mask.h >= top * 0.7); };
+    const tries = [DR.components(binarized, ms), DR.components(binarized, ms, true)];
+    tries.push(dropShort(tries[0]), dropShort(tries[1]));
+    const hit = tries.find((list) => list.length === want);
+    return (hit || tries[0]).sort((a, b) => a.x - b.x);
+  }
+  function teachCut(ch, pos, P, bank, value, fixedFloor) {
+    let floors;
+    let liveFloor = null;
+    if (fixedFloor != null) floors = [fixedFloor];
+    else {
+      liveFloor = readSlot(ch, pos, bank, P, null).floor;
+      floors = [liveFloor].concat(DR.ADAPTIVE_FLOORS.filter((f) => f !== liveFloor).sort((a, b) => Math.abs(a - liveFloor) - Math.abs(b - liveFloor)));
+    }
+    let first = null;
+    for (const floor of floors) {
+      const { binarized } = DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Object.assign({}, P, { floor }), ch.cellScale);
+      const comps = segmentDigits(binarized, P.matchScale > 1 ? P.matchScale : 1, value.length);
+      const r = { floor, binarized, comps, liveFloor, tried: floors.indexOf(floor) + 1 };
+      if (comps.length === value.length) return r;
+      if (!first) first = r;
+    }
+    return first;
+  }
+
+  return { EXTREME_SCALE, MARGIN, teachCut, segmentDigits, cropAroundSlot, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
 });
