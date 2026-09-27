@@ -289,6 +289,7 @@ const DEFAULT_CONFIG = {
   grandexHistory: [], // Grand Expedition tab: saved runs [{ts, rumors:[names], score, verdict}] newest first
   showRegexTab: true,     // App Settings: show the Regex tab in the tab bar
   showGrandExTab: true,   // App Settings: show the Grand Expedition tab in the tab bar
+  showSwapTab: true,     // App Settings: show the Swap tab (cheapest way from one currency to another)
   showRecipesTab: true,   // App Settings: show the Recipes tab (combine / vendor split profits)
   recipeBases: {},        // Recipes tab: the currency each recipe is priced in, if not its default
   recipeRounds: {},       // Recipes tab: how many rounds each recipe is planned for
@@ -4815,6 +4816,7 @@ ipcMain.handle('set-tab-shown', (_e, which, shown) => {
   if (which === 'regex') config.showRegexTab = !!shown;
   else if (which === 'grandex') config.showGrandExTab = !!shown;
   else if (which === 'recipes') config.showRecipesTab = !!shown;
+  else if (which === 'swap') config.showSwapTab = !!shown;
   else if (which === 'networth') config.showNetWorthTab = !!shown;
   else if (which === 'desec') config.showDesecrateTab = !!shown;
   else return false;

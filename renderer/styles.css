@@ -1993,6 +1993,30 @@ footer {
 .nw-skip-menu-item { text-align: left; background: transparent; border: none; color: var(--tx-body); font-size: 12px; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
 .nw-skip-menu-item:hover { background: var(--in-bd); color: var(--tx-hi); }
 
+/* ---------- Swap tab (swap/swap-tab.js) ---------- */
+#swap-root { overflow-y: auto; }
+.sw-form { display: grid; grid-template-columns: auto 1fr auto auto 1fr; gap: 6px 8px; align-items: center; margin-bottom: 10px; }
+.sw-lab { color: var(--tx-dim); font-size: 11px; }
+.sw-sel, .sw-side, .sw-amt { background: var(--in-bg); color: var(--tx-hi); border: 1px solid var(--in-bd); border-radius: 5px; padding: 4px 6px; font-size: 12px; min-width: 0; }
+.sw-flip { background: transparent; border: 1px solid var(--in-bd); color: var(--tx-body); border-radius: 5px; cursor: pointer; padding: 2px 8px; }
+.sw-flip:hover { color: var(--tx-gold); }
+.sw-amtrow { grid-column: 1 / -1; display: flex; gap: 6px; align-items: center; }
+.sw-amt { width: 90px; }
+.sw-unit { color: var(--tx-dim); }
+.sw-verdict { font-size: 12.5px; color: var(--tx-hi); margin: 2px 0 10px; }
+.sw-route { border: 1px solid var(--in-bd); border-radius: 7px; padding: 7px 10px; margin-bottom: 8px; }
+.sw-best { border-color: var(--green-mid); background: color-mix(in srgb, var(--green-mid) 7%, transparent); }
+.sw-star { color: var(--tx-gold); }
+.sw-cost { color: var(--tx-dim); margin: 0 6px; }
+.sw-steps { margin: 6px 0 4px 18px; padding: 0; }
+.sw-step { margin: 3px 0; }
+.sw-step .rc-ic { margin: 0 3px; }
+.sw-rate { color: var(--tx-dim); margin-left: 6px; font-size: 11px; }
+.sw-mark { color: var(--tx-gold2); cursor: help; }
+.sw-thin { color: var(--red-warn); font-size: 10.5px; margin-left: 4px; cursor: help; }
+.sw-total { color: var(--tx-body); }
+.sw-note, .sw-foot { margin-top: 8px; font-size: 11px; }
+
 /* ---------- Recipes tab (recipes/recipes-tab.js) ---------- */
 #recipes-root { overflow-y: auto; }
 .rc-wrap { padding: 8px 10px 14px; font-size: 11.5px; color: var(--tx-body); user-select: text; }

@@ -1004,6 +1004,7 @@ async function clearRateInput(a, b) {
 function afterRateChange() {
   if (pinnedTipEl) { rebuildArbTip(); listStale = true; } else render();
   if (window.Recipes) window.Recipes.render(); // the same rates price the recipes
+  if (window.Swap) window.Swap.render(); // and the swap routes
   sendDetached();
 }
 // direct/cross/gap for a pair, the way its bucket row computes them
@@ -1243,6 +1244,7 @@ function render() {
   unpinTip(); // rebuilt DOM invalidates the pinned element
   sendDetached(); // new rates/prices: the pinned route window follows
   if (window.Recipes) window.Recipes.render(); // same prices, the Recipes tab follows
+  if (window.Swap) window.Swap.render();
   updateMeta();
 
   // Build the new content off-screen and swap it in atomically AFTER all icons
@@ -3461,8 +3463,8 @@ async function initSettings() {
     });
   };
   // a tab's own ✕ hides it too - keep the matching Settings switch in sync
-  const TAB_TOGGLE_ID = { regex: 'show-regex-tab', grandex: 'show-grandex-tab', networth: 'show-networth-tab', desec: 'show-desecrate-tab', recipes: 'show-recipes-tab' };
-  const TAB_TOGGLE_CFG = { regex: 'showRegexTab', grandex: 'showGrandExTab', networth: 'showNetWorthTab', desec: 'showDesecrateTab', recipes: 'showRecipesTab' };
+  const TAB_TOGGLE_ID = { regex: 'show-regex-tab', grandex: 'show-grandex-tab', networth: 'show-networth-tab', desec: 'show-desecrate-tab', recipes: 'show-recipes-tab', swap: 'show-swap-tab' };
+  const TAB_TOGGLE_CFG = { regex: 'showRegexTab', grandex: 'showGrandExTab', networth: 'showNetWorthTab', desec: 'showDesecrateTab', recipes: 'showRecipesTab', swap: 'showSwapTab' };
   window.setTabToggleChecked = (visKey, checked) => {
     const t = $(TAB_TOGGLE_ID[visKey]);
     if (t) t.checked = !!checked;
@@ -3497,6 +3499,7 @@ async function initSettings() {
   wireTabToggle('show-regex-tab', 'showRegexTab', 'regex');
   wireTabToggle('show-grandex-tab', 'showGrandExTab', 'grandex');
   wireTabToggle('show-recipes-tab', 'showRecipesTab', 'recipes');
+  wireTabToggle('show-swap-tab', 'showSwapTab', 'swap');
   wireTabToggle('show-networth-tab', 'showNetWorthTab', 'networth');
   wireTabToggle('show-desecrate-tab', 'showDesecrateTab', 'desec');
 

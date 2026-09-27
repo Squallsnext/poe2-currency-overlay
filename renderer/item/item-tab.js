@@ -2881,9 +2881,10 @@
     { key: 'regex', id: 'tab-regex', closeable: true },
     { key: 'grandex', id: 'tab-grandex', closeable: true },
     { key: 'recipes', id: 'tab-recipes', closeable: true },
+    { key: 'swap', id: 'tab-swap', closeable: true },
   ];
   const metaOf = (key) => TAB_META.find((t) => t.key === key);
-  const tabVis = { desec: true, regex: true, grandex: true, networth: true, recipes: true };
+  const tabVis = { desec: true, regex: true, grandex: true, networth: true, recipes: true, swap: true };
   let tabOrder = TAB_META.map((t) => t.key);
 
   function activeKey() {
@@ -3010,6 +3011,7 @@
     const rxTab = $('tab-regex'); if (rxTab) rxTab.classList.toggle('active', which === 'regex');
     const gxTab = $('tab-grandex'); if (gxTab) gxTab.classList.toggle('active', which === 'grandex');
     const rcTab = $('tab-recipes'); if (rcTab) rcTab.classList.toggle('active', which === 'recipes');
+    const swTab = $('tab-swap'); if (swTab) swTab.classList.toggle('active', which === 'swap');
     $('item-root').classList.toggle('hidden', which !== 'items');
     $('buckets').classList.toggle('hidden', which !== 'currency');
     $('desecrate-root').classList.toggle('hidden', which !== 'desec');
@@ -3017,6 +3019,7 @@
     const rxRoot = $('regex-root'); if (rxRoot) rxRoot.classList.toggle('hidden', which !== 'regex');
     const gxRoot = $('grandex-root'); if (gxRoot) gxRoot.classList.toggle('hidden', which !== 'grandex');
     const rcRoot = $('recipes-root'); if (rcRoot) rcRoot.classList.toggle('hidden', which !== 'recipes');
+    const swRoot = $('swap-root'); if (swRoot) swRoot.classList.toggle('hidden', which !== 'swap');
     applyTabVisibility(which);
     document.querySelector('footer').classList.toggle('hidden', which !== 'currency');
     // #status is currency-feed state; keep it off the other tabs
@@ -3031,6 +3034,7 @@
     if (which === 'regex' && window.RegexTab) window.RegexTab.render();
     if (which === 'grandex' && window.GrandEx) window.GrandEx.render();
     if (which === 'recipes' && window.Recipes) window.Recipes.render();
+    if (which === 'swap' && window.Swap) window.Swap.render();
   }
 
   // ---------- wiring ----------
@@ -3042,6 +3046,7 @@
     { const t = $('tab-regex'); if (t) t.addEventListener('click', () => setTab('regex')); }
     { const t = $('tab-grandex'); if (t) t.addEventListener('click', () => setTab('grandex')); }
     { const t = $('tab-recipes'); if (t) t.addEventListener('click', () => setTab('recipes')); }
+    { const t = $('tab-swap'); if (t) t.addEventListener('click', () => setTab('swap')); }
     wireTabBar(); // drag-to-reorder + the ✕ on closeable tabs
     // Reopen on whichever tab you left it on last (persisted in config.lastTab);
     // first-ever launch falls back to Currency. Also syncs tab state + reports it.
@@ -3052,11 +3057,12 @@
       tabVis.grandex = c.showGrandExTab !== false;
       tabVis.networth = c.showNetWorthTab !== false;
       tabVis.recipes = c.showRecipesTab !== false;
+      tabVis.swap = c.showSwapTab !== false;
       tabOrder = normalizeOrder(c.tabOrder);
       applyTabOrder();
-      let last = ['currency', 'items', 'desec', 'networth', 'regex', 'grandex', 'recipes'].includes(c.lastTab) ? c.lastTab : 'currency';
+      let last = ['currency', 'items', 'desec', 'networth', 'regex', 'grandex', 'recipes', 'swap'].includes(c.lastTab) ? c.lastTab : 'currency';
       // never reopen INTO a hidden tab
-      if ((last === 'desec' && !tabVis.desec) || (last === 'regex' && !tabVis.regex) || (last === 'grandex' && !tabVis.grandex) || (last === 'networth' && !tabVis.networth) || (last === 'recipes' && !tabVis.recipes)) last = 'currency';
+      if ((last === 'desec' && !tabVis.desec) || (last === 'regex' && !tabVis.regex) || (last === 'grandex' && !tabVis.grandex) || (last === 'networth' && !tabVis.networth) || (last === 'recipes' && !tabVis.recipes) || (last === 'swap' && !tabVis.swap)) last = 'currency';
       setTab(last);
       if (state.active) render();
     }).catch(() => setTab('currency'));

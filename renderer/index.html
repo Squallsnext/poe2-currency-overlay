@@ -105,6 +105,7 @@
             <label class="switch set-excl" data-i18n-title="ui.settings.show_regex_tab_tooltip" title="Show the Regex tab in the tab bar. Off hides it entirely until you turn it back on here."><input type="checkbox" id="show-regex-tab" /><span class="sw-track"></span><span class="sw-lab" data-i18n="ui.settings.show_regex_tab_label">Show Regex tab</span></label>
             <label class="switch set-excl" data-i18n-title="ui.settings.show_grandex_tab_tooltip" title="Show the Grand Expedition tab in the tab bar. Off hides it entirely until you turn it back on here."><input type="checkbox" id="show-grandex-tab" /><span class="sw-track"></span><span class="sw-lab" data-i18n="ui.settings.show_grandex_tab_label">Show Grand Expedition tab</span></label>
             <label class="switch set-excl" data-i18n-title="ui.settings.show_recipes_tab_tooltip" title="Show the Recipes tab in the tab bar."><input type="checkbox" id="show-recipes-tab" /><span class="sw-track"></span><span class="sw-lab" data-i18n="ui.settings.show_recipes_tab_label">Show Recipes tab</span></label>
+            <label class="switch set-excl" data-i18n-title="ui.settings.show_swap_tab_tooltip" title="Show the Swap tab in the tab bar."><input type="checkbox" id="show-swap-tab" /><span class="sw-track"></span><span class="sw-lab" data-i18n="ui.settings.show_swap_tab_label">Show Swap tab</span></label>
             <label class="switch set-excl" data-i18n-title="ui.settings.show_networth_tab_tooltip" title="Show the Net Worth tab in the tab bar. Off hides it entirely until you turn it back on here. The capture hotkey still works either way."><input type="checkbox" id="show-networth-tab" /><span class="sw-track"></span><span class="sw-lab" data-i18n="ui.settings.show_networth_tab_label">Show Net Worth tab</span></label>
             <label class="switch set-excl" data-i18n-title="ui.settings.show_desecrate_tab_tooltip" title="Show the Desecrate tab in the tab bar. Off hides it - it still appears when you open an item's redesecrate? button, then hides again when you leave it."><input type="checkbox" id="show-desecrate-tab" /><span class="sw-track"></span><span class="sw-lab" data-i18n="ui.settings.show_desecrate_tab_label">Show Desecrate tab</span></label>
           </section>
@@ -328,6 +329,7 @@
       <button id="tab-regex" class="tab" data-i18n="ui.tabs.regex_label" data-i18n-title="ui.tabs.regex_tooltip" title="Build stash-search regex for waystones and tablets, and keep your saved regexes one click from the clipboard.">Regex</button>
       <button id="tab-grandex" class="tab" data-i18n="ui.tabs.grandex_label" data-i18n-title="ui.tabs.grandex_tooltip" title="Plan your Grand Expedition: track rumors, identify islands, and prep the run.">Grand Expedition</button>
       <button id="tab-recipes" class="tab" data-i18n="ui.tabs.recipes_label" data-i18n-title="ui.tabs.recipes_tooltip" title="Recipes: is it worth buying the parts, combining or splitting, and selling?">Recipes</button>
+      <button id="tab-swap" class="tab" data-i18n="ui.tabs.swap_label" data-i18n-title="ui.tabs.swap_tooltip" title="Swap: I have one currency and want another - which way is cheapest?">Swap</button>
     </nav>
 
     <div id="status" class="hidden"></div>
@@ -350,6 +352,7 @@
 
     <main id="grandex-root" class="hidden"></main>
     <main id="recipes-root" class="hidden"></main>
+    <main id="swap-root" class="hidden"></main>
 
     <div id="support-bar">
       <span id="btn-bug" class="support-bug" role="button" tabindex="0" data-i18n-title="ui.support.bug_tooltip" title="Report a bug (attaches a short activity log)">
@@ -469,6 +472,7 @@
   <script src="grandex/grandex-data.js"></script>
   <script src="grandex/grandex-tab.js"></script>
   <script src="recipes/recipes-tab.js"></script>
+  <script src="swap/swap-tab.js"></script>
   <div id="resize-grip" title="Drag to resize"></div>
   <script src="item/bonded-rune-ids.js"></script>
   <script src="item/item-tab.js"></script>
