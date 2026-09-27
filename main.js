@@ -1264,7 +1264,25 @@ function gamepadBindingFires(bind, btn, held, allBindings) {
 function startGamepadListener() {
   if (gamepadStarted) return;
   gamepadStarted = true;
+  // PS alone and PS combos on the same pad (asked for: Mute and PS are the only buttons
+  // the game ignores, so "PS + Mute" is the one free combo left - while PS alone opens
+  // the price check). PS alone used to fire the moment PS went down, so every PS combo
+  // also fired the PS action first. When some binding is a combo containing PS, a PS-alone
+  // binding now fires on PS RELEASE, and only if no other button was pressed meanwhile.
+  let psPending = false;
+  const allGamepadBindings = () => Object.values(config.gamepadBindings || {}).concat((config.commandHotkeys || []).map((r) => r && r.gamepad));
+  const psComboExists = () => allGamepadBindings().some((b) => Array.isArray(b) && b.includes(GP_PS));
+  const firePsAlone = () => {
+    const binds = config.gamepadBindings || {};
+    for (const action in GAMEPAD_ACTIONS) if (binds[action] === GP_PS) GAMEPAD_ACTIONS[action]();
+    for (const row of config.commandHotkeys || []) if (row && row.gamepad === GP_PS && isAllowedCommand(row.command)) sendChatCommand(row.command);
+  };
+  gamepad.onButtonUp((btn) => {
+    if (btn === GP_PS && psPending) { psPending = false; firePsAlone(); }
+  });
   gamepad.onButtonDown((btn, held) => {
+    if (btn === GP_PS && psComboExists()) { psPending = true; return; } // decided on release
+    if (btn !== GP_PS && held.has(GP_PS)) psPending = false;            // it became a combo
     if (itemBrowse && overlayShown && DPAD.includes(btn) && !held.has(GP_PS)) scheduleBrowseCheck();
     const binds = config.gamepadBindings || {};
     const all = Object.values(binds).concat((config.commandHotkeys || []).map((r) => r && r.gamepad));

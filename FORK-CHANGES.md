@@ -938,6 +938,13 @@ opens with it as "I have" and its stack size as "I spend" (German "Stapelgröße
 -> 1234). On any other item nothing happens and the overlay stays shut. Its own action on
 purpose: on a controller the cursor always rests on a stash cell, so sharing the stash
 scan's button would open the Swap tab on every scan.
+**PS alone next to PS combos** (reported: PS and the mic button are the only buttons the
+game ignores, so "PS + Mute" is the one free combo - while PS alone opens the price
+check): PS alone fired the moment PS went down, so every PS combo also fired it. When
+some binding is a combo containing PS, a PS-alone binding now fires on PS RELEASE, and
+only if no other button was pressed meanwhile (`gamepad.js` got `onButtonUp`). Checked
+with synthetic DualSense reports against the real dispatcher: PS -> price check,
+PS + Mute -> Swap only, Mute -> stash scan; without a PS combo PS fires at once as before.
 ### 4.12 Fragment tab (sub-tab "Fragmente")
 
 Asked for: the Fragment stash tab (patch 0.5) was not supported. `renderer/stash/
