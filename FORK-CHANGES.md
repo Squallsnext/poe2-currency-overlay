@@ -805,6 +805,13 @@ in; with exactly one list that is on, straight in; otherwise a small menu picks 
 (an off list is marked "still counts"). The ⊘ tag of a line already left out takes it
 back out on a click. Same config as before (`stashSkipGroups`).
 
+**Price check: an item that cannot be read says so** (reported: Trephina failed and the
+overlay showed nothing at all). The parse-error notice only rendered inside an item's
+panel; with no item open there was none, and with one open the old item's result stayed
+as if it were the answer. Now a card on top names the item, the error and offers "copy
+item text"; the view goes back to the landing page. Each failed item is also appended
+to `item-parse-errors.log` in the support folder.
+
 **Price check: the same item again shows the saved result for 3 hours** (asked for:
 checking an item a second time cost another trade search). `item-tab.js` `autoSearch`:
 an item with the same base and every mod at the same value (`itemSig`, now stored with

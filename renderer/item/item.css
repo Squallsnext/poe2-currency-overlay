@@ -656,6 +656,16 @@
   border-radius: 7px; padding: 6px 10px; margin: 2px 0 8px; color: var(--notice-tx); font-size: 11.5px;
 }
 
+/* an item that could not be read (item-ui.js parseFailCard) */
+.parse-fail { border: 1px solid color-mix(in srgb, var(--red-warn) 55%, transparent); background: color-mix(in srgb, var(--red-warn) 9%, transparent); border-radius: 7px; padding: 8px 10px; margin: 0 0 10px; font-size: 11.5px; color: var(--tx-body, #ccc); }
+.parse-fail-head { color: var(--red-hi); font-weight: 700; font-size: 12.5px; }
+.parse-fail-name { color: var(--tx-hi, #eee); font-size: 13px; margin-top: 3px; }
+.parse-fail-why { margin-top: 3px; color: var(--tx-dim); }
+.parse-fail-acts { display: flex; gap: 6px; margin-top: 7px; align-items: center; }
+.parse-fail-btn { font-size: 11.5px; padding: 3px 10px; border-radius: 5px; border: 1px solid var(--in-bd); background: var(--in-bg); color: var(--tx-body, #ccc); cursor: pointer; }
+.parse-fail-btn:hover { color: var(--tx-gold); }
+.parse-fail-btn-main { border-color: var(--red-warn); color: var(--red-hi); }
+.parse-fail-btn-ghost { margin-left: auto; border: none; background: transparent; }
 .notice-act { color: var(--tx-gold2); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .notice-act:hover { color: var(--tx-gold); }
 

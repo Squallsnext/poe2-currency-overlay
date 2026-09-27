@@ -1223,6 +1223,30 @@
   // straight into the max box lost the second click ("filters have changed" re-render
   // ate it). Every field the user types into carries a stable data-fk key; the field
   // that had focus - and its caret - is handed back after the rebuild.
+  // an item that could not be read: which one, why, its text - on top of any view
+  function parseFailCard(pf, h) {
+    const card = el('div', 'parse-fail');
+    card.appendChild(el('div', 'parse-fail-head', '⚠ ' + t('itemtab.parse_fail.title')));
+    if (pf.name) card.appendChild(el('div', 'parse-fail-name', esc(pf.name)));
+    card.appendChild(el('div', 'parse-fail-why', t('itemtab.parse_fail.why', { error: esc(pf.error) })));
+    const acts = el('div', 'parse-fail-acts');
+    const cp = el('button', 'parse-fail-btn', t('itemtab.parse_fail.copy'));
+    cp.onclick = () => { h.onParseFailCopy && h.onParseFailCopy(); cp.textContent = t('itemtab.parse_fail.copied'); };
+    acts.appendChild(cp);
+    if (h.onParseFailReport) {
+      const rp = el('button', 'parse-fail-btn parse-fail-btn-main', t('itemtab.parse_fail.report'));
+      rp.title = t('itemtab.parse_fail.report_title');
+      rp.onclick = () => { h.onParseFailReport(); rp.textContent = t('itemtab.parse_fail.reported'); rp.disabled = true; };
+      acts.appendChild(rp);
+    }
+    const x = el('button', 'parse-fail-btn parse-fail-btn-ghost', '✕');
+    x.title = t('itemtab.parse_fail.dismiss');
+    x.onclick = () => h.onParseFailDismiss && h.onParseFailDismiss();
+    acts.appendChild(x);
+    card.appendChild(acts);
+    return card;
+  }
+
   function render(root, state, handlers) {
     const h = handlers || {};
     const act = document.activeElement;
@@ -1230,6 +1254,7 @@
     const caret = fk && act.selectionStart != null ? [act.selectionStart, act.selectionEnd] : null;
     root.innerHTML = '';
     const tab = el('div', 'item-tab');
+    if (state.parseFail) tab.appendChild(parseFailCard(state.parseFail, h));
     if (state.view === 'item' && state.item) tab.appendChild(itemPanel(state, h));
     else tab.appendChild(historyPanel(state, h));
     root.appendChild(tab);

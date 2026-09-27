@@ -2021,6 +2021,10 @@
       }
       render();
     },
+    onParseFailCopy() {
+      if (state.parseFail) window.api.writeClipboard(state.parseFail.text);
+    },
+    onParseFailDismiss() { state.parseFail = null; render(); },
     onBack() {
       state.view = 'empty';
       state.item = null;
@@ -2544,6 +2548,7 @@
       // these. So look it up there and take the exchange path the tab already has.
       const viaCurrency = currencyFromRawText(text);
       if (viaCurrency) {
+        state.parseFail = null;
         state.item = viaCurrency;
         state.itemOriginal = JSON.parse(JSON.stringify(viaCurrency));
         state.openFolds = new Set();
@@ -2555,11 +2560,21 @@
         doCurrencyPrice();
         return true;
       }
-      state.notice = t('itemtab.notice.parse_failed', { error: res.error });
+      // Reported: a unique that failed to parse (Trephina) showed NOTHING - the notice only
+      // renders inside an item's panel, and with no item open the landing view has none.
+      // A failed item now gets its own card on top of either view (item-ui.js), saying
+      // which item, why, and offering its text; the previous result is not left looking
+      // like the answer. It is also kept in the support folder (item-parse-errors.log).
+      state.parseFail = { error: String(res.error || ''), text, name: itemNameOf(text) };
+      state.notice = null;
+      // back to the landing view: the previous item's result must not stand under the card
+      state.view = 'empty'; state.item = null; state.results = null; state.searchCtx = null;
       render();
       if (window.logAction) window.logAction('item-parse-error', String(res.error).slice(0, 200));
+      if (window.api.logParseFail) window.api.logParseFail({ error: String(res.error || ''), text });
       return false;
     }
+    state.parseFail = null;
     state.excAssume = null; // fresh paste: drop any prior item's per-item assume override
     state.item = toModel(res.item);
     applyExceptionalDefaults(); // Exceptional Normal base: assume OFF + corrupted=No
@@ -2576,6 +2591,18 @@
     render();
     autoSearch(); // auto-search on paste/hotkey: one keystroke -> priced comps
     return true;
+  }
+
+  // the item's own name line (the one after "Rarity:"/"Seltenheit:" ...) for the error card
+  function itemNameOf(text) {
+    const lines = String(text || '').split(/\r?\n/).map((l) => l.trim());
+    const ri = lines.findIndex((l) => RARITY_HEADER.some(([, lab]) => l.startsWith(lab)));
+    const out = [];
+    for (let i = ri + 1; ri >= 0 && i < lines.length && out.length < 2; i++) {
+      if (!lines[i] || lines[i].startsWith('--')) break;
+      out.push(lines[i]);
+    }
+    return out.join(' – ');
   }
 
   // A stackable currency the parser does not know, recognised from the clipboard text

@@ -1703,6 +1703,17 @@ ipcMain.handle('get-app-version', () => app.getVersion());
 // re-show its patch notes.
 ipcMain.handle('is-dev-build', () => !app.isPackaged);
 
+// Items the price check could not read, one block each, in the support folder - so a
+// report can name them later even when nobody copied the text at the time.
+ipcMain.handle('log-parse-fail', (_e, { error, text } = {}) => {
+  try {
+    fs.mkdirSync(SUPPORT_DIR(), { recursive: true });
+    const block = `=== ${new Date().toISOString()}  v${app.getVersion()}  ${String(error || '').slice(0, 200)}\n${String(text || '').slice(0, 4000)}\n\n`;
+    fs.appendFileSync(path.join(SUPPORT_DIR(), 'item-parse-errors.log'), block);
+    return true;
+  } catch { return false; }
+});
+
 ipcMain.handle('set-gamepad-item-browse', (_e, on) => {
   config.gamepadItemBrowse = !!on;
   if (!on) stopItemBrowse();
