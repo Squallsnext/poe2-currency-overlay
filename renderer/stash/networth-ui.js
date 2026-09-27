@@ -581,11 +581,18 @@
         const box = el('div', 'nw-gal');
         const b = mk(t('networth.gallery.open'), t('networth.gallery.open_title'), null, true);
         const out = el('div', 'nw-gal-out');
+        // every digit at ONE scale, without the empty rows of its frame (the frame is
+        // centred on the strip's middle, so a digit reaching higher - 6, 8 in this font -
+        // has a taller one; a per-tile whole-number zoom showed those at half size -
+        // reported: "warum die 6 und 8 so klein ist")
+        const inkRows = (m) => { let a = m.h, b = -1; for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) if (m.data[y * m.w + x]) { if (y < a) a = y; if (y > b) b = y; } return b < a ? [0, m.h - 1] : [a, b]; };
+        let galZ = 1;
         const draw = (m) => {
-          const c = document.createElement('canvas'); const Z = Math.max(1, Math.floor(56 / Math.max(m.h, 1)));
-          c.width = m.w * Z; c.height = m.h * Z; const g = c.getContext('2d');
+          const [y0, y1] = inkRows(m), h = y1 - y0 + 1, Z = galZ;
+          const c = document.createElement('canvas');
+          c.width = Math.round(m.w * Z); c.height = Math.round(h * Z); const g = c.getContext('2d');
           g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#fff';
-          for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) if (m.data[y * m.w + x]) g.fillRect(x * Z, y * Z, Z, Z);
+          for (let y = y0; y <= y1; y++) for (let x = 0; x < m.w; x++) if (m.data[y * m.w + x]) g.fillRect(Math.floor(x * Z), Math.floor((y - y0) * Z), Math.ceil(Z), Math.ceil(Z));
           c.className = 'nw-gal-img'; return c;
         };
         const show = async () => {
@@ -595,6 +602,9 @@
           if (!r || !r.ok) { out.textContent = t('networth.audit.failed'); return; }
           const grid = el('div', 'nw-gal-grid');
           let ready = 0;
+          // one zoom for all: the tallest digit (ink only) fills ~64 px
+          const tallest = Math.max(1, ...Object.values(r.digits).filter((x) => x && x.medoid).map((x) => { const [a, b2] = inkRows(x.medoid); return b2 - a + 1; }));
+          galZ = 64 / tallest;
           const clashOf = (d) => r.clash.filter((c) => c.a === d || c.b === d);
           for (let d = 0; d <= 9; d++) {
             const info = r.digits[d] || { n: 0 };
