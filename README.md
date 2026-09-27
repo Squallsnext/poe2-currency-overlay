@@ -79,6 +79,12 @@ it can be taken on its own.
   switchable, off by default.
 - **📌 Pin a route**: its own small window that stays open when the overlay closes.
 
+### Swap tab (new)
+
+I have Chaos, I want Divine - which way is cheapest? The direct trade and every way
+through Exalted, Chaos, Divine or Annulment, cheapest first, written out as the trades
+to make, with amounts, the in-game rate and how much it saves.
+
 ### Recipes tab (new)
 
 Is it worth buying parts, combining them (or splitting at a vendor) and selling? Profit

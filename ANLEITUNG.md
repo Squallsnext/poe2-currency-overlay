@@ -42,6 +42,9 @@ Alles läuft nur auf deinen Tastendruck; das Programm steuert das Spiel nie.
   an- und ausschaltbar.
 - **📌 Anpinnen** als eigenes Fenster, bleibt offen, wenn das Overlay zu ist.
 
+**Tauschen** (neuer Reiter): „Ich habe Chaos, ich will 10 Div“ – das Programm zeigt den
+günstigsten Weg (direkt oder über Ex/Div/Annul) als einzelne Tausch-Schritte mit Mengen.
+
 **Rezepte** (neuer Reiter): lohnt sich Kaufen, Kombinieren und Verkaufen? Gewinn pro
 Runde, Gold, Anpinnen.
 
@@ -188,7 +191,16 @@ Einstellungen haben immer Vorrang.
 
 ---
 
-## 5. Rezepte
+## 5. Tauschen
+
+Oben **„Ich habe“** und **„Ich will“** wählen (⇄ vertauscht beide), darunter **„Ich brauche
+10“** oder **„Ich gebe aus 100“**. Darunter stehen alle Wege, der günstigste zuerst (★,
+grün): jeder Schritt mit „so viel geben → so viel bekommen“ und dem Kurs, wie er im Spiel
+steht, dazu wie viel günstiger als direkt. ✎ = dein fixierter Kurs, ⚠ = Kurs nicht
+aktuell, „wenig Umsatz“ = deine Menge ist ein großer Teil dessen, was in der letzten
+Stunde gehandelt wurde. Zwischen zwei Tauschen kann sich der Kurs bewegen.
+
+## 6. Rezepte
 
 Lohnt es sich, Teile zu kaufen, zu kombinieren (oder beim Händler aufzuteilen) und zu
 verkaufen? Übersicht nach Gewinn pro Runde, pro Rezept eine Karte mit Kursen, Menge,

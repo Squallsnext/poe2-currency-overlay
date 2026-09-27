@@ -916,6 +916,21 @@ Is it worth buying the parts, combining (or splitting at a vendor) and selling?
   = 4710 Ex, about +10 %. Tested headless with those numbers in divine: +1.00 div
   (+10.5 %) per round, 10 rounds +10 div and 15k gold; own rate "1 Spark = 5 div" →
   +15.4 %; split card and 📌 window render. **Not yet tested in the real app.**
+### 4.11 Swap tab ("Tauschen")
+
+Asked for: "I need Divine and have lots of Chaos - do I buy Exalted with Chaos and then
+Divine? Thinking around three corners breaks me." `renderer/swap/swap-tab.js`: pick
+"I have" / "I want", and "I need N" or "I spend N". The tab lists the direct trade and
+every way through one major (Exalted, Chaos, Divine, Annulment), cheapest first (★),
+each as the trades to make in game - how much to give, how much comes out, the rate the
+way the game shows it (`legStr`), gold (Ange's fee per item received) - and how much
+cheaper or dearer than direct. Priced with the Currency tab's own functions (your fixed
+rates, then live, then GGG's exchange); ✎ = your rate, ⚠ = rate not current, "low
+volume" when the amount is over a quarter of what traded in the last hour. You hand
+over whole orbs, so the start amount is rounded up. Checked with the player's
+screenshot rates (1 Chaos = 70.9 Ex, 1 Div = 532 Ex, direct 8.21 Chaos per Div):
+via Exalted 7.50 Chaos per Div, 8.6 % cheaper, for 10 Div 7 Chaos saved - the same as
+by hand. Hideable like Recipes (`showSwapTab`).
 
 ## 5. New config keys
 
@@ -930,6 +945,7 @@ Is it worth buying the parts, combining (or splitting at a vendor) and selling?
 | `stashShowReliability` | `false` | "Often misread" row tints |
 | `stashSkipGroups` | `[]` | "Don't count" lists `[{ id, name, on, items }]` |
 | `arbVendorSplit` | `false` | Arbitrage also considers vendor splits (Greater → 3 normal) |
+| `showSwapTab` | `true` | Swap tab visible |
 | `showRecipesTab`, `recipeBases`, `recipeRounds` | `true`, `{}`, `{}` | Recipes tab visible; per-recipe currency and rounds |
 | `priceOverrides` | `{}` | `apiId → { ex, at }`: the player's own price per unit |
 | `gamepadItemBrowse` | `true` | Controller price check: D-pad checks the next item, right stick closes |
