@@ -2342,6 +2342,18 @@ async function initSettings() {
     return ok;
   });
   bindGamepadAction('itemTemp', 'gamepad-item-temp-input', 'gamepad-item-temp-clear');
+  // "Item -> Swap tab" (main.js swapHotkey / controller action swapItem)
+  const swapIn = $('swap-hotkey-input');
+  if (swapIn) {
+    bindHotkeyInput(swapIn, () => config.swapHotkey || '', async (acc) => {
+      const ok = await window.api.setSwapHotkey(acc);
+      if (ok) config.swapHotkey = acc;
+      return ok;
+    });
+    const clr = $('swap-hotkey-clear');
+    if (clr) clr.addEventListener('click', async () => { if (await window.api.setSwapHotkey('')) { config.swapHotkey = ''; swapIn.value = ''; } });
+  }
+  bindGamepadAction('swapItem', 'gamepad-swap-input', 'gamepad-swap-clear');
   const gpBrowse = $('gamepad-item-browse');
   if (gpBrowse) {
     gpBrowse.checked = config.gamepadItemBrowse !== false;

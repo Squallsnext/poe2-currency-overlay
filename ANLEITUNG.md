@@ -248,6 +248,12 @@ steht, dazu wie viel günstiger als direkt. ✎ = dein fixierter Kurs, ⚠ = Kur
 aktuell, „wenig Umsatz“ = deine Menge ist ein großer Teil dessen, was in der letzten
 Stunde gehandelt wurde. Zwischen zwei Tauschen kann sich der Kurs bewegen.
 
+**Item direkt übernehmen:** Einstellungen → Allgemein → **„Item ins Tauschen übernehmen“**
+eine Taste geben (Tastatur und/oder Controller). Im Spiel über eine Währung fahren, Taste
+drücken – der Tauschen-Tab geht auf mit ihr als „Ich habe“ und der Stapelgröße als Menge.
+Bei anderen Items passiert nichts. Tipp: nicht dieselbe Taste wie der Stash-Scan nehmen –
+mit Controller steht der Cursor im Stash immer auf einem Item.
+
 ## 6. Rezepte
 
 Lohnt es sich, Teile zu kaufen, zu kombinieren (oder beim Händler aufzuteilen) und zu

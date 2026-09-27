@@ -29,6 +29,9 @@ contextBridge.exposeInMainWorld('api', {
   setExcludeExaltedArb: (on) => ipcRenderer.invoke('set-exclude-exalted-arb', on),
   setArbVendorSplit: (on) => ipcRenderer.invoke('set-arb-vendor-split', on),
   // tab builder (Net Worth: "Neues Fach anlegen")
+  onSwapItemCopied: (cb) => ipcRenderer.on('swap-item-copied', (_e, text) => cb(text)),
+  swapItemShow: () => ipcRenderer.send('swap-item-show'),
+  setSwapHotkey: (acc) => ipcRenderer.invoke('set-swap-hotkey', acc),
   setStashUnits: (list) => ipcRenderer.invoke('set-stash-units', list),
   stashBuilderStart: (opts) => ipcRenderer.invoke('stash-builder-start', opts || {}),
   stashBuilderDelete: (key) => ipcRenderer.invoke('stash-builder-delete', key),

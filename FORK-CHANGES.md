@@ -931,6 +931,13 @@ over whole orbs, so the start amount is rounded up. Checked with the player's
 screenshot rates (1 Chaos = 70.9 Ex, 1 Div = 532 Ex, direct 8.21 Chaos per Div):
 via Exalted 7.50 Chaos per Div, 8.6 % cheaper, for 10 Div 7 Chaos saved - the same as
 by hand. Hideable like Recipes (`showSwapTab`).
+**Item -> Swap tab** (Settings → General, keyboard hotkey `swapHotkey` and controller action
+`swapItem`, both unbound by default): hover a currency in game, press - the item is copied
+(the price check's Ctrl+C, one per press) and, if the exchange trades it, the Swap tab
+opens with it as "I have" and its stack size as "I spend" (German "Stapelgröße: 1.234/5000"
+-> 1234). On any other item nothing happens and the overlay stays shut. Its own action on
+purpose: on a controller the cursor always rests on a stash cell, so sharing the stash
+scan's button would open the Swap tab on every scan.
 ### 4.12 Fragment tab (sub-tab "Fragmente")
 
 Asked for: the Fragment stash tab (patch 0.5) was not supported. `renderer/stash/
@@ -1026,6 +1033,7 @@ card's tab picker. The scan result now carries `detect` for this.
 | `stashSkipGroups` | `[]` | "Don't count" lists `[{ id, name, on, items }]` |
 | `arbVendorSplit` | `false` | Arbitrage also considers vendor splits (Greater → 3 normal) |
 | `showSwapTab` | `true` | Swap tab visible |
+| `swapHotkey`, `gamepadBindings.swapItem` | `''`, – | Hover a currency, press: Swap tab with it as "I have" |
 | `stashUnits` | `['ex', 'div']` | Net Worth values shown in Exalted / Divine / Chaos |
 | `stashUserTabMaps` | `{}` | Tabs built with the tab builder: `{ key: { label, created, cells: [{ apiId, x, y, w, h }] } }` |
 | `showRecipesTab`, `recipeBases`, `recipeRounds` | `true`, `{}`, `{}` | Recipes tab visible; per-recipe currency and rounds |

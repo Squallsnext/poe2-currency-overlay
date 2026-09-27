@@ -1308,6 +1308,8 @@ window.I18N_CATALOGS.de = {
   "ui.settings.gamepad.browse_label": "Controller: Steuerkreuz prüft das nächste Item",
   "ui.settings.gamepad.browse_sub": "rechter Stick schließt",
   "ui.settings.gamepad.browse_tooltip": "Ist eine Preisprüfung offen, die du mit dem Controller geöffnet hast, prüft ein Druck aufs Steuerkreuz (das im Spiel den Cursor bewegt) das nächste Item, sobald der Cursor steht. Rechter Stick oder die Taste nochmal: schließen. Ein Druck = höchstens ein Kopieren, sonst wird nichts ans Spiel gesendet.",
+  "ui.settings.swap_hotkey_label": "Item ins Tauschen übernehmen",
+  "ui.settings.swap_hotkey_tooltip": "Im Spiel über eine Währung fahren und drücken: der Tauschen-Tab öffnet sich mit ihr als „Ich habe“ und der Stapelgröße als Menge. Bei anderen Items passiert nichts.",
   "ui.settings.reprice.gamepad_button.mute": "Mikrofon (Mute)",
   "ui.settings.gamepad.close_label": "Controller: Overlay schließen",
   "ui.settings.gamepad.close_tooltip": "Optional: eine Controller-Taste, die das Overlay nur schließt, wenn es offen ist - öffnet nie ein leeres Overlay, anders als der Umschalter oben. Wie ein Druck auf Escape.",

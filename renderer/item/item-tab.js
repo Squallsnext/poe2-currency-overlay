@@ -2991,6 +2991,7 @@
   // networth-ui calls this when a capture fires so the tally is visible even
   // when the tab is hidden in App Settings
   window.showNetWorthTab = () => setTab('networth');
+  window.showSwapTab = () => setTab('swap');
 
   function setTab(which) {
     if (which === true) which = 'items'; // legacy boolean callers

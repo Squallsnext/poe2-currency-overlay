@@ -165,6 +165,40 @@
       if (e.target.closest('.sw-flip')) { const h = state.have; state.have = state.want; state.want = h; save(); render(); }
     });
   }
+  // "Item -> Swap": the hovered item's text (main.js swap-item-copied). A currency the
+  // exchange trades becomes "I have" with its stack as the amount ("I spend N"); the
+  // overlay then opens on this tab. Anything else is left alone.
+  const STACK_RE = /^(?:Stack Size|Stapelgröße|Размер стопки|Taille de la pile|Tamaño de pila|Tamanho da Pilha):\s*([\d.,\s\u00a0]+)\//i;
+  const RARITY_RE = /^(?:Rarity|Seltenheit|Редкость|Rareté|Rareza|Raridade):/;
+  function fromItemText(text) {
+    const lines = String(text || '').split(/\r?\n/).map((l) => l.trim());
+    const ri = lines.findIndex((l) => RARITY_RE.test(l));
+    const name = ri >= 0 ? lines[ri + 1] : '';
+    if (!name) return null;
+    const sl = lines.find((l) => STACK_RE.test(l));
+    const stack = sl ? parseInt(STACK_RE.exec(sl)[1].replace(/[^0-9]/g, ''), 10) : 1;
+    const want = name.toLowerCase();
+    const id = currencies().find((cid) => {
+      const en = String((catalog[cid] && catalog[cid].text) || '').toLowerCase();
+      return en === want || nameOf(cid).toLowerCase() === want;
+    });
+    return id ? { id, stack: stack > 0 ? stack : 1 } : null;
+  }
+  if (window.api && window.api.onSwapItemCopied) {
+    window.api.onSwapItemCopied((text) => {
+      if (typeof catalog === 'undefined' || !Object.keys(catalog).length) return;
+      const hit = fromItemText(text);
+      if (!hit) return;
+      state.have = hit.id;
+      state.amt = String(hit.stack);
+      state.side = 'give';
+      if (state.want === hit.id) state.want = hit.id === 'divine' ? 'exalted' : 'divine';
+      save();
+      if (window.showSwapTab) window.showSwapTab();
+      render();
+      if (window.api.swapItemShow) window.api.swapItemShow();
+    });
+  }
   window.addEventListener('DOMContentLoaded', wire);
-  window.Swap = { render: () => { wire(); render(); }, _routes: routes };
+  window.Swap = { render: () => { wire(); render(); }, _routes: routes, _fromItemText: fromItemText };
 })();

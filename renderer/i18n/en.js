@@ -1316,6 +1316,8 @@ window.I18N_CATALOGS.en = {
   "ui.settings.gamepad.browse_label": "Controller: D-pad checks the next item",
   "ui.settings.gamepad.browse_sub": "right stick closes",
   "ui.settings.gamepad.browse_tooltip": "While a price check opened with the controller is up, a D-pad press (which moves the cursor in game) also checks the next item once the cursor rests; the right stick or the button again closes it. One press = at most one copy, nothing else is sent to the game.",
+  "ui.settings.swap_hotkey_label": "Item to Swap tab",
+  "ui.settings.swap_hotkey_tooltip": "Hover a currency in game and press this: the Swap tab opens with it as \"I have\" and its stack size as the amount. On anything else nothing happens.",
   "ui.settings.reprice.gamepad_button.mute": "Mic mute",
   "ui.settings.gamepad.close_label": "Controller: close overlay",
   "ui.settings.gamepad.close_tooltip": "Optional: a controller button that only closes the overlay if it's open - never opens a blank one, unlike the toggle above. Same as pressing Escape.",

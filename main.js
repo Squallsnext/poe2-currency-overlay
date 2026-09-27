@@ -251,6 +251,7 @@ const DEFAULT_CONFIG = {
   // through Raw Input (below anything an overlay can intercept) and walks the
   // character right, closing stash/vendor windows. F carries no movement.
   itemHotkey: 'Control+F', // hover an item in game, press this: copies + opens the Items tab; overlay STAYS
+  swapHotkey: '', // hover a currency in game, press: the Swap tab opens with it as "I have" (stack size as amount)
   itemHotkeyTemp: 'Control+Alt+F', // same check, but the overlay hides once the mouse visits it and leaves
   stashHotkey: 'F7', // view a currency tab in game, press this: reads + values it into the Net Worth tally
   gameWindowMatch: 'Path of Exile 2', // LINUX only: window title xdotool looks for (non-English clients)
@@ -1120,11 +1121,11 @@ function registerItemHotkey() {
   if (!config) return;
   // two-hotkey behavior: pin = overlay stays until hidden; temp = overlay
   // hides itself once the mouse visits the app and leaves it
-  const binds = [[config.itemHotkey, 'pin'], [config.itemHotkeyTemp, 'temp']];
+  const binds = [[config.itemHotkey, 'pin'], [config.itemHotkeyTemp, 'temp'], [config.swapHotkey, 'swap']];
   for (const [acc, mode] of binds) {
     if (!acc) continue;
     try {
-      const ok = globalShortcut.register(acc, () => onItemHotkey(mode, acc));
+      const ok = globalShortcut.register(acc, () => (mode === 'swap' ? onItemHotkey('pin', acc, { swap: true }) : onItemHotkey(mode, acc)));
       if (!ok) console.error(`Item hotkey "${acc}" is taken by another app`);
     } catch (err) {
       console.error(`Failed to register item hotkey "${acc}":`, err.message);
@@ -1213,6 +1214,7 @@ const GAMEPAD_ACTIONS = {
   // since a controller player has no separate close button they'd reliably reach for.
   itemPin: () => { if (overlayShown) hideOverlay(true); else { startItemBrowse('pin'); onItemHotkey('pin', null); } },
   itemTemp: () => { if (overlayShown) hideOverlay(true); else { startItemBrowse('temp'); onItemHotkey('temp', null); } },
+  swapItem: () => { onItemHotkey('pin', null, { swap: true }); },
   stashCapture: () => captureAndBroadcast(),
   repriceToggle: () => reprice.toggle(),
   repriceRead: () => reprice.startAttempt(),
@@ -1475,7 +1477,14 @@ async function onItemHotkey(mode = 'pin', acc = null, opts = {}) {
       if (cleared && before) clipboard.writeText(before); // put their clipboard back
       // manual-workflow fallback (Ctrl+Alt+C then hotkey) - but never text we
       // already consumed, which would silently re-search the previous item
-      if (looksLikeItemText(before) && before !== lastConsumedItemText) text = before;
+      if (!opts.swap && looksLikeItemText(before) && before !== lastConsumedItemText) text = before;
+    }
+    // "Item -> Swap" (swapHotkey / controller action swapItem): the Swap tab decides
+    // whether the item is a currency it can trade; only then the overlay opens on it
+    // (swap-item-show). Nothing hovered, or not a currency: nothing happens.
+    if (opts.swap) {
+      if (text && win) win.webContents.send('swap-item-copied', text);
+      return;
     }
     if (!overlayShown) showOverlay();
     if (win) win.webContents.send('overlay-temp-mode', mode === 'temp');
@@ -1618,6 +1627,17 @@ ipcMain.handle('set-hotkey', (_e, accelerator) => {
   return ok;
 });
 
+ipcMain.on('swap-item-show', () => { if (!overlayShown) showOverlay(); });
+ipcMain.handle('set-swap-hotkey', (_e, acc) => {
+  const next = String(acc || '');
+  if (next && [config.hotkey, config.itemHotkey, config.itemHotkeyTemp, config.stashHotkey].includes(next)) return false;
+  const prev = config.swapHotkey;
+  config.swapHotkey = next;
+  registerHotkey(config.hotkey);
+  if (next && !globalShortcut.isRegistered(next)) { config.swapHotkey = prev; registerHotkey(config.hotkey); return false; }
+  saveConfig();
+  return true;
+});
 ipcMain.handle('set-item-hotkeys', (_e, { pin, temp }) => {
   const nextPin = pin || config.itemHotkey;
   const nextTemp = temp || config.itemHotkeyTemp;
@@ -3671,7 +3691,7 @@ ipcMain.handle('capture-gamepad-button', () => {
 // Keep in sync with GAMEPAD_ACTIONS above - this is the write-side allowlist so an
 // arbitrary string from the renderer can't land as a live config key.
 const GAMEPAD_ACTION_IDS = new Set([
-  'overlay', 'closeOverlay', 'overlayFocus', 'itemPin', 'itemTemp', 'stashCapture',
+  'overlay', 'closeOverlay', 'overlayFocus', 'itemPin', 'itemTemp', 'swapItem', 'stashCapture',
   'repriceToggle', 'repriceRead',
 ]);
 // one button 0..17, or a combo of 2-3 distinct ones (sorted)
