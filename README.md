@@ -66,6 +66,9 @@ it can be taken on its own.
   on or off at the top. ⊘ on a line puts the item into a list with one click.
 - **Prices you can check.** Own price per item; implausible thin-market prices replaced by
   GGG's exchange rate, poe.ninja as a second opinion, all sources on hover.
+- **Tab builder** for tabs the app does not know yet: it finds the cells on a picture
+  of the tab, you name each one from the item list, save - the tab is paired and read
+  like the shipped ones, and can be exported to ship for everyone.
 - "Wrong tab?" correction, the list kept across restarts, reset with backup, support
   pictures and settings export.
 

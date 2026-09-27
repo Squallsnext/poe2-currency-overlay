@@ -944,6 +944,34 @@ Registered like every tab (main.js `TAB_MAPS`, reader-worker `TABS`, Net Worth l
 stop of "scan tabs"). No shipped detection template: the tab tour (or "Wrong tab?") learns
 its fingerprint on the first capture, the first scan places the boxes on the cells.
 **Not yet tested on a real capture of the tab.**
+### 4.13 Tab builder ("Neues Fach anlegen")
+
+Asked for: a new stash tab should not have to wait for a release ("then 300 issues because
+the calibration is off"). Settings → Net Worth → "Eigene Fächer" → **"+ Neues Fach anlegen"**
+with the tab open in game:
+- the app takes a picture and **finds the cells itself** (`renderer/stash/cell-finder.js`:
+  dark areas on the parchment, at least 0.6 of a small cell each way, reading order;
+  a second, looser pass for OWNED cells whose item art makes them too bright). Measured:
+  Fragment tab screenshot 20/20 cells within 3.3 reference px of the hand measurement;
+  real 1080p captures - currency 38/38, breach 29/29, ritual 29/30, essence 62/82 (the
+  20 missing are the column of perfect essences, all owned and bright);
+- `renderer/stash/builder.html/.js/.css`: the cells numbered on the picture; click one,
+  type a few letters, pick the item from the list (the client's own names via
+  game-names.js, English below, with icons), Enter = first match; it moves on to the next
+  unnamed cell. "+ Zelle" adds a missed cell with a click, Entf removes one; unnamed cells
+  are simply not saved;
+- **"Speichern & paaren"** stores the tab (`config.stashUserTabMaps`, key `user-<name>`,
+  cells in reference coordinates), learns its fingerprint from this picture (like the
+  tour's "yes, this is that tab"), reads it and places the boxes by rule - the tour's own
+  path (`tourAutoSnap`, `tourKeep`). From then on the scan key reads it.
+- The tab joins everything else: `TAB_MAPS` in main.js is a proxy over the shipped maps
+  plus `renderer/stash/user-tab-maps.js`; the reader thread gets the definitions with
+  every read; Net Worth adds them to its tab names, so they are in the tour and in
+  "Wrong tab?". Edit (tab open in game), **Export** (a file for the support folder, to be
+  shipped for everyone) and Delete per tab.
+Tested: the cell finder on the captures above, the window with the Fragment screenshot
+(20 cells shown, German search "krisen" -> the three Crisis Fragments, Enter names and
+moves on, save sends the named cells). **Not yet run in the Electron app / in game.**
 
 ## 5. New config keys
 
@@ -959,6 +987,7 @@ its fingerprint on the first capture, the first scan places the boxes on the cel
 | `stashSkipGroups` | `[]` | "Don't count" lists `[{ id, name, on, items }]` |
 | `arbVendorSplit` | `false` | Arbitrage also considers vendor splits (Greater → 3 normal) |
 | `showSwapTab` | `true` | Swap tab visible |
+| `stashUserTabMaps` | `{}` | Tabs built with the tab builder: `{ key: { label, created, cells: [{ apiId, x, y, w, h }] } }` |
 | `showRecipesTab`, `recipeBases`, `recipeRounds` | `true`, `{}`, `{}` | Recipes tab visible; per-recipe currency and rounds |
 | `priceOverrides` | `{}` | `apiId → { ex, at }`: the player's own price per unit |
 | `gamepadItemBrowse` | `true` | Controller price check: D-pad checks the next item, right stick closes |

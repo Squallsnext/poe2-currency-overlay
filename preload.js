@@ -28,6 +28,12 @@ contextBridge.exposeInMainWorld('api', {
   setBgOpacity: (v) => ipcRenderer.invoke('set-bg-opacity', v),
   setExcludeExaltedArb: (on) => ipcRenderer.invoke('set-exclude-exalted-arb', on),
   setArbVendorSplit: (on) => ipcRenderer.invoke('set-arb-vendor-split', on),
+  // tab builder (Net Worth: "Neues Fach anlegen")
+  stashBuilderStart: (opts) => ipcRenderer.invoke('stash-builder-start', opts || {}),
+  stashBuilderDelete: (key) => ipcRenderer.invoke('stash-builder-delete', key),
+  stashBuilderExport: (key) => ipcRenderer.invoke('stash-builder-export', key),
+  stashUserTabs: () => ipcRenderer.invoke('stash-user-tabs'),
+  onStashUserTabsChanged: (cb) => ipcRenderer.on('stash-user-tabs-changed', (_e, m) => cb(m)),
   logParseFail: (info) => ipcRenderer.invoke('log-parse-fail', info),
   setGamepadItemBrowse: (on) => ipcRenderer.invoke('set-gamepad-item-browse', on),
   setRecipePrefs: (prefs) => ipcRenderer.invoke('set-recipe-prefs', prefs),

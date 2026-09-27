@@ -403,6 +403,27 @@
         return b;
       })(),
     ]);
+    // the player's own tabs (tab builder): a new one from the tab open in game, and the
+    // ones built so far - edit (the tab must be open in game), export, delete
+    group(t('networth.builder.group'), [
+      mk(t('networth.builder.new'), t('networth.builder.new_title'), () => startBuilder(null)),
+    ]);
+    for (const [key, label] of Object.entries(userTabs)) {
+      group(label, [
+        mk(t('networth.builder.edit'), t('networth.builder.edit_title'), () => startBuilder(key), true),
+        mk(t('networth.builder.export'), t('networth.builder.export_title'), () => { window.api.stashBuilderExport(key).catch(() => {}); }, true),
+        (() => {
+          const b = mk(t('networth.builder.delete'), null, null, true);
+          let armed = null;
+          b.onclick = async () => {
+            if (!armed) { b.textContent = t('networth.builder.delete_confirm'); armed = setTimeout(() => { armed = null; b.textContent = t('networth.builder.delete'); }, 5000); return; }
+            clearTimeout(armed); armed = null;
+            await window.api.stashBuilderDelete(key).catch(() => null);
+          };
+          return b;
+        })(),
+      ]);
+    }
     group(t('networth.settings.cal_group_support'), [
       mk(t('networth.tour.support_start'), t('networth.tour.support_start_title'), () => startTour(true), true),
       mk(t('networth.tour.export'), t('networth.tour.export_title'), () => { window.api.stashExportSettings().catch(() => {}); }, true),
@@ -1259,6 +1280,34 @@
   // In the order the tabs are reached in game: the runes tab's five sub-tabs one after
   // the other (ritual used to sit between Kalguur runes and soul cores - out of the runes
   // tab and back in, reported), then the rest.
+  // the player's own tabs join TAB_LABEL, so they show up as names, in the tour and in
+  // "Wrong tab?" like the shipped ones (main.js stash-user-tabs / tab builder)
+  let userTabs = {};
+  function setUserTabs(map) {
+    for (const k of Object.keys(TAB_LABEL)) if (k.startsWith('user-')) delete TAB_LABEL[k];
+    userTabs = map || {};
+    for (const [k, label] of Object.entries(userTabs)) TAB_LABEL[k] = label;
+    const sr = document.getElementById('nw-set-root');
+    if (sr && sr.childElementCount) renderSettings(sr);
+    render();
+  }
+  if (window.api.stashUserTabs) window.api.stashUserTabs().then(setUserTabs).catch(() => {});
+  if (window.api.onStashUserTabsChanged) window.api.onStashUserTabsChanged(setUserTabs);
+  async function startBuilder(editKey) {
+    // like calibrating: the settings go, the game (with the new tab open) must be visible
+    const settings = document.getElementById('settings');
+    if (settings) settings.classList.add('hidden');
+    const tabBtn = document.getElementById('tab-networth');
+    if (tabBtn && !tabBtn.classList.contains('active')) tabBtn.click();
+    state.notice = { kind: 'info', msg: t('networth.builder.capturing') };
+    render();
+    const r = await window.api.stashBuilderStart(editKey ? { edit: editKey } : {}).catch(() => null);
+    state.notice = r && r.ok
+      ? { kind: 'ok', msg: t('networth.builder.opened', { n: r.cells }) }
+      : { kind: 'err', msg: t('networth.builder.failed', { error: esc((r && r.error) || '?') }) };
+    render();
+  }
+
   const TOUR_ORDER = ['currency', 'abyss', 'essence', 'runes', 'runes-kalguuran', 'soulcore', 'idol', 'ancient-augment', 'ritual', 'delirium', 'breach', 'expedition', 'fragment'];
   const TOUR_TABS = () => TOUR_ORDER.filter((k) => TAB_LABEL[k]).concat(Object.keys(TAB_LABEL).filter((k) => !TOUR_ORDER.includes(k)));
   let tourHotkeyOn = false;

@@ -1978,7 +1978,7 @@ async function grabScreen(cw, ch, withDataUrl) {
 // knows which tab it is, before the full read finishes.
 // shared by writeStashDebug, stash-teach-count and stash-adjust-open, which all need to
 // map a detected tab name to its slot layout
-const TAB_MAPS = {
+const BUILTIN_TAB_MAPS = {
   currency: require('./renderer/stash/currency-tab-map'),
   abyss: require('./renderer/stash/abyss-tab-map'),
   essence: require('./renderer/stash/essence-tab-map'),
@@ -1993,6 +1993,19 @@ const TAB_MAPS = {
   expedition: require('./renderer/stash/expedition-tab-map'),
   fragment: require('./renderer/stash/fragment-tab-map'),
 };
+// Tabs the player built with the tab builder (config.stashUserTabMaps, see
+// renderer/stash/user-tab-maps.js) join the shipped ones: every TAB_MAPS[tab] lookup and
+// Object.keys(TAB_MAPS) sees them, so reading, aligning, the tour and the box placement
+// need no special case.
+const UTM = require('./renderer/stash/user-tab-maps.js');
+const userTabDefs = () => (config && config.stashUserTabMaps) || {};
+const TAB_MAPS = new Proxy(BUILTIN_TAB_MAPS, {
+  get: (t, k) => (k in t ? t[k] : (typeof k === 'string' && userTabDefs()[k] ? UTM.build(k, userTabDefs()[k]) : undefined)),
+  has: (t, k) => k in t || !!userTabDefs()[k],
+  ownKeys: (t) => Reflect.ownKeys(t).concat(Object.keys(userTabDefs()).filter((k) => !(k in t))),
+  getOwnPropertyDescriptor: (t, k) => (k in t ? Reflect.getOwnPropertyDescriptor(t, k)
+    : (userTabDefs()[k] ? { configurable: true, enumerable: true, writable: false, value: UTM.build(k, userTabDefs()[k]) } : undefined)),
+});
 
 function runReaderWorker(bitmap, W, H, onDetected, opts) {
   return new Promise((resolve) => {
@@ -2018,7 +2031,7 @@ function runReaderWorker(bitmap, W, H, onDetected, opts) {
     const slotOverrides = config.stashSlotOverrides || null;
     // opts.calBox: a panel box to use instead of the calibration (tab tour: where the
     // panel was found for an earlier tab of the same run)
-    w.postMessage({ bitmap: ab, W, H, calBox: (opts && opts.calBox) || config.stashCalibration || null, learnedTemplates, slotOverrides, hiRes: !!config.stashHiRes, userTabSigs: config.stashUserTabSigs || null }, [ab]); // transfer the ~8MB frame, no copy
+    w.postMessage({ bitmap: ab, W, H, calBox: (opts && opts.calBox) || config.stashCalibration || null, learnedTemplates, slotOverrides, hiRes: !!config.stashHiRes, userTabSigs: config.stashUserTabSigs || null, userTabMaps: config.stashUserTabMaps || null }, [ab]); // transfer the ~8MB frame, no copy
   });
 }
 
@@ -4285,6 +4298,119 @@ ipcMain.handle('stash-support-open-folder', async () => { fs.mkdirSync(SUPPORT_D
 ipcMain.handle('stash-tour-capture', async (_e, tab) => tourCapture(tab));
 ipcMain.handle('stash-tour-confirm', async (_e, tab) => tourConfirm(tab));
 ipcMain.handle('stash-tour-discard', async () => { tourPending = null; return true; });
+
+// ---------- tab builder ("Neues Fach anlegen") ----------
+// Asked for: a new stash tab should not wait for a release. Open the tab in game, press
+// "Neues Fach anlegen": the builder window gets a capture of it with every cell found
+// (renderer/stash/cell-finder.js) and numbered; the player clicks a cell, types a few
+// letters, picks the item from the list (with icon), and so on. "Speichern" stores the
+// tab (config.stashUserTabMaps, renderer/stash/user-tab-maps.js), pairs it (learns its
+// fingerprint from this capture, like the tour's "yes, this is that tab"), reads it and
+// places the boxes on the cells by rule - the same path as a tour confirmation.
+let builderWin = null, builderData = null, builderCap = null;
+function closeBuilderWin() { try { if (builderWin && !builderWin.isDestroyed()) builderWin.close(); } catch {} builderWin = null; }
+ipcMain.handle('stash-builder-data', () => builderData);
+ipcMain.handle('stash-builder-start', async (_e, opts) => {
+  try {
+    const editKey = opts && opts.edit;
+    const shot = await tourGrab();
+    if (!shot) return { ok: false, error: 'game-window-not-found' };
+    if (frameLooksBlank(shot.bitmap)) return { ok: false, error: 'game-window-black' };
+    const bitmap = Buffer.from(shot.bitmap), W = shot.W, H = shot.H;
+    const res = await runReaderWorker(bitmap, W, H, null);
+    const box = (res && res.box) || config.stashCalibration;
+    if (!box) return { ok: false, error: 'no-box' };
+    const TT = require('./renderer/stash/tab-templates.json');
+    const cells = require('./renderer/stash/cell-finder.js').findCells(bitmap, W, H, box, TT.box, 4);
+    const x = Math.max(0, Math.round(box.x)), y = Math.max(0, Math.round(box.y));
+    const width = Math.min(W - x, Math.round(box.w)), height = Math.min(H - y, Math.round(box.h));
+    const png = nativeImage.createFromBitmap(bitmap, { width: W, height: H }).crop({ x, y, width, height }).toPNG();
+    builderCap = { bitmap, W, H, box };
+    const def = editKey ? userTabDefs()[editKey] : null;
+    builderData = { width, height, refBox: TT.box, panelBase64: png.toString('base64'), cells, lang: resolvedUiLang(),
+      edit: def ? { key: editKey, label: def.label, cells: def.cells } : null,
+      detected: res && (res.ok && !res.mismatch ? res.tab : res.detectedTab) || null };
+    closeBuilderWin();
+    builderWin = new BrowserWindow({
+      width: Math.min(1500, width + 380), height: Math.min(1050, height + 120), title: 'Neues Fach anlegen', autoHideMenuBar: true,
+      webPreferences: { preload: path.join(__dirname, 'renderer', 'stash', 'builder-preload.js'), contextIsolation: true, nodeIntegration: false },
+    });
+    builderWin.setAlwaysOnTop(true, 'screen-saver');
+    builderWin.on('closed', () => { builderWin = null; builderData = null; });
+    builderWin.loadFile(path.join(__dirname, 'renderer', 'stash', 'builder.html'));
+    return { ok: true, cells: cells.length };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+});
+// every item the reader can price, for the name picker (the player's language is done
+// in the window with the game's own names)
+ipcMain.handle('stash-builder-items', async () => {
+  try {
+    const map = await getStashPriceMap();
+    return Object.keys(map).map((id) => ({ apiId: id, name: map[id].name || id, icon: map[id].icon || null }));
+  } catch { return []; }
+});
+ipcMain.handle('stash-builder-save', async (_e, payload) => {
+  try {
+    const label = String((payload && payload.label) || '').trim().slice(0, 40) || 'Eigenes Fach';
+    const cells = ((payload && payload.cells) || []).filter((c) => c && c.apiId && Number.isFinite(c.x) && Number.isFinite(c.y))
+      .map((c) => ({ apiId: String(c.apiId), x: +c.x, y: +c.y, w: +c.w || 51.5, h: +c.h || 51.5 }));
+    if (!cells.length) return { ok: false, error: 'no-cells' };
+    config.stashUserTabMaps = config.stashUserTabMaps || {};
+    const key = payload.key && config.stashUserTabMaps[payload.key] ? payload.key
+      : UTM.keyFor(label, Object.assign({}, BUILTIN_TAB_MAPS, config.stashUserTabMaps));
+    config.stashUserTabMaps[key] = { label, created: (config.stashUserTabMaps[key] && config.stashUserTabMaps[key].created) || Date.now(), cells };
+    // pair it: this capture IS the tab
+    const cap = builderCap;
+    if (cap) {
+      const sig = tourSig(cap.bitmap, cap.W, cap.H, cap.box);
+      config.stashUserTabSigs = config.stashUserTabSigs || {};
+      config.stashUserTabSigs[key] = [Array.from(sig, (v) => Math.round(v * 10000))];
+    }
+    saveConfig();
+    let out = { ok: true, key, label };
+    if (cap) {
+      const res = await runReaderWorker(cap.bitmap, cap.W, cap.H, null, { calBox: cap.box });
+      const okRead = res && res.ok && !res.mismatch && res.tab === key;
+      const auto = okRead ? await tourAutoSnap(key, { bitmap: cap.bitmap, W: cap.W, H: cap.H, box: res.box, res }, res) : null;
+      const fin = auto && auto.kept ? auto.res : res;
+      if (okRead) publishTourRead(fin, cap.W, cap.H);
+      tourKeep(key, cap.bitmap, cap.W, cap.H, fin);
+      out = Object.assign(out, { detected: res && (res.tab || res.detectedTab) || null, paired: okRead, readCount: fin && fin.readCount, slotCount: fin && fin.slotCount });
+    }
+    try { if (win) win.webContents.send('stash-user-tabs-changed', userTabLabels()); } catch {}
+    return out;
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+});
+ipcMain.handle('stash-builder-delete', async (_e, key) => {
+  if (!UTM.isUserTab(key) || !config.stashUserTabMaps || !config.stashUserTabMaps[key]) return { ok: false };
+  delete config.stashUserTabMaps[key];
+  if (config.stashUserTabSigs) delete config.stashUserTabSigs[key];
+  if (config.stashSlotOverrides) delete config.stashSlotOverrides[key];
+  saveConfig();
+  try { if (win) win.webContents.send('stash-user-tabs-changed', userTabLabels()); } catch {}
+  return { ok: true };
+});
+// a built tab as a file, to send in - then it can ship with the app for everyone
+ipcMain.handle('stash-builder-export', async (_e, key) => {
+  const def = config.stashUserTabMaps && config.stashUserTabMaps[key];
+  if (!def) return { ok: false };
+  fs.mkdirSync(SUPPORT_DIR(), { recursive: true });
+  const file = path.join(SUPPORT_DIR(), `fach-${key}.json`);
+  fs.writeFileSync(file, JSON.stringify({ key, label: def.label, app: app.getVersion(), cells: def.cells, map: UTM.build(key, def) }, null, 2));
+  shell.showItemInFolder(file);
+  return { ok: true, file };
+});
+function userTabLabels() {
+  const out = {};
+  for (const [k, d] of Object.entries(userTabDefs())) out[k] = d.label || k;
+  return out;
+}
+ipcMain.handle('stash-user-tabs', () => userTabLabels());
+ipcMain.on('stash-builder-close', () => closeBuilderWin());
 ipcMain.handle('stash-tour-list', async () => {
   const out = {};
   for (const tab of Object.keys(TAB_MAPS)) {

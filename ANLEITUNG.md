@@ -125,6 +125,21 @@ Andere Auflösung oder UI-Größe? Einfach neu kalibrieren.
    anwenden“, Ziffern anlernen.
 4. Ab jetzt reicht **F7**.
 
+**Ein Fach, das das Programm nicht kennt, selbst anlegen** (Einstellungen → Vermögen →
+„Eigene Fächer“ → **„+ Neues Fach anlegen“**):
+1. Das Fach im Spiel öffnen, dann klicken. Das Programm macht ein Bild und **findet die
+   Zellen selbst** – sie sind nummeriert.
+2. Die erste Zelle ist ausgewählt: **ein paar Buchstaben tippen** (z. B. „krisen“), das
+   Item aus der Liste wählen (**Enter** = erster Treffer). Es springt zur nächsten Zelle.
+   Namen unklar? Im Spiel mit der Maus drüber – auch leere Felder zeigen ihren Namen.
+3. Zellen ohne Namen werden nicht gespeichert – einfach frei lassen. Fehlt eine Zelle
+   (volle Zellen mit hellem Item findet es manchmal nicht): **„+ Zelle“**, ins Bild klicken.
+4. Oben dem Fach einen **Namen** geben, **„Speichern & paaren“**: das Fach ist gepaart, die
+   Kästchen sitzen auf den Zellen. Ab jetzt liest **F7** es.
+5. Zahlen im Vermögen prüfen, wo nötig **Debug** (3.3).
+6. **Exportieren** legt das Fach als Datei in den Support-Ordner – schick sie ein, dann
+   kommt das Fach fest ins Programm. **Bearbeiten** (Fach im Spiel offen) ändert Namen.
+
 ### 3.2 Ausrichten (Kästchen auf die Zahlen setzen)
 
 Beim Fach auf **„Ausrichten“** klicken. Jedes Kästchen ist die Stelle, an der gelesen wird.

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https://web.poecdn.com; style-src 'self'">
+<title>Neues Fach anlegen</title>
+<link rel="stylesheet" href="builder.css">
+</head>
+<body>
+<div id="wrap">
+  <div id="stage"><div id="pic"><img id="panel" alt=""><div id="cells"></div></div></div>
+  <aside id="side">
+    <label class="lab" for="name">Name des Fachs</label>
+    <input id="name" type="text" placeholder="z. B. Fragmente" maxlength="40">
+    <div id="progress" class="dim"></div>
+    <div id="pickbox">
+      <div id="picktitle" class="lab"></div>
+      <input id="search" type="text" placeholder="Item-Name tippen …" autocomplete="off">
+      <div id="hits"></div>
+    </div>
+    <div id="list"></div>
+    <div class="row">
+      <button id="add" title="Fehlt eine Zelle? Klick, dann ins Bild klicken - eine Zelle in Standardgröße entsteht dort.">+ Zelle</button>
+      <button id="del" title="Ausgewählte Zelle entfernen (Entf)">Zelle entfernen</button>
+    </div>
+    <div class="row">
+      <button id="save" class="main">Speichern &amp; paaren</button>
+      <button id="cancel">Abbrechen</button>
+    </div>
+    <div id="msg" class="dim"></div>
+    <details class="help"><summary>Hilfe</summary>
+      <p>Die Zellen hat das Programm selbst gefunden und nummeriert. <b>Klick auf eine Zelle</b>
+      (oder in der Liste), ein paar Buchstaben tippen, das Item wählen (Enter = erster Treffer).
+      Danach springt es zur nächsten Zelle.</p>
+      <p>Zellen, deren Namen du nicht kennst: einfach frei lassen – nur benannte Zellen werden
+      gespeichert. Eine Zelle fehlt (z. B. eine volle mit hellem Item)? <b>+ Zelle</b>, dann ins Bild klicken.</p>
+      <p><b>Speichern &amp; paaren</b>: das Fach wird gespeichert, an diesem Bild erkannt (gepaart) und
+      die Kästchen werden auf die Zellen gesetzt. Danach liest F7 das Fach.</p>
+    </details>
+  </aside>
+</div>
+<script src="../i18n/game-names.js"></script>
+<script src="builder.js"></script>
+</body>
+</html>

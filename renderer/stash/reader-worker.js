@@ -13,6 +13,7 @@ const RP = require('./read-pipeline');
 const TD = require('./tab-detect');
 const PF = require('./panel-finder');
 const SD = require('./slot-defaults');
+const UTM = require('./user-tab-maps');
 const TAB_TEMPLATES = require('./tab-templates.json'); // { box (reference), tw, th, templates }
 const TABS = {
   currency: require('./currency-tab-map'),
@@ -29,6 +30,10 @@ const TABS = {
   expedition: require('./expedition-tab-map'),
   fragment: require('./fragment-tab-map'),
 };
+// the player's own tabs (tab builder, main.js stashUserTabMaps) - sent with every read
+function installUserTabs(defs) {
+  for (const k of Object.keys(defs || {})) { const m = UTM.build(k, defs[k]); if (m) TABS[k] = m; }
+}
 // multi-rendering bank: the base exemplars plus one set per baked capture, so a digit
 // drawn slightly differently on someone else's machine still has something to match
 const RAW_DIGIT_TEMPLATES = require('./digit-templates.json');
@@ -112,13 +117,14 @@ function readSlotsParallel(slots, c, msg) {
     const w = new Worker(__filename);
     w.once('message', (m) => { w.terminate(); if (m && m.reads) { m.reads.forEach((rec, k) => { out[idx[k]] = rec; }); resolve(); } else reject(new Error((m && m.error) || 'helper failed')); });
     w.once('error', (e) => { w.terminate(); reject(e); });
-    w.postMessage({ mode: 'slots', shared, W: c.W, H: c.H, box: c.box, tab: c.tab, idx, learnedTemplates: msg.learnedTemplates, tabOverrides: c.tabOverrides, hiRes: c.hiRes });
+    w.postMessage({ mode: 'slots', shared, W: c.W, H: c.H, box: c.box, tab: c.tab, idx, learnedTemplates: msg.learnedTemplates, tabOverrides: c.tabOverrides, hiRes: c.hiRes, userTabMaps: msg.userTabMaps || null });
   }))).then(() => out);
 }
 
 parentPort.on('message', (msg) => {
   if (msg && msg.mode === 'slots') { // a helper thread: read these slots, send them back
     try {
+      installUserTabs(msg.userTabMaps);
       const map = TABS[msg.tab], refBox = TAB_TEMPLATES.box;
       const c = { tab: msg.tab, buf: Buffer.from(msg.shared), W: msg.W, H: msg.H, box: msg.box, refBox, map, scale: msg.box.h / refBox.h, hiRes: msg.hiRes, tabOverrides: msg.tabOverrides, perSlot: true, bankFor: makeBankFor(msg.learnedTemplates) };
       parentPort.postMessage({ reads: msg.idx.map((i) => readOneSlot(map.STATIC_SLOTS[i], c)) });
@@ -130,6 +136,7 @@ parentPort.on('message', (msg) => {
 async function readFrame(msg) {
   try {
     const { bitmap, W, H, calBox, learnedTemplates, slotOverrides, hiRes, userTabSigs } = msg;
+    installUserTabs(msg.userTabMaps);
     // baked fingerprints plus the ones the player taught via "wrong tab?" (main.js
     // stash-correct-tab), as extra keys "tab@u0".. that map back to their tab
     const DETECT = { tw: TAB_TEMPLATES.tw, th: TAB_TEMPLATES.th, templates: Object.assign({}, TAB_TEMPLATES.templates) };
