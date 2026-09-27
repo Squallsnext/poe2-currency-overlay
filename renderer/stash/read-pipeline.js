@@ -275,6 +275,23 @@
     let own = 0; for (const c of chain) for (let i = 0; i < c.mask.data.length; i++) own += c.mask.data[i] ? 1 : 0;
     return { digits: chain.length, junk: own ? (all - own) / own : 1 };
   }
+  // One digit cut for a template: a frame centred on the strip's middle (so the template
+  // lines up with dy=0 in the reader's search - see stash-teach-count) but tall enough
+  // for the WHOLE digit wherever it sits. It used to be exactly the digit's height,
+  // centred - a digit a few px above or below the middle lost its top or bottom
+  // (reported with the gallery: "die Rahmen sind zu klein ... die Schriften wandern
+  // in px hoch und runter"). Only the digit's own pixels go in, no art beside it.
+  function glyphFrame(c, Hd) {
+    const mid = Hd >> 1;
+    const half = Math.max(mid - c.y, c.y + c.mask.h - mid, (c.mask.h + 1) >> 1);
+    const top = mid - half, h = 2 * half, w = c.mask.w;
+    const data = new Uint8Array(w * h);
+    for (let y = 0; y < c.mask.h; y++) {
+      const ty = c.y - top + y; if (ty < 0 || ty >= h) continue;
+      for (let x = 0; x < w; x++) data[ty * w + x] = c.mask.data[y * w + x];
+    }
+    return { w, h, data };
+  }
   function digitsInPicture(ch, pos, P, floor) { return numberInPicture(ch, pos, P, floor).digits; }
   // The number's digits as the picture shows them (for the digit gallery): each piece cut
   // the way teaching cuts it - full strip height, centred on the strip's middle, so it
@@ -284,17 +301,9 @@
     const S = P.matchScale > 1 ? P.matchScale : 1;
     const pieces = chainPieces(DR.components(binarized, S), S);
     const Hd = binarized.h;
-    const masks = () => pieces.map((c) => {
-      const bw = c.mask.w, bh = c.mask.h, y0 = (Hd >> 1) - (bh >> 1);
-      const m = new Uint8Array(bw * bh);
-      for (let ty = 0; ty < bh; ty++) {
-        const sy = y0 + ty; if (sy < 0 || sy >= Hd) continue;
-        for (let tx = 0; tx < bw; tx++) m[ty * bw + tx] = binarized.data[sy * binarized.w + c.x + tx] ? 1 : 0;
-      }
-      return { w: bw, h: bh, data: m };
-    });
+    const masks = () => pieces.map((c) => glyphFrame(c, Hd));
     return { digits: pieces.length, masks };
   }
 
-  return { EXTREME_SCALE, MARGIN, GROW_SAT, teachCut, segmentDigits, digitsInPicture, numberInPicture, pictureQuality, cropAroundSlot, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
+  return { EXTREME_SCALE, MARGIN, GROW_SAT, glyphFrame, teachCut, segmentDigits, digitsInPicture, numberInPicture, pictureQuality, cropAroundSlot, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
 });

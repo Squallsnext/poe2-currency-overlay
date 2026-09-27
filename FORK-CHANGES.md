@@ -1279,6 +1279,22 @@ same capture read at 91.6 % mean (today with the old learned digits: 88.6 %), 5 
 under 85 % (today 10), no dropped digit (today 1: great chaos "4" is now "45"). Caveat:
 read from the same capture the gallery came from - the next scan is the real test.
 
+### 4.27 Whole digits in templates, the rescued edge in green, a magnifier
+
+- **Whole digits** (reported with the gallery: "die Rahmen sind zu klein ... die
+  Schriften wandern in px hoch und runter"): a learned digit was cut exactly as tall as
+  the digit, centred on the strip's middle - a digit sitting a few px higher or lower
+  lost its top or bottom (the gallery's 1, 2, 3, 4, 5). `RP.glyphFrame`: still centred on
+  the middle (so it lines up at dy=0), but tall enough for the whole digit, and only the
+  digit's own pixels. Used by teaching and the gallery. On the player's 5K currency
+  capture the gallery's digits now agree 84-88 % (before 82-86 %) and the gallery-read
+  mean rose 91.6 -> 92.1 %.
+- **Green edge**: with "save the edge" on, the OCR panel's black/white picture shows the
+  hard cut white and what the edge rescue brought back from the original green, with
+  the pixel count - the rescue sliders can be judged by eye.
+- **Magnifier** (asked for: "mit einer Lupe am besten"): a click on any of the four
+  pictures shows all four big and pixel-sharp, one under the other; a click closes it.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

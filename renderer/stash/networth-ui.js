@@ -74,6 +74,21 @@
     catch { dbgImgCache[k] = { ok: false }; }
     render();
   }
+  // the OCR panel's magnifier: the four pictures big and pixel-sharp
+  function openLoupe(imgs, note) {
+    const ov = el('div', 'nw-loupe');
+    const labels = [t('networth.line.loupe_1'), t('networth.line.loupe_2'), t('networth.line.loupe_3'), t('networth.line.loupe_4')];
+    imgs.forEach((im, i) => {
+      const row = el('div', 'nw-loupe-row');
+      row.appendChild(el('div', 'nw-loupe-lab', esc(labels[i] || '')));
+      const big = el('img', 'nw-loupe-img'); big.src = im.src; row.appendChild(big);
+      ov.appendChild(row);
+    });
+    if (note) ov.appendChild(el('div', 'nw-loupe-note', esc(note)));
+    ov.appendChild(el('div', 'nw-loupe-close', esc(t('networth.line.loupe_close'))));
+    ov.onclick = () => ov.remove();
+    document.body.appendChild(ov);
+  }
   // Teaching (the row's ✓ and the panel's "learn from this image") only when the reader
   // reads the number right but UNSURE - below this confidence. A confident correct read
   // would only add a near-identical copy to the exemplar pool (the learned template is
@@ -1165,8 +1180,15 @@
                 digit: g.digit, pct: Math.round((g.score || 0) * 100), miss: g.miss, extra: g.extra,
                 src: t(String(g.source).startsWith('user-corrections') ? 'networth.line.debug_diff_src_learned' : 'networth.line.debug_diff_src_shipped') }))).join(' · ')
               : '';
+            if (r && r.grow) diffInfo.innerHTML = esc(t('networth.line.debug_grow_legend')) + ' (' + (r.rescued || 0) + ' px). ' + diffInfo.innerHTML;
           };
           showDiff(cached);
+          // the magnifier (asked for: "mit einer Lupe am besten"): a click on any picture
+          // shows all four big and pixel-sharp, one under the other; a click closes it
+          for (const im of [rawImg, filtImg, binImg, diffImg]) {
+            im.style.cursor = 'zoom-in';
+            im.onclick = (e) => { e.stopPropagation(); openLoupe([rawImg, filtImg, binImg, diffImg].filter((x) => x.style.display !== 'none' && x.src), diffInfo.textContent); };
+          }
           imgs.appendChild(rawImg); imgs.appendChild(filtImg); imgs.appendChild(binImg); imgs.appendChild(diffImg);
           dbg.appendChild(imgs);
           dbg.appendChild(diffInfo);
@@ -1279,7 +1301,7 @@
               showDiff(res);
               showPreview(res.preview);
               showTemplates(res.templates);
-              Object.assign(cached, { templates: res.templates, defaults: res.defaults, effFloor: res.effFloor, rawUrl: res.rawUrl, filtUrl: res.filtUrl, binUrl: res.binUrl, diffUrl: res.diffUrl, diffGlyphs: res.diffGlyphs, preview: res.preview });
+              Object.assign(cached, { templates: res.templates, defaults: res.defaults, effFloor: res.effFloor, rawUrl: res.rawUrl, filtUrl: res.filtUrl, binUrl: res.binUrl, diffUrl: res.diffUrl, diffGlyphs: res.diffGlyphs, grow: res.grow, rescued: res.rescued, preview: res.preview });
               for (const sp of specs) cached[sp.key] = res[sp.key];
               if (!touched.has('floor')) sliders.floor.s.value = res.floor;
               sliders.floor.mark();

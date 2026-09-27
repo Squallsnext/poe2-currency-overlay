@@ -2665,18 +2665,9 @@ function teachCount({ apiId, value, settings, tab: tabIn } = {}) {
     const Hd = binarized.h;
     comps.forEach((c, i) => {
       const ch = value[i];
-      const bw = c.mask.w, bh = c.mask.h;
-      const yStart = (Hd >> 1) - (bh >> 1);
-      const mask = new Uint8Array(bw * bh);
-      for (let ty = 0; ty < bh; ty++) {
-        const sy = yStart + ty;
-        if (sy < 0 || sy >= binarized.h) continue;
-        for (let tx = 0; tx < bw; tx++) {
-          const sx = c.x + tx;
-          if (sx < 0 || sx >= binarized.w) continue;
-          mask[ty * bw + tx] = binarized.data[sy * binarized.w + sx];
-        }
-      }
+      // the whole digit in a frame centred on the strip's middle (RP.glyphFrame)
+      const fr = RP.glyphFrame(c, Hd);
+      const bw = fr.w, bh = fr.h, mask = fr.data;
       const arr = learned.exemplars[ch] || (learned.exemplars[ch] = []);
       arr.push({ w: bw, h: bh, data: Array.from(mask) });
       if (arr.length > MAX_EXEMPLARS_PER_DIGIT) arr.shift(); // oldest out, so it keeps drifting with reality
@@ -2806,17 +2797,23 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
       diffGlyphs.push({ digit: bankInfo.unmap(g.ch), source: bankInfo.sourceOf(g.ch), score: g.score, both, miss, extra });
     }
     const diffUrl = diffGlyphs.length ? toUrl(diffBuf, Wd, Hd, 6) : null;
+    // with "save the edge" on, what the edge rescue added is GREEN (the hard cut white),
+    // so the player sees what the rescue does while moving its sliders
+    const core = P.growV ? DR.debugShrunkCell(ch.V, ch.W2, ch.H2, pos.cx, pos.cy, Object.assign({}, P, { floor, growV: null }), cs).binarized : null;
     const binBuf = Buffer.alloc(binarized.w * binarized.h * 4);
+    let rescued = 0;
     for (let i = 0; i < binarized.w * binarized.h; i++) {
       const v = binarized.data[i] ? 255 : 0;
-      binBuf[i * 4] = v; binBuf[i * 4 + 1] = v; binBuf[i * 4 + 2] = v; binBuf[i * 4 + 3] = 255;
+      const edge = core && binarized.data[i] && !core.data[i];
+      if (edge) rescued++;
+      binBuf[i * 4] = edge ? 60 : v; binBuf[i * 4 + 1] = edge ? 220 : v; binBuf[i * 4 + 2] = edge ? 90 : v; binBuf[i * 4 + 3] = 255;
     }
     return {
       ok: true,
       rawUrl: toUrl(rawBuf, cw, chh, UPSCALE),
       filtUrl: toUrl(filtBuf, cw, chh, UPSCALE),
       binUrl: toUrl(binBuf, binarized.w, binarized.h, 6),
-      diffUrl, diffGlyphs,
+      diffUrl, diffGlyphs, rescued,
       floor, effFloor, desatSat, contrast, minBlob, bright, gain, satPct, localThr, growFloor, growDepth, growSat, grow,
       // matchScale as asked for (slider), effective one actually used, and the most
       // this capture allows (1 = not available in this regime)
