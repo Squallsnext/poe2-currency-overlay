@@ -279,6 +279,8 @@ const DEFAULT_CONFIG = {
   priceOverrides: {}, // apiId -> {ex, at}: the user's own price for an item, wins over every feed (see applyPriceRules)
   commandHotkeys: [], // Hotkeys settings: [{command:'/hideout', accelerator:'F8'}] - whitelist-only safe chat commands, one key = one manual command
   stashCalibration: null, // Net Worth: {x,y,w,h} panel box from one-time calibration; null = assume reference res
+  stashConfirmed: {}, // per-tab, per-apiId count the player confirmed (✓ / typed / learned) - not asked about again while the scan reads that count
+  stashTuneBackup: {}, // per-tab slot settings from before the last "Automatisch einstellen" (undo)
   stashSlotOverrides: {}, // per-tab, per-apiId {cx,cy,stripWidth,up,dn} from the in-app "align" tool; overrides the shipped map for slots a user's setup misreads
   itemQ20: true,       // search armour/weapons as if 20% quality
   itemFillRunes: true, // search as if empty rune sockets held Greater Iron Runes
@@ -2820,6 +2822,95 @@ ipcMain.handle('stash-slot-save-read-settings', (_e, { apiId, settings, tab } = 
 // setup is recognised), then the same frame is read again. Tab detection correlates the
 // panel's edge structure against ONE baked fingerprint per tab, and on a setup unlike the
 // one it was baked on two tabs can swap - Kalguuran runes came back as Ancient Augment.
+// ---- A) confirmed counts: a count the player said is right (✓ on an unsure read, a
+// typed correction, "learn from this image"). While the scan reads that same count in
+// that slot, it is not asked about again - whatever its percentage (asked for: "wenn ich
+// dauernd neu lerne ist das dumm"). A different count is checked again. They are also
+// what "Automatisch einstellen" measures against (the counts known to be right).
+ipcMain.handle('stash-confirm-count', (_e, { tab, apiId, count } = {}) => {
+  try {
+    if (!tab || !apiId) return { ok: false };
+    config.stashConfirmed = config.stashConfirmed || {};
+    const t = config.stashConfirmed[tab] || (config.stashConfirmed[tab] = {});
+    if (count == null || !(count > 0)) delete t[apiId]; else t[apiId] = Math.round(count);
+    saveConfig();
+    return { ok: true, confirmed: config.stashConfirmed };
+  } catch (err) { return { ok: false, error: String(err && err.message || err) }; }
+});
+
+// ---- B) "Automatisch einstellen" (renderer/stash/auto-tune.js): tries the read filters
+// on the tab's last capture against the counts known to be right - confirmed ones, and
+// reads the reader is already sure of (90 %+) - then saves what won: one setting for the
+// whole tab if it beats the tab as it reads now, and own settings for slots still weak.
+// The settings before are kept for "Rückgängig". Ends with a re-read of the same picture.
+const TUNE_SURE = 0.9;
+ipcMain.handle('stash-autotune', async (_e, { tab } = {}) => {
+  try {
+    const cap = lastCaptureByTab.get(tab);
+    const map = TAB_MAPS[tab];
+    if (!cap || !map || !cap.res || !Array.isArray(cap.res.reads)) return { ok: false, reason: 'no-recent-capture' };
+    const confirmed = (config.stashConfirmed && config.stashConfirmed[tab]) || {};
+    const truth = [];
+    map.STATIC_SLOTS.forEach((s, i) => {
+      const r = cap.res.reads[i] || {};
+      const c = confirmed[s.apiId];
+      if (c > 0) truth.push({ i, apiId: s.apiId, value: c, confirmed: true });
+      else if (r.count > 0 && r.conf >= TUNE_SURE) truth.push({ i, apiId: s.apiId, value: r.count });
+    });
+    const nConfirmed = truth.filter((x) => x.confirmed).length;
+    if (truth.length < 3) return { ok: false, reason: 'few-truth', n: truth.length };
+    const send = (m) => { try { if (win && !win.isDestroyed()) win.webContents.send('stash-tune-progress', Object.assign({ tab }, m)); } catch {} };
+    const t0 = Date.now();
+    const out = await new Promise((resolve) => {
+      let w;
+      try { const { Worker } = require('worker_threads'); w = new Worker(path.join(__dirname, 'renderer', 'stash', 'reader-worker.js')); }
+      catch (e) { return resolve({ ok: false, error: String(e && e.message || e) }); }
+      const finish = (r) => { try { w.terminate(); } catch {} resolve(r); };
+      w.on('message', (m) => { if (m && m.phase) { send(m); return; } finish(m); });
+      w.on('error', (e) => finish({ ok: false, error: String(e && e.message || e) }));
+      let learnedTemplates = null;
+      try { learnedTemplates = loadLearnedTemplates(); } catch {}
+      const bm = cap.bitmap;
+      const ab = bm.buffer.slice(bm.byteOffset, bm.byteOffset + bm.byteLength);
+      w.postMessage({ mode: 'tune', bitmap: ab, W: cap.W, H: cap.H, box: cap.box, tab, truth, learnedTemplates, hiRes: !!config.stashHiRes,
+        tabOverrides: (config.stashSlotOverrides && config.stashSlotOverrides[tab]) || null, userTabMaps: config.stashUserTabMaps || null }, [ab]);
+    });
+    if (!out || !out.ok) return out || { ok: false, error: 'tune failed' };
+    const changed = out.useTab || Object.keys(out.perSlot).length > 0;
+    if (changed) {
+      config.stashSlotOverrides = config.stashSlotOverrides || {};
+      const cur = config.stashSlotOverrides[tab] || {};
+      config.stashTuneBackup = config.stashTuneBackup || {};
+      config.stashTuneBackup[tab] = JSON.parse(JSON.stringify(cur));
+      const next = JSON.parse(JSON.stringify(cur));
+      if (out.useTab) for (const s of map.STATIC_SLOTS) next[s.apiId] = Object.assign({}, next[s.apiId], out.settings);
+      for (const [id, S] of Object.entries(out.perSlot)) {
+        next[id] = S ? Object.assign({}, cur[id], S) : Object.assign({}, cur[id]); // null: the slot keeps its own
+      }
+      config.stashSlotOverrides[tab] = next;
+      saveConfig();
+    }
+    logToggle('stash-learn', `autotune ${tab}: ${truth.length} known (${nConfirmed} confirmed), right ${out.before.right}->${out.after.right}, conf ${out.before.meanConf.toFixed(3)}->${out.after.meanConf.toFixed(3)}, tab setting ${out.useTab ? JSON.stringify(out.settings) : 'no'}, own ${Object.keys(out.perSlot).length}, weak ${out.stillBad.length}, ${Date.now() - t0}ms`);
+    const result = changed ? await readStashFrame({ bitmap: cap.bitmap, W: cap.W, H: cap.H }) : null;
+    return { ok: true, changed, useTab: out.useTab, own: Object.keys(out.perSlot).length, stillBad: out.stillBad, before: out.before, after: out.after, known: truth.length, confirmed: nConfirmed, result };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message || err) };
+  }
+});
+ipcMain.handle('stash-autotune-undo', async (_e, { tab } = {}) => {
+  try {
+    const bk = config.stashTuneBackup && config.stashTuneBackup[tab];
+    if (!bk) return { ok: false, reason: 'no-backup' };
+    config.stashSlotOverrides = config.stashSlotOverrides || {};
+    config.stashSlotOverrides[tab] = bk;
+    delete config.stashTuneBackup[tab];
+    saveConfig();
+    const cap = lastCaptureByTab.get(tab);
+    const result = cap ? await readStashFrame({ bitmap: cap.bitmap, W: cap.W, H: cap.H }) : null;
+    return { ok: true, result };
+  } catch (err) { return { ok: false, error: String(err && err.message || err) }; }
+});
+
 ipcMain.handle('stash-correct-tab', async (_e, { fromTab, toTab } = {}) => {
   try {
     if (!toTab || !TAB_MAPS[toTab]) return { ok: false, reason: 'unknown-tab' };

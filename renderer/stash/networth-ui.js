@@ -89,7 +89,7 @@
   const TAB_LABEL = { currency: t('networth.tab.currency'), abyss: t('networth.tab.abyss'), essence: t('networth.tab.essence'), runes: t('networth.tab.runes'), 'runes-kalguuran': t('networth.tab.runes_kalguuran'), ritual: t('networth.tab.ritual'), soulcore: t('networth.tab.soulcore'), idol: t('networth.tab.idol'), 'ancient-augment': t('networth.tab.ancient_augment'), delirium: t('networth.tab.delirium'), breach: t('networth.tab.breach'), expedition: t('networth.tab.expedition'), fragment: t('networth.tab.fragment') };
   const MIRROR_ICON = 'https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lEdXBsaWNhdGUiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/26bc31680e/CurrencyDuplicate.png';
 
-  if (window.api && window.api.getConfig) window.api.getConfig().then((c) => { state.dup = !!(c && c.stashDupTabs); state.sortLayout = !!(c && c.stashSortLayout); state.showMissing = !!(c && c.stashShowMissing); state.showConfidence = !!(c && c.stashShowConfidence); state.showOcrDebug = !!(c && c.stashShowOcrDebug); state.units = Array.isArray(c && c.stashUnits) && c.stashUnits.length ? c.stashUnits : ['ex', 'div']; state.hiRes = !!(c && c.stashHiRes); state.showRel = !!(c && c.stashShowReliability); state.calibrated = !!(c && c.stashCalibration); state.hotkey = (c && c.stashHotkey) || 'F7'; state.bannerHidden = !!(c && c.stashBannerHidden); render(); }).catch(() => {});
+  if (window.api && window.api.getConfig) window.api.getConfig().then((c) => { state.dup = !!(c && c.stashDupTabs); state.sortLayout = !!(c && c.stashSortLayout); state.showMissing = !!(c && c.stashShowMissing); state.showConfidence = !!(c && c.stashShowConfidence); state.showOcrDebug = !!(c && c.stashShowOcrDebug); state.units = Array.isArray(c && c.stashUnits) && c.stashUnits.length ? c.stashUnits : ['ex', 'div']; state.hiRes = !!(c && c.stashHiRes); state.showRel = !!(c && c.stashShowReliability); state.calibrated = !!(c && c.stashCalibration); state.hotkey = (c && c.stashHotkey) || 'F7'; state.bannerHidden = !!(c && c.stashBannerHidden); state.confirmed = (c && c.stashConfirmed) || {}; render(); }).catch(() => {});
 
   const rowsOfType = (tab) => state.rows.filter((r) => r.tab === tab);
   // The debug panel of a row: with the OCR-debug switch, or during a check the scan
@@ -549,8 +549,66 @@
   }
   function weakLines(row) {
     return ((row.result && row.result.lines) || [])
-      .filter((ln) => !ln.missing && ln.userCount == null && ln.conf != null && ln.conf < LEARN_BELOW)
+      .filter((ln) => !ln.missing && ln.userCount == null && ln.conf != null && ln.conf < LEARN_BELOW && !isConfirmed(row, ln))
       .sort((a, b) => a.conf - b.conf);
+  }
+  // A) a count the player confirmed for this slot, read again the same: not asked about
+  // again, whatever its percentage (main.js stash-confirm-count)
+  function isConfirmed(row, ln) {
+    const c = state.confirmed && state.confirmed[row.tab];
+    return !!(c && ln.count > 0 && c[ln.apiId] === ln.count);
+  }
+  function confirmCount(row, apiId, count) {
+    if (!window.api.stashConfirmCount) return;
+    state.confirmed = state.confirmed || {};
+    const t0 = state.confirmed[row.tab] || (state.confirmed[row.tab] = {});
+    if (count > 0) t0[apiId] = count; else delete t0[apiId];
+    window.api.stashConfirmCount(row.tab, apiId, count).catch(() => {});
+  }
+
+  // B) "Automatisch einstellen" (main.js stash-autotune, auto-tune.js)
+  async function runAutoTune(row) {
+    if (!window.api.stashAutoTune || state.tuning) return;
+    const tabName = TAB_LABEL[row.tab] || row.tab;
+    state.tuning = { tab: row.tab, phase: 'tune', done: 0, total: 0 };
+    state.cardMenu = null;
+    state.notice = { kind: 'info', msg: t('networth.tune.running', { tab: esc(tabName) }) };
+    render();
+    const res = await window.api.stashAutoTune(row.tab).catch((e) => ({ ok: false, error: String(e && e.message || e) }));
+    state.tuning = null;
+    if (res && res.ok && res.result && res.result.ok && !res.result.mismatch) {
+      applyResult(res.result); // a re-read of the same picture with the new settings
+      for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
+    }
+    if (!res || !res.ok) {
+      state.notice = res && res.reason === 'few-truth'
+        ? { kind: 'warn', msg: t('networth.tune.few', { tab: esc(tabName), n: res.n || 0 }) }
+        : res && res.reason === 'no-recent-capture'
+          ? { kind: 'warn', msg: t('networth.tune.no_capture', { tab: esc(tabName), hotkey: state.hotkey }) }
+          : { kind: 'err', msg: t('networth.tune.failed', { error: esc((res && res.error) || '?') }) };
+      return render();
+    }
+    const pct = (x) => Math.round(x * 100);
+    let msg = !res.changed
+      ? t('networth.tune.nothing', { tab: esc(tabName), n: res.known })
+      : t('networth.tune.done', { tab: esc(tabName), n: res.known, before: pct(res.before.meanConf), after: pct(res.after.meanConf), own: res.own });
+    const rowNow = rowsOfType(row.tab)[0] || row;
+    const weakNow = weakLines(rowNow);
+    if (res.stillBad && res.stillBad.length) {
+      const names = res.stillBad.slice(0, 4).map((id) => { const ln = (rowNow.result.lines || []).find((l) => l.apiId === id); return ln ? window.gameName(ln.name) : id; });
+      msg += ' ' + t('networth.tune.still_weak', { list: esc(names.join(', ')) + (res.stillBad.length > 4 ? ' …' : '') });
+    }
+    const actions = [];
+    if (weakNow.length) actions.push({ label: t('networth.review.start'), fn: () => startReview(rowNow, weakNow.map((ln) => ln.apiId)) });
+    if (res.changed) actions.push({ label: t('networth.tune.undo'), ghost: true, fn: async () => {
+      const u = await window.api.stashAutoTuneUndo(row.tab).catch(() => null);
+      if (u && u.ok && u.result && u.result.ok && !u.result.mismatch) { applyResult(u.result); for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k]; }
+      state.notice = { kind: u && u.ok ? 'ok' : 'warn', msg: t(u && u.ok ? 'networth.tune.undone' : 'networth.tune.undo_failed', { tab: esc(tabName) }) };
+      render();
+    } });
+    actions.push({ label: t('networth.review.later'), ghost: true, fn: () => {} });
+    state.notice = { kind: res.changed ? 'ok' : 'info', msg, actions };
+    render();
   }
   function reviewOffer(res) {
     if (!res || !res.ok || res.mismatch || state.review) return;
@@ -604,6 +662,7 @@
     b('◀ ' + t('networth.review.prev'), () => go(-1), true, r.i === 0);
     if (r.i < r.ids.length - 1) b(t('networth.review.next') + ' ▶', () => go(1));
     b(t('networth.row.adjust_label'), () => openAlign(row.tab), true);
+    if (window.api.stashAutoTune) b(t('networth.tune.button'), () => { endReview(); runAutoTune(row); }, true);
     b(t('networth.review.done'), () => endReview(), r.i < r.ids.length - 1);
     bar.appendChild(btns);
     return bar;
@@ -725,6 +784,12 @@
         head.appendChild(fix);
       }
     }
+    if (menuOpen && window.api.stashAutoTune) {
+      const at = el('button', 'nw-card-adjust', t('networth.tune.button'));
+      at.title = t('networth.tune.title');
+      at.onclick = (e) => { e.stopPropagation(); runAutoTune(row); };
+      head.appendChild(at);
+    }
     // Align: on every scanned tab (it needs the captured frame). Opens the drag-to-fix
     // tool as a real window; saving writes straight into config for the next scan.
     if (menuOpen && window.api.stashAdjustOpen) {
@@ -811,7 +876,7 @@
       else line.appendChild(el('div', 'nw-ic nw-ic-none'));
       line.appendChild(el('div', 'nw-name', esc(window.gameName(ln.name) + (ln.suffix || '')))); // feed is English; show the client's own name (+ "#2" for an extra slot of the same currency)
       // unsure read, even with the percentages hidden: a "?" that opens its check
-      if (!ln.missing && ln.userCount == null && ln.conf != null && ln.conf < LEARN_BELOW && !state.showConfidence && !dbgActive(row)) {
+      if (!ln.missing && ln.userCount == null && ln.conf != null && ln.conf < LEARN_BELOW && !isConfirmed(row, ln) && !state.showConfidence && !dbgActive(row)) {
         const q = el('button', 'nw-weak' + (ln.conf < 0.65 ? ' nw-weak-bad' : ''), '?');
         q.title = t('networth.review.weak_title', { pct: Math.round(ln.conf * 100) });
         q.onclick = (e) => { e.stopPropagation(); startReview(row, [ln.apiId]); };
@@ -834,8 +899,9 @@
       if ((state.showConfidence || dbgActive(row)) && ln.conf != null) {
         const pct = Math.round(ln.conf * 100);
         const cl = pct >= 88 ? 'ok' : (pct >= 80 ? 'mid' : 'low');
-        const cf = el('div', 'nw-conf nw-conf-' + cl, pct + '%');
-        cf.title = t('networth.line.confidence_title');
+        const conf = isConfirmed(row, ln);
+        const cf = el('div', 'nw-conf nw-conf-' + (conf ? 'confirmed' : cl), pct + '%' + (conf ? ' ✓' : ''));
+        cf.title = conf ? t('networth.line.confirmed_title') : t('networth.line.confidence_title');
         line.appendChild(cf);
         // Low confidence but already-correct reads (a thin margin at OCR time, not a
         // wrong value) never reach the teach pipeline otherwise - it only fires on an
@@ -844,12 +910,13 @@
         // from an idle click that never checked the number.
         // below LEARN_BELOW only: a read the reader is already sure of adds nothing but
         // near-identical copies to the exemplar pool
-        if (pct < LEARN_BELOW * 100 && effCount(ln) > 0 && window.api.stashTeachCount) {
+        if (pct < LEARN_BELOW * 100 && effCount(ln) > 0 && !conf && window.api.stashTeachCount) {
           const okBtn = el('button', 'nw-conf-confirm', '✓');
           okBtn.title = t('networth.line.confirm_title');
           okBtn.onclick = async (e) => {
             e.stopPropagation();
             okBtn.disabled = true;
+            confirmCount(row, ln.apiId, effCount(ln)); // right is right, even if learning fails
             let res;
             try { res = await window.api.stashTeachCount(ln.apiId, String(effCount(ln)), undefined, row.tab); }
             catch { res = { ok: false }; }
@@ -869,6 +936,7 @@
                   render();
                 }
               } catch { /* keep the old percentage; the next scan updates it */ }
+              render(); // shows it as confirmed (green ✓)
             } else {
               // Segmentation couldn't isolate one glyph per digit for this exact frame
               // (touching digits, icon bleed, ...) - the teach pipeline refuses rather
@@ -1183,6 +1251,7 @@
               try { res = await window.api.stashTeachCount(ln.apiId, value, v, row.tab); } catch { res = { ok: false }; }
               learnBtn.disabled = false;
               if (res && res.ok) {
+                confirmCount(row, ln.apiId, parseInt(value, 10));
                 learnMsg.textContent = learnNote[slotKey(row.tab, ln.apiId)] = t('networth.line.debug_learn_ok', { value });
                 refreshPreview(); // the reader's answer with the newly learned digits
               } else if (res && res.reason === 'segment-mismatch') {
@@ -1297,6 +1366,7 @@
       // teach the reader from this correction - fire-and-forget, never blocks the UI.
       // Only when there's an actual digit string to learn from (not "correcting" to 0,
       // which usually just means "this slot is empty", not "here is what 0 looks like").
+      if (corrected && v > 0 && row) confirmCount(row, ln.apiId, v); // the typed number is the truth
       if (corrected && v > 0 && window.api.stashTeachCount) {
         window.api.stashTeachCount(ln.apiId, String(v), undefined, row && row.tab).catch(() => {});
       }
@@ -1954,6 +2024,14 @@
     if (window.api.onStashQueued) window.api.onStashQueued((info) => {
       state.queued = (info && info.depth) || 0;
       if (!state.queued) { state.busy = false; state.phase = 'idle'; state.pendingTab = null; }
+      render();
+    });
+    if (window.api.onStashTuneProgress) window.api.onStashTuneProgress((m) => {
+      if (!state.tuning || m.tab !== state.tuning.tab) return;
+      const tabName = TAB_LABEL[m.tab] || m.tab;
+      state.notice = { kind: 'info', msg: m.phase === 'tune-slot'
+        ? t('networth.tune.progress_slots', { tab: esc(tabName), done: m.done, total: m.total })
+        : t('networth.tune.progress', { tab: esc(tabName), pct: Math.min(99, Math.round(100 * m.done / Math.max(1, m.total))) }) };
       render();
     });
     if (window.api.onStashAdjusted) window.api.onStashAdjusted(() => {

@@ -1083,6 +1083,40 @@ Measured over the captures we hold (reads at 60 %+ taken as the value to teach):
 12 -> 15 of 19, 1440p essence 34 -> 45 of 45; slots with a fixed floor unchanged. The
 learn log names the floor used.
 
+### 4.20 Confirmed counts and "Auto-tune"
+
+Asked for by a player who kept nudging sliders per slot ("a 5 at 90 %, then the next 5
+needs the same again") and found re-teaching the same digits over and over pointless.
+
+**Confirmed counts (A).** ✓ on an unsure read, a typed correction and "learn from this
+image" also store the count as confirmed for that tab and slot (`stashConfirmed`,
+main.js `stash-confirm-count`). While a scan reads that same count there, it is not
+listed as unsure, gets no "?" and no ✓ - its percentage shows green with a ✓ ("confirmed
+by you"). A different count is checked again. The threshold itself stays: measured on the
+player's 1080p captures, real misreads sit at 81-84 % too ("511" for 50, "2117" for
+207), so lowering it would let those through unseen.
+
+**Auto-tune (B)** - card ⚙ menu and the check bar ("Automatisch einstellen",
+`renderer/stash/auto-tune.js`, worker mode `tune` in reader-worker.js, main.js
+`stash-autotune`). On the tab's last capture it tries the read filters against the
+counts known to be right (confirmed ones plus reads at 90 %+; at least 3): starting from
+the player's own recipe (saturation 200 %, colour limit 5, contrast 75, specks 11 px)
+and from the reader's defaults, then one slider at a time over a few stops, twice. A
+slot scores its confidence when read right and -0.5 when wrong, so no wrong count can
+pay for a higher percentage elsewhere. One setting for the whole tab is saved only if it
+beats the tab as it reads now; the weakest slots (up to 10) then get their own search,
+with their current settings as the one to beat. The tries run on the helper threads
+(slots of one try spread out; the per-slot searches side by side). Saved settings are
+backed up for "Undo" (`stashTuneBackup`), then the same picture is re-read. Measured on
+the player's real 5K currency capture with their learned digits (every read taken as
+known): unsure 10 -> 3, avg 88.6 -> 90.8 %, all 38 counts unchanged - the player's
+hand-tuned slots beat any single tab setting there, the gain is in the per-slot search.
+On an unlearned upscaled essence capture the filters barely moved the percentage (84.0
+vs 83.8 %): there the ceiling is the learned digit shapes, not the filters. About 70 s
+on a 4-core test box (2 helper threads); a 6-helper machine is roughly three times
+faster. Browser-tested: confirm -> green, same count rescanned -> no question, tune
+progress / result / undo.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
@@ -1096,6 +1130,8 @@ learn log names the floor used.
 | `stashShowReliability` | `false` | "Often misread" row tints |
 | `stashSkipGroups` | `[]` | "Don't count" lists `[{ id, name, on, items }]` |
 | `arbVendorSplit` | `false` | Arbitrage also considers vendor splits (Greater → 3 normal) |
+| `stashConfirmed` | `{}` | Per tab and slot: the count the player confirmed; not asked about again while read the same |
+| `stashTuneBackup` | `{}` | Per tab: slot settings from before the last auto-tune (Undo) |
 | `showSwapTab` | `true` | Swap tab visible |
 | `swapHotkey`, `gamepadBindings.swapItem` | `''`, – | Hover a currency, press: Swap tab with it as "I have" |
 | `stashUnits` | `['ex', 'div']` | Net Worth values shown in Exalted / Divine / Chaos |

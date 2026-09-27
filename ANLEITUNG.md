@@ -187,6 +187,20 @@ zwei zusammen, sind sie zerbrochen oder hängt ein Stück Icon dran, lernt er li
 Falsches. Dann die Filter ein wenig verstellen, bis jede Ziffer sauber einzeln steht, und
 nochmal ✓. Die Leiste sagt dir, was los war („1 Teile gefunden, 2 Ziffern erwartet“).
 
+**Bestätigt = Ruhe:** Drückst du bei einer Zahl ✓ (oder tippst die richtige ein), merkt
+sich das Programm: *in diesem Feld steht diese Zahl*. Liest der nächste Scan dort dieselbe
+Zahl, wird **nicht mehr gefragt** – egal ob 78 % oder 88 %. Die Prozentzahl steht dann grün
+mit ✓. Erst wenn sich die Zahl ändert, wird wieder geprüft.
+
+**Automatisch einstellen** (⚙ am Fach oder in der Prüf-Leiste): Das Programm dreht die
+Regler selbst – so wie du: Sättigung hoch, Farb-Grenze runter, Kontrast hoch, Flecken weg,
+dann Helligkeit, Bild-Kontrast, floor. Gemessen wird an den Zahlen, die sicher stimmen
+(von dir bestätigt oder schon 90 %+; mindestens 3). Erst sucht es **eine** Einstellung
+fürs ganze Fach (nur wenn sie besser ist als jetzt), dann für die schwächsten Felder eine
+**eigene**. Eine falsche Zahl zählt dabei immer als schlecht – höhere Prozente auf Kosten
+einer falschen Zahl gibt es nicht. Dauert je nach Rechner 20–60 s, oben steht der
+Fortschritt. Danach: „Ø 84 % → 92 %“, was noch schwach ist, und **Rückgängig**.
+
 ### 3.3 Debug: eine Zahl sauber lesen
 
 **Einstellungen → „OCR-Debug-Bilder zeigen“** an, dann beim Fach **„Debug“** und in der

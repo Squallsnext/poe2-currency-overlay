@@ -121,7 +121,114 @@ function readSlotsParallel(slots, c, msg) {
   }))).then(() => out);
 }
 
+// ---- "Automatisch einstellen" (auto-tune.js): read chosen slots of a kept capture with
+// candidate filter settings. The same readOneSlot as a scan, so what the search scores is
+// what the next scan reads. Native-regime captures spread each try over helper threads
+// that stay up for the whole run (a few dozen tries), the normalised regime reads here.
+const AT = require('./auto-tune');
+let tuneCtx = null;
+function makeTuneCtx(m) {
+  installUserTabs(m.userTabMaps);
+  const map = TABS[m.tab], refBox = TAB_TEMPLATES.box;
+  const buf = Buffer.from(m.shared);
+  const perSlot = RP.cropAroundSlot(buf, m.W, m.H, m.box, refBox, map.STATIC_SLOTS[0], null).buf !== buf;
+  const chCache = new Map();
+  const chFor = (ov) => {
+    const o = RP.channelOpts(ov), key = RP.channelKey(o);
+    if (!chCache.has(key)) { if (chCache.size > 6) chCache.clear(); chCache.set(key, RP.buildChannel(buf, m.W, m.H, m.box, refBox, o)); }
+    return chCache.get(key);
+  };
+  return { tab: m.tab, buf, W: m.W, H: m.H, box: m.box, refBox, map, scale: m.box.h / refBox.h, hiRes: m.hiRes, base: m.tabOverrides || {}, perSlot, chFor, bankFor: makeBankFor(m.learnedTemplates) };
+}
+// S = the filter keys to try on every slot in idxs (null = each slot as saved now)
+function tuneRead(ctx, S, idxs) {
+  let tabOverrides = ctx.base;
+  if (S) {
+    tabOverrides = Object.assign({}, ctx.base);
+    for (const i of idxs) { const id = ctx.map.STATIC_SLOTS[i].apiId; tabOverrides[id] = Object.assign({}, ctx.base[id], S); }
+  }
+  const c = Object.assign({}, ctx, { tabOverrides });
+  return idxs.map((i) => { const r = readOneSlot(ctx.map.STATIC_SLOTS[i], c); return { count: r.count, conf: r.conf }; });
+}
+async function runTune(msg) {
+  const shared = new SharedArrayBuffer(msg.bitmap.byteLength);
+  new Uint8Array(shared).set(new Uint8Array(msg.bitmap));
+  const base = { shared, W: msg.W, H: msg.H, box: msg.box, tab: msg.tab, learnedTemplates: msg.learnedTemplates, hiRes: msg.hiRes, userTabMaps: msg.userTabMaps || null, tabOverrides: msg.tabOverrides || null };
+  const ctx = makeTuneCtx(base);
+  let helpers = [];
+  if (ctx.perSlot && HELPERS > 1) {
+    try {
+      helpers = await Promise.all(Array.from({ length: HELPERS }, () => new Promise((resolve, reject) => {
+        const w = new Worker(__filename);
+        w.once('message', (m) => (m && m.ready ? resolve(w) : reject(new Error('helper failed'))));
+        w.once('error', reject);
+        w.postMessage(Object.assign({ mode: 'tune-init' }, base));
+      })));
+    } catch { helpers.forEach((w) => { try { w.terminate(); } catch {} }); helpers = []; }
+  }
+  let reqId = 0, rr = 0;
+  const evaluate = async (S, idxs) => {
+    if (!helpers.length) return tuneRead(ctx, S, idxs);
+    const groups = helpers.map(() => []);
+    // one slot (the per-slot search, several slots at once): the next helper in turn
+    if (idxs.length === 1) groups[rr++ % helpers.length].push(0);
+    else idxs.forEach((_i, k) => groups[k % helpers.length].push(k));
+    const out = new Array(idxs.length);
+    await Promise.all(groups.map((g, h) => (!g.length ? null : new Promise((resolve) => {
+      const id = ++reqId, w = helpers[h];
+      const on = (m) => { if (!m || m.id !== id) return; w.off('message', on); m.reads.forEach((r, j) => { out[g[j]] = r; }); resolve(); };
+      w.on('message', on);
+      w.postMessage({ mode: 'tune-eval', id, S, idxs: g.map((k) => idxs[k]) });
+    }))));
+    return out;
+  };
+  try {
+    const truth = msg.truth;
+    const t = await AT.tuneTab(truth, evaluate, (done) => parentPort.postMessage({ phase: 'tune', done, total: AT.TAB_EVALS }));
+    const perSlot = {}, stillBad = [];
+    const useTab = t.after.score > t.before.score;
+    const final = truth.map((tr, k) => AT.slotScore((useTab ? t.after : t.before).reads[k], tr.value));
+    // weak slots get their own search either way: from the tab setting when it won, and
+    // with their own current settings as the one to beat (a hand-tuned tab often reads
+    // better slot by slot than any single setting - measured on the player's currency tab)
+    {
+      const weak = truth.map((tr, k) => ({ tr, k })).filter((x) => final[x.k] < AT.WEAK)
+        .sort((a, b) => final[a.k] - final[b.k]).slice(0, 10);
+      let n = 0;
+      // all weak slots at once: each one's tries go to the helpers in turn
+      await Promise.all(weak.map(async ({ tr, k }) => {
+        const r = await AT.tuneSlot(tr, t.settings, evaluate);
+        // null = keep what it had (only matters when the tab setting is applied)
+        if (r.settings !== (useTab ? t.settings : null)) perSlot[tr.apiId] = r.settings;
+        final[k] = Math.max(final[k], r.score);
+        parentPort.postMessage({ phase: 'tune-slot', done: ++n, total: weak.length });
+      }));
+    }
+    truth.forEach((tr, k) => { if (final[k] < AT.WEAK) stillBad.push(tr.apiId); });
+    const right = final.filter((x) => x !== AT.WRONG);
+    parentPort.postMessage({
+      ok: true, useTab, settings: t.settings, perSlot, stillBad,
+      before: { right: t.before.right, n: t.before.n, meanConf: t.before.meanConf },
+      after: { right: right.length, n: truth.length, meanConf: right.length ? right.reduce((a, b) => a + b, 0) / right.length : 0 },
+    });
+  } finally {
+    helpers.forEach((w) => { try { w.terminate(); } catch {} });
+  }
+}
+
 parentPort.on('message', (msg) => {
+  if (msg && msg.mode === 'tune-init') {
+    try { tuneCtx = makeTuneCtx(msg); parentPort.postMessage({ ready: true }); } catch (err) { parentPort.postMessage({ error: String(err && err.message || err) }); }
+    return;
+  }
+  if (msg && msg.mode === 'tune-eval') {
+    parentPort.postMessage({ id: msg.id, reads: tuneRead(tuneCtx, msg.S, msg.idxs) });
+    return;
+  }
+  if (msg && msg.mode === 'tune') {
+    runTune(msg).catch((err) => parentPort.postMessage({ ok: false, error: String(err && err.message || err) }));
+    return;
+  }
   if (msg && msg.mode === 'slots') { // a helper thread: read these slots, send them back
     try {
       installUserTabs(msg.userTabMaps);
