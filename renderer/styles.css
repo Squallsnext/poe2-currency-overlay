@@ -2145,9 +2145,12 @@ footer {
 .nw-gal-drop { position: absolute; top: 2px; right: 3px; background: transparent; border: none; color: var(--tx-faint); cursor: pointer; }
 .nw-gal-drop:hover { color: var(--red, #e05555); }
 .nw-gal-warn { font-size: 12px; color: var(--am-hi); }
-.nw-loupe { position: fixed; inset: 0; z-index: 9999; background: rgba(10,9,8,.94); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; cursor: zoom-out; overflow: auto; }
+/* the magnifier: all five pictures fit the window (each a fifth of its height, minus the
+   texts), top-aligned - centred, a column taller than the window lost its top (reported:
+   "Lupe fängt erst an bei 2 Graubild") */
+.nw-loupe { position: fixed; inset: 0; z-index: 9999; background: rgba(10,9,8,.94); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 8px; padding: 12px 16px; cursor: zoom-out; overflow: auto; }
 .nw-loupe-row { display: flex; align-items: center; gap: 12px; width: 100%; justify-content: center; }
 .nw-loupe-lab { width: 90px; font-size: 12px; color: var(--tx-dim); text-align: right; }
-.nw-loupe-img { image-rendering: pixelated; width: min(78vw, 900px); height: auto; border: 1px solid var(--bd-09); background: #000; }
+.nw-loupe-img { image-rendering: pixelated; height: calc((100vh - 130px) / 5); width: auto; max-width: 80vw; object-fit: contain; border: 1px solid var(--bd-09); background: #000; }
 .nw-loupe-note { font-size: 13px; color: var(--tx-body); max-width: 900px; text-align: center; }
 .nw-loupe-close { font-size: 12px; color: var(--tx-faint); }
