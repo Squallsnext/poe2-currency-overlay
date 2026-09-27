@@ -2807,6 +2807,35 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
       diffGlyphs.push({ digit: bankInfo.unmap(g.ch), source: bankInfo.sourceOf(g.ch), score: g.score, both, miss, extra });
     }
     const diffUrl = diffGlyphs.length ? toUrl(diffBuf, Wd, Hd, 6) : null;
+    // Extraction fidelity (asked for: "die Grenze ausloten, wo das Freistellen kippt"):
+    // the reader's number (picture 4, after the sliders) against the number freed straight
+    // from the original with fixed values (RP.originalNumber) - no templates involved.
+    // White = both, RED = in the original's digit but missing in the reader's picture,
+    // BLUE = the reader's number has it, the original's digit not, grey = other ink in the
+    // reader's picture (art). Treue = white / (white + red + blue).
+    let truthUrl = null, truth = null;
+    try {
+      const ref = RP.originalNumber(ch, pos, Object.assign({}, P, { floor }));
+      if (ref && ref.w === Wd && ref.h === Hd) {
+        const Sx = P.matchScale > 1 ? P.matchScale : 1;
+        const rn = new Uint8Array(Wd * Hd);
+        for (const c of DR.numberPieces(DR.components(binarized, Sx), Sx)) for (let y = 0; y < c.mask.h; y++) for (let x = 0; x < c.mask.w; x++) if (c.mask.data[y * c.mask.w + x]) rn[(c.y + y) * Wd + c.x + x] = 1;
+        const tb = Buffer.alloc(Wd * Hd * 4);
+        let both = 0, miss = 0, extra = 0, junk = 0;
+        for (let i = 0; i < Wd * Hd; i++) {
+          const o = i * 4, A = ref.data[i], Bn = rn[i], Bany = binarized.data[i];
+          let b = 0, g = 0, r = 0; // BGRA
+          if (A && Bn) { both++; b = g = r = 255; }
+          else if (A) { miss++; b = 40; g = 40; r = 235; }
+          else if (Bn) { extra++; b = 255; g = 130; r = 60; }
+          else if (Bany) { junk++; b = g = r = 90; }
+          tb[o] = b; tb[o + 1] = g; tb[o + 2] = r; tb[o + 3] = 255;
+        }
+        const u = both + miss + extra;
+        truth = { fidelity: u ? +(both / u).toFixed(3) : 0, miss, extra, junk, digitsOrig: ref.digits };
+        truthUrl = toUrl(tb, Wd, Hd, 6);
+      }
+    } catch { /* a debugging aid only */ }
     // The freed digit ON the original (asked for: "die Ziffer, die freigestellt wurde, auf
     // der Original-Ansicht ... um sehen zu können, wo sie sich befindet"): the original's
     // cell, cut and shrunk exactly like the black/white picture so they line up pixel for
@@ -2850,7 +2879,7 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
       rawUrl: toUrl(rawBuf, cw, chh, UPSCALE),
       filtUrl: toUrl(filtBuf, cw, chh, UPSCALE),
       binUrl: toUrl(binBuf, binarized.w, binarized.h, 6),
-      diffUrl, diffGlyphs, rescued, overlayUrl,
+      diffUrl, diffGlyphs, rescued, overlayUrl, truthUrl, truth,
       floor, effFloor, desatSat, contrast, minBlob, bright, gain, satPct, localThr, growFloor, growDepth, growSat, grow,
       // matchScale as asked for (slider), effective one actually used, and the most
       // this capture allows (1 = not available in this regime)

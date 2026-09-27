@@ -305,6 +305,45 @@
     }
     return { w, h, data };
   }
+  // The number as the ORIGINAL shows it, with fixed neutral values - independent of every
+  // slider (the "truth" of the extraction test, asked for: "die Grenze ausloten"): sure
+  // digit pixels (bright >= 200, colour spread <= 40), the number's chain of them, grown
+  // into the connected light, nearly colourless pixels (>= 120, spread <= 90). Same cell
+  // window as the black/white picture, so both line up pixel for pixel.
+  const TRUTH = { strong: 200, strongSpread: 40, weak: 120, weakSpread: 90 };
+  function originalNumber(ch, pos, P) {
+    const n = ch.W2 * ch.H2, R = new Uint8Array(n), G = new Uint8Array(n), B = new Uint8Array(n);
+    for (let i = 0; i < n; i++) { R[i] = ch.orig[i * 4]; G[i] = ch.orig[i * 4 + 1]; B[i] = ch.orig[i * 4 + 2]; }
+    const wr = DR.cellWindow(R, ch.W2, ch.H2, pos.cx, pos.cy, P, ch.cellScale);
+    const wg = DR.cellWindow(G, ch.W2, ch.H2, pos.cx, pos.cy, P, ch.cellScale);
+    const wb = DR.cellWindow(B, ch.W2, ch.H2, pos.cx, pos.cy, P, ch.cellScale);
+    if (!wr) return null;
+    const w = wr.w, h = wr.h, N = w * h;
+    const strong = new Uint8Array(N), weak = new Uint8Array(N);
+    for (let i = 0; i < N; i++) {
+      const r = wr.data[i], g = wg.data[i], b = wb.data[i];
+      const mx = Math.max(r, g, b), sp = mx - Math.min(r, g, b);
+      if (mx >= TRUTH.strong && sp <= TRUTH.strongSpread) strong[i] = 1;
+      if (mx >= TRUTH.weak && sp <= TRUTH.weakSpread) weak[i] = 1;
+    }
+    const S = P.matchScale > 1 ? P.matchScale : 1;
+    const seeds = DR.numberPieces(DR.components({ data: strong, w, h }, S), S);
+    const out = new Uint8Array(N);
+    const stack = [];
+    for (const c of seeds) for (let y = 0; y < c.mask.h; y++) for (let x = 0; x < c.mask.w; x++) {
+      if (c.mask.data[y * c.mask.w + x]) { const k = (c.y + y) * w + c.x + x; if (!out[k]) { out[k] = 1; stack.push(k); } }
+    }
+    while (stack.length) {
+      const q = stack.pop(), qx = q % w, qy = (q / w) | 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = qx + dx, ny = qy + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const k = ny * w + nx;
+        if (!out[k] && weak[k]) { out[k] = 1; stack.push(k); }
+      }
+    }
+    return { w, h, data: out, digits: seeds.length };
+  }
   function digitsInPicture(ch, pos, P, floor) { return numberInPicture(ch, pos, P, floor).digits; }
   // The number's digits as the picture shows them (for the digit gallery): each piece cut
   // the way teaching cuts it - full strip height, centred on the strip's middle, so it
@@ -318,5 +357,5 @@
     return { digits: pieces.length, masks };
   }
 
-  return { EXTREME_SCALE, MARGIN, GROW_SAT, glyphFrame, teachCut, segmentDigits, digitsInPicture, numberInPicture, pictureQuality, cropAroundSlot, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
+  return { EXTREME_SCALE, MARGIN, GROW_SAT, TRUTH, originalNumber, glyphFrame, teachCut, segmentDigits, digitsInPicture, numberInPicture, pictureQuality, cropAroundSlot, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
 });

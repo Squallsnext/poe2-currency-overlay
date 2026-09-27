@@ -1316,6 +1316,21 @@ read from the same capture the gallery came from - the next scan is the real tes
   capture after the gallery: no count changed, mean 92.1 -> 92.0 % - the own digits win
   anyway; the switch makes sure a digit is never compared with a worse shipped one.
 
+### 4.29 Extraction fidelity (no templates involved)
+
+Asked for: test where freeing the number from the original stops working, independent of
+any template ("die Grenze ausloten"). `RP.originalNumber` frees the number straight from
+the original with fixed values, untouched by the sliders - sure digit pixels (bright >=
+200, colour spread <= 40), the number's chain of them, grown into the connected light,
+nearly colourless pixels (>= 120, spread <= 90). The OCR panel's 6th picture lays the
+reader's number (picture 4, after the sliders) on it: white = both, red = the original's
+digit has it and the reader's lacks it, blue = the other way round, grey = other ink; above
+it "Extraction fidelity 93 % (12 missing, 4 extra)". Measured over the player's 5K currency
+capture (38 slots, their own filters then deliberately worse): their "Jawbone" setting
+median 92 %, colour limit 60: 94 %, floor 160: 80 %, floor 200: 66 % - raising the floor
+thins the digits and the fidelity falls with it. The fixed truth has its own limits (a digit
+touching bright art), so a single low slot is worth a look with the magnifier, not a verdict.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
