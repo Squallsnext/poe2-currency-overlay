@@ -1000,6 +1000,24 @@ confidence and ✓ - without the debug switch (`dbgActive` in networth-ui.js: th
 a running check). **Done** closes it. With percentages hidden, an unsure number carries a
 small "?" (red under 65 %) that opens the check for just that one. Tested in the browser
 with a mocked scan (notice, bar, picture requested per number, next / done).
+The number being checked is moved right under the bar (with its panel) until Done -
+reported: the bar sits at the top, the item could be far down the list. A ✓ that cannot
+teach (the black/white picture does not split into one part per digit) now says why in
+the bar instead of only turning into a "!", and the bar says it is on purpose: nudge the
+filters until each digit stands whole and alone, then again.
+
+### 4.17 Faster count reading (essence tab 22 s -> 3 s at 5K)
+
+Reported: the essence tab took long. Measured at 5K (high-res on): currency 4.8 s,
+essence 22 s. Essence slots have no shipped 5K filters, so all 82 run the full 8-floor
+sweep, and 93 % of the time was the template slide (`slideMatch` in digit-reader.js).
+It now takes the window's ink from a summed-area table of the strip (a blank window is
+dropped without being read) and counts the overlap over the template's ink pixels only.
+Exact, not an approximation (0/1 masks: IoU = inter / (templateInk + winInk - inter)):
+all 1706 reads over every capture we hold (1080p + 1440p, every tab, high-res on and
+off, 5K currency x2 and essence) came back identical, count and confidence. Times:
+5K essence 22.1 -> 3.2 s, 5K currency 4.8 -> 1.1 s, 1440p essence 3.9 -> 0.75 s,
+1080p essence 2.3 -> 0.54 s; the OCR debug preview and teaching use the same code.
 ### 4.15 Net Worth values in Ex / Div / Chaos
 
 Asked for: Divine next to Exalted in every line, and a choice - "some want only Ex, or

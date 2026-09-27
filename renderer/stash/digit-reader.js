@@ -332,13 +332,54 @@
 
   // Slide template across a binary strip; best vertical offset per x column.
   // Returns [{ x, dy, score }].
-  function slideMatch(strip, tmpl, dyLo, dyHi, minInkFrac) {
+  //
+  // Same scores as the plain version (copy the window, IoU against the template), just
+  // counted cheaper - reported: the essence tab took ~22 s at 5K where the currency tab
+  // took ~5 s. Profiled: ~93% of a read was in here. Essence slots have no shipped 5K
+  // filters, so every slot runs the full 8-floor sweep (readCellAdaptive), and at
+  // matchScale 2 each window is 4x the pixels over 2x the positions. Two changes, both
+  // exact (masks are 0/1, so IoU = inter / (templateInk + winInk - inter)):
+  //  - the window's ink comes from a summed-area table of the strip (one lookup instead of
+  //    copying Tw x Th pixels) - a mostly blank window fails minInkFrac without being read;
+  //  - the overlap is counted over the TEMPLATE's ink pixels only (offsets cached per
+  //    template and strip width) instead of over the whole window.
+  // Measured: every read of every capture we hold (1080p/1440p, all tabs, high-res on and
+  // off, 5K currency + essence) is identical, count and confidence.
+  function integralOf(strip) {
     const { data: S, w: Wd, h: Hd } = strip;
-    const { data: T, w: Tw, h: Th } = tmpl;
+    const I = new Int32Array((Wd + 1) * (Hd + 1));
+    for (let y = 0; y < Hd; y++) {
+      let row = 0;
+      for (let x = 0; x < Wd; x++) {
+        row += S[y * Wd + x];
+        I[(y + 1) * (Wd + 1) + x + 1] = I[y * (Wd + 1) + x + 1] + row;
+      }
+    }
+    return I;
+  }
+  const inkOffsCache = new WeakMap(); // template -> Map(strip width -> Int32Array)
+  function inkOffsets(tmpl, Wd) {
+    let byW = inkOffsCache.get(tmpl);
+    if (!byW) { byW = new Map(); inkOffsCache.set(tmpl, byW); }
+    let offs = byW.get(Wd);
+    if (!offs) {
+      const { data: T, w: Tw, h: Th } = tmpl, list = [];
+      for (let ty = 0; ty < Th; ty++) for (let tx = 0; tx < Tw; tx++) if (T[ty * Tw + tx]) list.push(ty * Wd + tx);
+      offs = Int32Array.from(list);
+      byW.set(Wd, offs);
+    }
+    return offs;
+  }
+  function slideMatch(strip, tmpl, dyLo, dyHi, minInkFrac, integral) {
+    const { data: S, w: Wd, h: Hd } = strip;
+    const { w: Tw, h: Th } = tmpl;
     if (Tw > Wd) return [];
-    const templateInk = inkSum(tmpl);
+    const I = integral || integralOf(strip);
+    const offs = inkOffsets(tmpl, Wd);
+    const templateInk = offs.length;
+    const minInk = minInkFrac * templateInk;
+    const W1 = Wd + 1;
     const out = [];
-    const win = new Uint8Array(Tw * Th);
     const xEnd = Math.max(1, Wd - Tw + 1);
     for (let x = 0; x < xEnd; x++) {
       let bestDy = null, bestScore = 0;
@@ -347,14 +388,14 @@
         const yStart = yCenter - (Th / 2 | 0);
         const yEnd = yStart + Th;
         if (yStart < 0 || yEnd > Hd) continue;
-        // extract window (exact Tw x Th)
-        let winInk = 0;
-        for (let ty = 0; ty < Th; ty++) {
-          const srow = (yStart + ty) * Wd + x, drow = ty * Tw;
-          for (let tx = 0; tx < Tw; tx++) { const v = S[srow + tx]; win[drow + tx] = v; winInk += v; }
-        }
-        if (winInk < minInkFrac * templateInk) continue;
-        const score = iou(win, T);
+        const x1 = Math.min(x + Tw, Wd); // a template wider than the strip is caught above
+        const winInk = I[yEnd * W1 + x1] - I[yStart * W1 + x1] - I[yEnd * W1 + x] + I[yStart * W1 + x];
+        if (winInk < minInk) continue;
+        const base = yStart * Wd + x;
+        let inter = 0;
+        for (let k = 0; k < offs.length; k++) inter += S[base + offs[k]];
+        const uni = templateInk + winInk - inter;
+        const score = uni > 0 ? inter / uni : 0;
         if (score > bestScore) { bestScore = score; bestDy = dy; }
       }
       if (bestDy !== null && bestScore > 0) out.push({ x, dy: bestDy, score: bestScore });
@@ -710,9 +751,10 @@
   // collect candidates over all templates at a given IoU threshold.
   function collect(strip, templates, thresh, P) {
     const out = [];
+    const integral = integralOf(strip); // once per strip, shared by every template
     for (const ch of Object.keys(templates)) {
       const t = templates[ch];
-      const ms = slideMatch(strip, t, P.dyLo, P.dyHi, P.minInkFrac);
+      const ms = slideMatch(strip, t, P.dyLo, P.dyHi, P.minInkFrac, integral);
       for (const m of ms) if (m.score >= thresh) out.push({ x: m.x, ch, score: m.score, tw: t.w });
     }
     return out;

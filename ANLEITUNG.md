@@ -173,6 +173,13 @@ eintragen), **Weiter**, zum Schluss **Fertig**. Der Debug-Schalter muss dafür *
 sein. Ohne Prozentanzeige steht neben einer unsicheren Zahl ein kleines **?** – anklicken
 prüft genau diese Zahl.
 
+Beim Prüfen steht das Item **direkt unter der Leiste**, bis du fertig bist – du musst es
+nicht in der Liste suchen. **Lernt er eine Zahl nicht?** Das ist Absicht: Er lernt nur,
+wenn im rechten Schwarz-Weiß-Bild **jede Ziffer einzeln und ganz** zu sehen ist. Kleben
+zwei zusammen, sind sie zerbrochen oder hängt ein Stück Icon dran, lernt er lieber nichts
+Falsches. Dann die Filter ein wenig verstellen, bis jede Ziffer sauber einzeln steht, und
+nochmal ✓. Die Leiste sagt dir, was los war („1 Teile gefunden, 2 Ziffern erwartet“).
+
 ### 3.3 Debug: eine Zahl sauber lesen
 
 **Einstellungen → „OCR-Debug-Bilder zeigen“** an, dann beim Fach **„Debug“** und in der

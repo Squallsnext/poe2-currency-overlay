@@ -1004,6 +1004,7 @@ window.I18N_CATALOGS.en = {
   "networth.review.start": "Check now",
   "networth.review.later": "Later",
   "networth.review.head": "Check {i} of {n}: {name} {pct}",
+  "networth.review.why_fail": "A number will not learn? That is on purpose: it only learns when the black-and-white picture on the right shows every digit whole and on its own - if two touch, one is broken, or icon remains hang on, it would rather learn nothing than something wrong. Nudge the filters until each digit stands clean and alone, then try again.",
   "networth.review.how": "Is the number right? Press ✓ (teaches it). Wrong? Type the right one at \"Learn from this image\". If the picture is noisy, open the filters and tune them.",
   "networth.review.prev": "Back",
   "networth.review.next": "Next",

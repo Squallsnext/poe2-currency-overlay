@@ -999,6 +999,7 @@ window.I18N_CATALOGS.de = {
   "networth.review.start": "Jetzt prüfen",
   "networth.review.later": "Später",
   "networth.review.head": "Prüfen {i} von {n}: {name} {pct}",
+  "networth.review.why_fail": "Lernt er eine Zahl nicht? Das ist so gewollt: Er lernt nur, wenn im rechten Schwarz-Weiß-Bild jede Ziffer einzeln und ganz zu sehen ist – kleben zwei zusammen, sind sie zerbrochen oder hängt Icon-Rest dran, lernt er lieber nichts Falsches. Dann die Filter ein wenig verstellen, bis jede Ziffer sauber einzeln steht, und nochmal.",
   "networth.review.how": "Stimmt die Zahl? ✓ drücken (lernt sie). Falsch? Die richtige bei „Aus diesem Bild lernen“ eintragen. Stört das Bild, die Filter aufklappen und einstellen.",
   "networth.review.prev": "Zurück",
   "networth.review.next": "Weiter",

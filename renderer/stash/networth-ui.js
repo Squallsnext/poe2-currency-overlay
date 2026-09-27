@@ -583,6 +583,8 @@
     const pct = ln && ln.conf != null ? Math.round(ln.conf * 100) + ' %' : '';
     bar.appendChild(el('div', 'nw-review-head', t('networth.review.head', { i: r.i + 1, n: r.ids.length, name: esc(name), pct })));
     bar.appendChild(el('div', 'nw-review-how', t('networth.review.how')));
+    bar.appendChild(el('div', 'nw-review-how', t('networth.review.why_fail')));
+    if (learnNote[r.ids[r.i]]) bar.appendChild(el('div', 'nw-review-note', esc(learnNote[r.ids[r.i]])));
     const btns = el('div', 'nw-review-btns');
     const go = (d) => { r.i = Math.max(0, Math.min(r.ids.length - 1, r.i + d)); state.dbgLine = r.ids[r.i]; render(); };
     const b = (label, fn, ghost, dis) => { const x = el('button', 'nw-set-btn' + (ghost ? ' nw-set-btn-ghost' : ''), esc(label)); x.disabled = !!dis; x.onclick = (e) => { e.stopPropagation(); fn(); }; btns.appendChild(x); };
@@ -753,7 +755,15 @@
     // with this tab's debug on, the unread slots are listed too - they are the ones that
     // need tuning (reported: at 1080p nothing was read, so there was nothing to pick)
     const dbgOn = dbgActive(row);
-    const shown = state.showMissing || dbgOn ? owned.concat(missing) : owned;
+    let shown = state.showMissing || dbgOn ? owned.concat(missing) : owned;
+    // while checking unsure numbers the one being checked sits right under the check bar,
+    // with its filter panel (reported: the bar is at the top, the item can be far down
+    // the list - "man sucht das"); back in its place once the check is done
+    const revId = state.review && state.review.rowId === row.id ? state.review.ids[state.review.i] : null;
+    if (revId) {
+      const cur = shown.find((ln) => ln.apiId === revId);
+      if (cur) shown = [cur].concat(shown.filter((ln) => ln !== cur));
+    }
     for (const ln of shown) {
       // Rows our own testing says to distrust are marked, so a wrong number is visible
       // rather than silently averaged into the total. `rel` is measured per slot against
@@ -766,6 +776,7 @@
         + (ln.userCount != null ? ' nw-line-edited' : '')
         + (ln.excluded || skipGroup(ln) ? ' nw-line-off' : '')
         + (ln.missing ? ' nw-line-missing' : '')
+        + (ln.apiId === revId ? ' nw-line-review' : '')
         + (relFlag ? ' nw-line-rel-' + relFlag : ''));
       if (relFlag) {
         line.title = relFlag === 'low'
@@ -824,6 +835,7 @@
             try { res = await window.api.stashTeachCount(ln.apiId, String(effCount(ln))); }
             catch { res = { ok: false }; }
             if (res && res.ok) {
+              if (state.review) learnNote[ln.apiId] = t('networth.line.debug_learn_ok', { value: String(effCount(ln)) });
               okBtn.classList.add('nw-conf-confirm-done');
               okBtn.textContent = '✓';
               okBtn.title = t('networth.line.confirm_done_title');
@@ -846,6 +858,13 @@
               okBtn.textContent = '!';
               okBtn.title = t('networth.line.confirm_failed_title');
               okBtn.disabled = false;
+              // during a check the reason goes into the bar, readable, not just a "!"
+              if (state.review) {
+                learnNote[ln.apiId] = res && res.reason === 'segment-mismatch'
+                  ? t('networth.line.debug_learn_parts', { found: res.found, want: res.want })
+                  : t('networth.line.debug_learn_failed');
+                render();
+              }
             }
           };
           line.appendChild(okBtn);
