@@ -2834,7 +2834,7 @@ async function stashResultWithPrices(res, W, H) {
   lines.sort((a, b) => (b.valueEx || 0) - (a.valueEx || 0));
   return {
     ok: true, tab: res.tab, w: W, h: H, readCount: res.readCount, slotCount: res.slotCount,
-    totalEx: total, divPrice, chaosPrice, mirrorPrice, totalDiv: divPrice ? total / divPrice : null, lines, flags, mismatch: false,
+    totalEx: total, divPrice, chaosPrice, mirrorPrice, detect: res.detect || null, totalDiv: divPrice ? total / divPrice : null, lines, flags, mismatch: false,
     autoFound: !!res.autoFound, // false = the panel finder came up empty, so manual calibration is worth offering
   };
 }

@@ -508,6 +508,32 @@
     const res = await window.api.stashAdjustOpen(tab).catch(() => ({ ok: false }));
     if (!res || !res.ok) console.warn('stash-adjust-open:', res && res.reason);
   }
+  // A tab recognised only narrowly: ask once. Measured on the player's 1080p captures with
+  // the shipped fingerprints: tabs read right led the runner-up by 0.20-0.65, the two
+  // misreads (Kalguur runes and soul cores taken for Ancient Augments - sub-tabs that look
+  // alike) by 0.08 and 0.21. Under DETECT_MARGIN the scan asks; "yes" teaches this tab's
+  // fingerprint from the picture (then it leads by far and the question does not come
+  // back), "no" opens the tab picker of that card.
+  const DETECT_MARGIN = 0.25;
+  function detectOffer(res) {
+    const d = res && res.ok && !res.mismatch && res.detect;
+    if (!d || d.score == null || d.runnerScore == null || !d.runnerUp || d.runnerUp === res.tab) return;
+    if (d.score - d.runnerScore >= DETECT_MARGIN) return;
+    if (state.notice && (state.notice.actions || state.notice.pickTab)) return;
+    const rows = rowsOfType(res.tab);
+    const row = rows[rows.length - 1];
+    if (!row) return;
+    state.notice = { kind: 'warn', msg: t('networth.notice.detect_close', { tab: TAB_LABEL[res.tab] || res.tab, other: TAB_LABEL[d.runnerUp] || d.runnerUp }),
+      actions: [
+        { label: t('networth.notice.detect_yes'), fn: async () => {
+          const r = await window.api.stashCorrectTab(res.tab, res.tab).catch(() => null);
+          state.notice = r && r.ok ? { kind: 'ok', msg: t('networth.notice.detect_learned', { tab: TAB_LABEL[res.tab] || res.tab }) } : null;
+          render();
+        } },
+        { label: t('networth.notice.detect_no'), ghost: true, fn: () => { state.cardMenu = row.id; state.tabFix = row.id; state.expanded[row.id] = true; } },
+      ] };
+    render();
+  }
   function weakLines(row) {
     return ((row.result && row.result.lines) || [])
       .filter((ln) => !ln.missing && ln.userCount == null && ln.conf != null && ln.conf < LEARN_BELOW)
@@ -1878,6 +1904,7 @@
       calCheckResult(res);
       // first scan of a tab: its boxes were put onto the cells (main.js autoPlaceNewTab)
       if (res && res.autoPlaced && !state.notice) { state.notice = { kind: 'ok', msg: t('networth.notice.auto_placed', { tab: TAB_LABEL[res.tab] || res.tab, n: res.autoPlaced }) }; render(); }
+      detectOffer(res);
       reviewOffer(res);
     });
     if (window.api.onStashQueued) window.api.onStashQueued((info) => {

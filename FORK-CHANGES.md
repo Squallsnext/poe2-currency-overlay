@@ -1005,6 +1005,12 @@ longer just says so: its picture is kept ("__unknown") and the notice asks "Whic
 this?" - picking one pairs it from that picture (stash-correct-tab, like the tour) and
 reads it; "+ New tab" opens the tab builder on the same picture. Tested in the browser
 (⚙ menu, align call, unknown scan -> pick -> paired and listed).
+A tab recognised only NARROWLY is asked about: measured on the player's 1080p captures
+with the shipped fingerprints, correct tabs led the runner-up by 0.20-0.65, the two
+misreads (Kalguur runes and soul cores taken for Ancient Augments) by 0.08 and 0.21. Under
+0.25 the scan asks "Recognised narrowly: X - Y looked almost the same. Is it X?"; yes
+teaches X's fingerprint from this picture (the question does not come back), no opens the
+card's tab picker. The scan result now carries `detect` for this.
 
 ## 5. New config keys
 
