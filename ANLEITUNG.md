@@ -46,10 +46,14 @@ Alles läuft nur auf deinen Tastendruck; das Programm steuert das Spiel nie.
 Runde, Gold, Anpinnen.
 
 **Controller**: jede Hotkey-Aktion auf eine Taste oder Kombination – Preis prüfen,
-Stash scannen, Overlay im Vordergrund usw.
+Stash scannen, Overlay im Vordergrund usw. Bei offener Preisprüfung prüft das
+Steuerkreuz das nächste Item, der rechte Stick schließt.
 
-**Deutscher Client**: Preisabfragen für Tafeln, Unikate, Außergewöhnliche Items und
-umbenannte Runen.
+**Preisprüfung**: dasselbe Item nochmal zeigt 3 Stunden lang das gespeicherte Ergebnis –
+keine neue Abfrage („Suchen“ fragt live neu ab).
+
+**Deutscher Client**: Preisabfragen für Tafeln, Unikate (auch Trephina, Volls Protektor,
+Wylunds Pfahl), Außergewöhnliche Items und umbenannte Runen.
 
 ---
 
@@ -70,6 +74,10 @@ Gegenstände und die umbenannten Wiederbelebungs-Runen. Nichts einzustellen.
   die PS-Taste benutzt das Spiel nicht. Eine einzelne Taste löst nicht aus, solange PS
   gedrückt ist.
 - **Mute-Taste** (Mikrofon) ist auch belegbar – das Spiel liest sie nicht.
+- **Items nacheinander prüfen**: Preisprüfung mit der Controller-Taste öffnen, dann mit dem
+  **Steuerkreuz** zum nächsten Item – es wird geprüft, sobald der Cursor kurz steht.
+  **Rechter Stick** oder die Taste nochmal schließt. Leeres Feld: das letzte Ergebnis
+  bleibt stehen. Abschaltbar in Einstellungen → Allgemein.
 - **„Overlay im Vordergrund öffnen“**: öffnet das Overlay und macht es zum aktiven
   Fenster; nochmal drücken schließt es und gibt das Spiel zurück.
 

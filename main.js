@@ -205,6 +205,7 @@ const DEFAULT_CONFIG = {
   autoAddDefaults: false,
   overrides: { enabled: false, rates: {}, ratesAt: {} }, // ratesAt: when each was pinned
   excludeExaltedArb: false, // Ange charges gold per unit; exclude exalted as a route middle
+  gamepadItemBrowse: true, // item check opened by controller: D-pad re-checks, right stick closes
   arbVendorSplit: false, // arbitrage also considers splitting a higher tier at a vendor (Greater -> 3 normal)
   currencyIcons: false, // show currency icons instead of names next to denominations/prices (dyslexia aid)
   dyslexicFont: false, // render the whole app in the bundled OpenDyslexic typeface (accessibility)
@@ -1042,6 +1043,7 @@ function syncOverlayState() {
 
 function hideOverlay(toGame) {
   overlayShown = false;
+  stopItemBrowse();
   try {
     const wasFocused = win.isFocused();
     if (process.platform !== 'win32') { try { globalShortcut.unregister('Escape'); } catch {} }
@@ -1207,12 +1209,39 @@ const GAMEPAD_ACTIONS = {
   // Unlike the keyboard hotkey (which always re-checks and "stays open"), the
   // controller button toggles: a second press closes what the first one opened,
   // since a controller player has no separate close button they'd reliably reach for.
-  itemPin: () => { if (overlayShown) hideOverlay(true); else onItemHotkey('pin', null); },
-  itemTemp: () => { if (overlayShown) hideOverlay(true); else onItemHotkey('temp', null); },
+  itemPin: () => { if (overlayShown) hideOverlay(true); else { startItemBrowse('pin'); onItemHotkey('pin', null); } },
+  itemTemp: () => { if (overlayShown) hideOverlay(true); else { startItemBrowse('temp'); onItemHotkey('temp', null); } },
   stashCapture: () => captureAndBroadcast(),
   repriceToggle: () => reprice.toggle(),
   repriceRead: () => reprice.startAttempt(),
 };
+
+// ---- Browsing items with the controller (reported: "look at an item, then the next one:
+// PS to close, D-pad, PS again - every time") ----
+// While an item check the CONTROLLER opened is up, a D-pad press - which the game itself
+// uses to move the cursor to the next slot - also re-checks the item under the cursor
+// once it has settled; the right stick (moving on in the game) or the bound button again
+// closes the check. One press of the player = at most one Ctrl+C, the same copy the price
+// check hotkey sends; nothing here moves or clicks anything in the game, and the D-pad
+// press itself reaches the game untouched (we only listen to the HID reports).
+// Settled = no further D-pad press for BROWSE_SETTLE_MS: walking across five slots makes
+// one trade search, not five (the trade site's rate limit is shared with every search).
+// An empty slot copies nothing - the last result simply stays (no "copy failed" notice).
+const DPAD = [12, 13, 14, 15];
+const BROWSE_SETTLE_MS = 350;
+let itemBrowse = null; // 'pin' | 'temp' while active
+let browseTimer = null;
+function startItemBrowse(mode) { itemBrowse = config.gamepadItemBrowse !== false ? mode : null; }
+function stopItemBrowse() { itemBrowse = null; clearTimeout(browseTimer); browseTimer = null; }
+function scheduleBrowseCheck() {
+  clearTimeout(browseTimer);
+  browseTimer = setTimeout(function run() {
+    if (!itemBrowse || !overlayShown) return;
+    if (itemHotkeyBusy) { browseTimer = setTimeout(run, 120); return; }
+    onItemHotkey(itemBrowse, null, { quiet: true });
+  }, BROWSE_SETTLE_MS);
+}
+
 let gamepadStarted = false;
 // A binding is one button index or a combo (sorted array, e.g. [6, 16] = L2 + PS).
 // A combo fires when its last button goes down and exactly its buttons are held.
@@ -1232,6 +1261,7 @@ function startGamepadListener() {
   if (gamepadStarted) return;
   gamepadStarted = true;
   gamepad.onButtonDown((btn, held) => {
+    if (itemBrowse && overlayShown && DPAD.includes(btn) && !held.has(GP_PS)) scheduleBrowseCheck();
     const binds = config.gamepadBindings || {};
     const all = Object.values(binds).concat((config.commandHotkeys || []).map((r) => r && r.gamepad));
     for (const action in GAMEPAD_ACTIONS) {
@@ -1241,6 +1271,7 @@ function startGamepadListener() {
       if (row && gamepadBindingFires(row.gamepad, btn, held, all) && isAllowedCommand(row.command)) sendChatCommand(row.command);
     }
   });
+  gamepad.onStick(() => { if (itemBrowse && overlayShown) hideOverlay(true); });
   gamepad.start();
 }
 
@@ -1305,7 +1336,7 @@ const ITEM_TEXT_MARKERS = [
 ];
 const looksLikeItemText = (t) => !!t && ITEM_TEXT_MARKERS.some((m) => t.includes(m));
 
-async function onItemHotkey(mode = 'pin', acc = null) {
+async function onItemHotkey(mode = 'pin', acc = null, opts = {}) {
   if (itemHotkeyBusy) return;
   itemHotkeyBusy = true;
   logToggle('item-hotkey', `press mode=${mode} winFocused=${!!(win && win.isFocused())}`);
@@ -1447,9 +1478,12 @@ async function onItemHotkey(mode = 'pin', acc = null) {
     if (!overlayShown) showOverlay();
     if (win) win.webContents.send('overlay-temp-mode', mode === 'temp');
     if (!text) {
-      if (win) win.webContents.send('item-copy-failed');
+      // a D-pad step onto an empty slot (controller browsing): keep the last result
+      if (win && !opts.quiet) win.webContents.send('item-copy-failed');
       return;
     }
+    // browsing back and forth over the same item: no second search
+    if (opts.quiet && text === lastConsumedItemText) return;
     lastConsumedItemText = text;
     if (win) win.webContents.send('item-copied', text);
   } finally {
@@ -1668,6 +1702,13 @@ ipcMain.handle('get-app-version', () => app.getVersion());
 // config file both builds SHARE - a suffixed version there would make the packaged app
 // re-show its patch notes.
 ipcMain.handle('is-dev-build', () => !app.isPackaged);
+
+ipcMain.handle('set-gamepad-item-browse', (_e, on) => {
+  config.gamepadItemBrowse = !!on;
+  if (!on) stopItemBrowse();
+  saveConfig();
+  return config.gamepadItemBrowse;
+});
 
 ipcMain.handle('set-arb-vendor-split', (_e, on) => {
   config.arbVendorSplit = !!on;

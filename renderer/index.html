@@ -75,6 +75,9 @@
                 <div class="kb-field"><span class="kb-hint" data-i18n="ui.settings.gamepad.label">Controller</span><input id="gamepad-item-temp-input" class="kb-input" readonly data-i18n-ph="ui.settings.reprice.gamepad_placeholder" placeholder="click, then press a controller button" /><button id="gamepad-item-temp-clear" class="cmdhk-del" data-i18n="ui.settings.reprice.gamepad_clear" data-i18n-title="ui.settings.reprice.gamepad_clear_tooltip" title="Unbind">×</button></div>
               </div>
               <div class="set-field">
+                <label class="switch set-excl" data-i18n-title="ui.settings.gamepad.browse_tooltip" title="While a price check opened with the controller is up, a D-pad press (which moves the cursor in game) also checks the next item once the cursor rests; the right stick or the button again closes it. One press = at most one copy, nothing is sent to the game besides it."><input type="checkbox" id="gamepad-item-browse" /><span class="sw-track"></span><span class="sw-lab" data-i18n="ui.settings.gamepad.browse_label">Controller: D-pad checks the next item</span><span class="set-sub" data-i18n="ui.settings.gamepad.browse_sub">right stick closes</span></label>
+              </div>
+              <div class="set-field">
                 <div class="set-slab"><label data-i18n="ui.settings.ui_scale_label" data-i18n-title="ui.settings.ui_scale_tooltip" title="Zoom the whole overlay up or down (50-200%).">UI scale</label><span id="scale-value" class="scale-value">100%</span></div>
                 <div id="scale-slider" class="cslider"></div>
               </div>

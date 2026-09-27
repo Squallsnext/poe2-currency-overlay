@@ -81,6 +81,8 @@ function create(deps) {
   let prevBits = new Array(BUTTON_KEYS.length).fill(false);
   let retryTimer = null;
   const listeners = [];
+  const stickListeners = [];
+  let rightStickOut = false; // right stick pushed past the dead zone (edge-triggered)
   let capture = null; // { cb, seen: Set } while the settings capture is waiting
   let captureTimer = null;
 
@@ -114,6 +116,13 @@ function create(deps) {
       if (bits[i] && !prevBits[i]) fireButtonDown(i, held);
     }
     prevBits = bits;
+    // Right stick (report bytes 3/4, 0-255, centre 128): one event when it leaves the
+    // dead zone - half its travel, so a resting stick's drift never fires it.
+    if (buf.length > 4) {
+      const out = Math.max(Math.abs(buf[3] - 128), Math.abs(buf[4] - 128)) > 64;
+      if (out && !rightStickOut && !capture) for (const fn of stickListeners) { try { fn('right'); } catch { /* keep input alive */ } }
+      rightStickOut = out;
+    }
     // a capture ends when every button is up again: what was pressed in between is the
     // binding - one button, or a combo like PS + L2
     if (capture && capture.seen.size && !held.size) {
@@ -161,6 +170,7 @@ function create(deps) {
   }
 
   function onButtonDown(fn) { listeners.push(fn); }
+  function onStick(fn) { stickListeners.push(fn); }
 
   // Settings "click, then press a controller button": collects every button pressed
   // until all are released again, then answers with one index or a sorted combo
@@ -174,7 +184,7 @@ function create(deps) {
     }, timeoutMs || 8000);
   }
 
-  return { start, stop, onButtonDown, captureNext, isConnected: () => !!device };
+  return { start, stop, onButtonDown, onStick, captureNext, isConnected: () => !!device };
 }
 
 module.exports = { create, BUTTON_KEYS };

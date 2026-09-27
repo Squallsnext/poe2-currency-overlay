@@ -2340,6 +2340,15 @@ async function initSettings() {
     return ok;
   });
   bindGamepadAction('itemTemp', 'gamepad-item-temp-input', 'gamepad-item-temp-clear');
+  const gpBrowse = $('gamepad-item-browse');
+  if (gpBrowse) {
+    gpBrowse.checked = config.gamepadItemBrowse !== false;
+    gpBrowse.addEventListener('change', async () => {
+      config.gamepadItemBrowse = gpBrowse.checked;
+      logAction(`controller item browse: ${gpBrowse.checked}`);
+      await window.api.setGamepadItemBrowse(gpBrowse.checked);
+    });
+  }
   const stashHkInput = $('stash-hotkey-input');
   if (stashHkInput) bindHotkeyInput(stashHkInput, () => config.stashHotkey || '', async (acc) => {
     const ok = await window.api.setStashHotkey(acc);

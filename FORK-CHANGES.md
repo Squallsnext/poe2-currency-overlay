@@ -25,6 +25,7 @@ below).
 | Unique items not found on trade from a German client | Unique `name` was the localized title | Use `info.refName` before the title | `renderer/item/item-tab.js` |
 | German "Außergewöhnlich…" (exceptional) items not parsed | Missing `ITEM_EXCEPTIONAL` pattern | Added `^Außergewöhnlich(?:e\|er\|es\|en) (.*)$` | `renderer/vendor/ee2/data/de/client_strings.js` |
 | Lesser/Greater/Perfect **Rebirth Rune** not recognised (no price check, no search) | GGG renamed them in German to "Kleine/Große/Perfekte Wiederbelebungsrune"; the vendored EE2 data (and poe2db) still say "…Wiedergeburt-Rune" | New `scripts/ee2-name-aliases.mjs`: a commented list of renamed items, appended as extra name records (old names keep working); index rebuilt with `gen-ee2-index.mjs de` (ref/stat indexes byte-identical); display names regenerated | `scripts/ee2-name-aliases.mjs`, `renderer/vendor/ee2/data/de/items.ndjson`, `items-name.index.bin`, `renderer/i18n/game-names.js` |
+| Uniques on a base whose translated name stands for several English bases fail to parse ("item.parse_error"): German *Trephina* (Ambosshammer = Anvil Maul **and** Forge Maul), *Volls Protektor*, *Wylunds Pfahl*; 3 in French, 7 in Spanish, 3 in Portuguese, 1 in Russian | `findInDatabase` filtered the unique's variants by the FIRST English base of that name only; for a unique on the second one nothing was left, `info[0]` was undefined and the parse threw | Match any English base of the name, and never filter down to nothing | `renderer/vendor/ee2/src/parser/Parser.ts` |
 | German requirement line not parsed for Dexterity | `REQUIRES_LINE` expected `Geschick ` / `Ges ` with a trailing space | Removed the stray spaces | same |
 
 The tablet fix was confirmed against the live trade API (`Aufseher-Tafel` → 400,
@@ -72,6 +73,18 @@ HID reports instead (`node-hid`, new dependency), in `gamepad.js`.
   AttachThreadInput / SetForegroundWindow combo it already uses to focus the game.
   **Not yet tested in game.** (Driving the overlay with the controller - move between
   buttons, confirm, back - is planned, low priority.)
+
+- **Browsing items with the D-pad** (Settings → General, on by default; config
+  `gamepadItemBrowse`; asked for: "look at an item, then the next: PS to close, D-pad, PS
+  again - every time"). While a price check the controller opened is up, a D-pad press -
+  which the game uses to move its cursor to the next slot - also checks the item under
+  the cursor once it has rested for 350 ms (walking over five slots is one search, not
+  five); the right stick (past half its travel, so drift never fires it) or the bound
+  button closes it. An empty slot copies nothing and the last result stays; the same
+  item again is not searched again. The D-pad press reaches the game untouched (the app
+  only listens to the HID reports); each press causes at most the one Ctrl+C the price
+  check hotkey sends anyway. `gamepad.js` got `onStick`. Tested with synthetic DualSense
+  reports; **not yet tested in game.**
 
 ### Reprice with a controller
 
@@ -792,6 +805,13 @@ in; with exactly one list that is on, straight in; otherwise a small menu picks 
 (an off list is marked "still counts"). The ⊘ tag of a line already left out takes it
 back out on a click. Same config as before (`stashSkipGroups`).
 
+**Price check: the same item again shows the saved result for 3 hours** (asked for:
+checking an item a second time cost another trade search). `item-tab.js` `autoSearch`:
+an item with the same base and every mod at the same value (`itemSig`, now stored with
+each Recent-searches entry) found in the history within 3 h opens that entry - the
+notice says how old it is, "Search" runs it live. Older entries (no signature) are not
+used.
+
 ### 4.8 Setup-specific parts – already removed from this branch
 
 These existed in the player's own build and were **deliberately left out** here:
@@ -901,6 +921,7 @@ Is it worth buying the parts, combining (or splitting at a vendor) and selling?
 | `arbVendorSplit` | `false` | Arbitrage also considers vendor splits (Greater → 3 normal) |
 | `showRecipesTab`, `recipeBases`, `recipeRounds` | `true`, `{}`, `{}` | Recipes tab visible; per-recipe currency and rounds |
 | `priceOverrides` | `{}` | `apiId → { ex, at }`: the player's own price per unit |
+| `gamepadItemBrowse` | `true` | Controller price check: D-pad checks the next item, right stick closes |
 | `ninjaCheck` | `true` | poe.ninja as a price source; replaces a price > 1.5× off only when its own value is direct against Exalted (≥ 1 Div volume) |
 
 Learned templates (`userData/learned-digit-templates.json`) gained `byScale[ms]` for

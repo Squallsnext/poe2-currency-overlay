@@ -89,11 +89,19 @@ tab can be hidden.
 
 Every hotkey action on a button or a combo (PS + L2, the mic mute button too): price
 check of the hovered item, stash scan, reprice read, chat commands, "open overlay in
-front".
+front". With a price check open, the D-pad checks the next item and the right stick
+closes it.
+
+### Price check
+
+The same item checked again within 3 hours shows the saved result instead of searching
+again (less traffic, less of the trade site's rate limit); *Search* still runs it live.
 
 ### German client
 
-Price checks for rare tablets, uniques, exceptional items and the renamed runes.
+Price checks for rare tablets, uniques, exceptional items and the renamed runes. Uniques
+whose base name is shared by two English bases (German *Trephina*, and a few in French,
+Spanish, Portuguese and Russian) no longer fail to parse.
 
 ## Net Worth (stash) – setting it up
 

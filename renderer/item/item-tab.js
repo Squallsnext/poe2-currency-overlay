@@ -2469,6 +2469,7 @@
   function pushHistory(rawListings, total) {
     const rec = {
       ts: Date.now(),
+      sig: itemSig(), // for the 3 h result cache (autoSearch)
       base: state.item.title ? `${state.item.title} (${state.item.base})` : state.item.base,
       summary: summaryOf(state.item),
       icon: state.item.icon || null,
@@ -2638,12 +2639,20 @@
     if (!state.item) return null;
     return state.item.base + '|' + (state.item.mods || []).map((m) => `${m.id}:${m.value}`).join(',');
   }
+  // The same item checked again within PRICE_CACHE_MS shows the saved result instead of
+  // searching again (asked for: flipping back and forth between items, or checking one a
+  // second time, cost a trade search - and a share of the rate limit - each time). Same
+  // item = same base and every mod with the same value (itemSig). The notice says how old
+  // the result is; the Search button still runs it live.
+  const PRICE_CACHE_MS = 3 * 60 * 60 * 1000;
   function autoSearch() {
     const sig = itemSig();
     const now = Date.now();
     if (sig && sig === lastAutoSig && now - lastAutoAt < 1000) return; // same item, just searched
     lastAutoAt = now;
     lastAutoSig = sig;
+    const hit = sig ? state.history.findIndex((r) => r.sig === sig && r.cachedRaw && now - r.ts < PRICE_CACHE_MS) : -1;
+    if (hit >= 0) { handlers.onHistoryOpen(hit); return; }
     doSearch();
   }
 

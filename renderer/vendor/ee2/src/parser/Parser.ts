@@ -351,9 +351,16 @@ function findInDatabase(item: ParserState) {
     if (uniqueInfo?.length) {
       info = uniqueInfo;
     } else if (item.baseType) {
+      // FORK: a translated base name can stand for several English bases - German
+      // "Ambosshammer" is both "Anvil Maul" and "Forge Maul". Filtering by the first
+      // one only left Trephina (a Forge Maul) with no variant at all, info[0] was
+      // undefined and the whole parse threw ("item.parse_error"). Match any of them,
+      // and never filter down to nothing.
       const baseInfo = ITEM_BY_TRANSLATED("ITEM", item.baseType);
       if (baseInfo?.length) {
-        info = info.filter((info) => info.unique!.base === baseInfo[0].refName);
+        const refs = new Set(baseInfo.map((b) => b.refName));
+        const byBase = info.filter((info) => refs.has(info.unique!.base));
+        if (byBase.length) info = byBase;
       }
     }
   }

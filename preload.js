@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('api', {
   setBgOpacity: (v) => ipcRenderer.invoke('set-bg-opacity', v),
   setExcludeExaltedArb: (on) => ipcRenderer.invoke('set-exclude-exalted-arb', on),
   setArbVendorSplit: (on) => ipcRenderer.invoke('set-arb-vendor-split', on),
+  setGamepadItemBrowse: (on) => ipcRenderer.invoke('set-gamepad-item-browse', on),
   setRecipePrefs: (prefs) => ipcRenderer.invoke('set-recipe-prefs', prefs),
   setCurrencyIcons: (on) => ipcRenderer.invoke('set-currency-icons', on),
   checkUpdates: () => ipcRenderer.send('check-updates-now'),
