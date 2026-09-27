@@ -91,9 +91,15 @@ function readOneSlot(s, c) {
   if (raw !== '?') {
     const pic = RP.numberInPicture(ch, pos, Pm, r.floor);
     if (pic.digits > raw.length) short = pic.digits;
-    // the digit gallery (main.js collectDigits): a sure read whose picture shows exactly
-    // its digits hands them over, each with the digit the reader saw
-    else if (pic.digits === raw.length && r.conf >= 0.5) pieces = { ms, masks: pic.masks().map((m, i) => Object.assign(m, { d: raw[i] })) }; // main decides (collectDigits)
+    // the number's picture, digit by digit, goes to main every time: the digit gallery
+    // (collectDigits) takes the digits whose read fits them (d set), the slot memory
+    // (applySlotMemory) compares the whole picture with the one the player confirmed
+    const labelled = pic.digits === raw.length && r.conf >= 0.5;
+    if (pic.digits) pieces = { ms, grow: !!c.grow, masks: pic.masks().map((m, i) => Object.assign(m, { d: labelled ? raw[i] : null })) };
+  } else {
+    // unread: the picture can still match the one the player confirmed here
+    const pic = RP.numberInPicture(ch, pos, Pm, Pm.floor);
+    if (pic.digits) pieces = { ms, grow: !!c.grow, masks: pic.masks().map((m) => Object.assign(m, { d: null })) };
   }
   // pass the measured reliability of this slot through, so the UI can flag the
   // rows our own testing says to distrust rather than showing them all alike

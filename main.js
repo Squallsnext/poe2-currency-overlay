@@ -2434,6 +2434,61 @@ function recomputeLearnedTemplates(learned, digits) {
 }
 // "Gelernte Ziffern prüfen": every learned digit against the shipped ones
 // (learned-audit.js); apply = remove the suspicious ones
+// ---- Slot memory (the player's idea: "jeder Scan ist die Vorlage"): when a count is
+// confirmed, the slot keeps the number's freed picture from that capture (per digit, the
+// way teaching cuts it). A later scan whose freed picture is the SAME - every digit
+// agreeing 93 %+ with the kept one - is that count, whatever the templates read (they may
+// have aged: new settings, a changed font). Only a changed picture (the count changed)
+// is read with the templates, and confirmed once more. Kept per tab and slot in
+// slot-memory.json, tied to the matching resolution and the edge switch it was taken with.
+const MEMORY_MATCH = 0.93;
+function slotMemoryFile() { return path.join(app.getPath('userData'), 'slot-memory.json'); }
+function loadSlotMemory() { try { return JSON.parse(fs.readFileSync(slotMemoryFile(), 'utf8')); } catch { return {}; } }
+function saveSlotMemory(m) { try { fs.writeFileSync(slotMemoryFile(), JSON.stringify(m)); } catch {} }
+function rememberSlot(tab, apiId, count) {
+  try {
+    const mem = loadSlotMemory();
+    const t = mem[tab] || (mem[tab] = {});
+    if (!(count > 0)) { delete t[apiId]; saveSlotMemory(mem); return false; }
+    const cap = lastCaptureByTab.get(tab);
+    const map = TAB_MAPS[tab];
+    const i = map && map.STATIC_SLOTS ? map.STATIC_SLOTS.findIndex((x) => x.apiId === apiId) : -1;
+    const r = cap && cap.res && cap.res.reads && i >= 0 ? cap.res.reads[i] : null;
+    // the picture must show as many digits as the confirmed count has, or it is not this count's picture
+    if (!r || !r.pieces || !r.pieces.masks || r.pieces.masks.length !== String(count).length) { delete t[apiId]; saveSlotMemory(mem); return false; }
+    t[apiId] = { count, ms: r.pieces.ms, grow: !!r.pieces.grow, at: Date.now(),
+      masks: r.pieces.masks.map((m) => ({ w: m.w, h: m.h, b: Buffer.from(Uint8Array.from(m.data)).toString('base64') })) };
+    saveSlotMemory(mem);
+    return true;
+  } catch (err) { logToggle('stash-learn', 'slot memory failed: ' + (err && err.message || err)); return false; }
+}
+function applySlotMemory(res) {
+  try {
+    const mem = loadSlotMemory()[res.tab];
+    if (!mem) return;
+    const LA = require('./renderer/stash/learned-audit.js');
+    let hits = 0, fixed = 0;
+    for (const r of res.reads || []) {
+      const m = r && mem[r.apiId];
+      if (!m || !r.pieces || !r.pieces.masks || r.pieces.ms !== m.ms || !!r.pieces.grow !== !!m.grow) continue;
+      if (r.pieces.masks.length !== m.masks.length) continue;
+      let worst = 1;
+      for (let k = 0; k < m.masks.length && worst >= MEMORY_MATCH; k++) {
+        const a = r.pieces.masks[k], e = m.masks[k];
+        worst = Math.min(worst, LA.maskIoU({ w: a.w, h: a.h, data: a.data }, { w: e.w, h: e.h, data: Buffer.from(e.b, 'base64') }, r.pieces.ms));
+      }
+      if (worst < MEMORY_MATCH) continue;
+      hits++;
+      if (r.count !== m.count) { r.memoFrom = r.count; fixed++; }
+      r.count = m.count;
+      r.memo = +worst.toFixed(3);
+      r.short = null;
+      if (!(r.conf >= worst)) r.conf = worst; // as sure as the picture agrees
+    }
+    if (hits) logToggle('stash-learn', `slot memory ${res.tab}: ${hits} unchanged picture(s), ${fixed} read differently by the templates and taken from the memory`);
+  } catch (err) { logToggle('stash-learn', 'slot memory apply failed: ' + (err && err.message || err)); }
+}
+
 // ---- The digit gallery ("Ziffern-Tafel", the player's idea): every sure read whose
 // picture shows exactly its digits hands them over (reader-worker `pieces`, cut the way
 // teaching cuts them, grown when "save the edge" is on). Per digit 0-9 up to 15 of them
@@ -2460,6 +2515,7 @@ function collectDigits(res) {
       if (!(r.conf >= 0.7 || (confirmed[r.apiId] > 0 && confirmed[r.apiId] === r.count))) continue;
       const set = g.sets[gallerySetKey(grow, r.pieces.ms)] || (g.sets[gallerySetKey(grow, r.pieces.ms)] = {});
       for (const m of r.pieces.masks) {
+        if (m.d == null) continue; // the read did not fit the picture: no label
         const list = set[m.d] || (set[m.d] = []);
         const mask = { w: m.w, h: m.h, data: Uint8Array.from(m.data) };
         if (list.some((e) => LA.maskIoU(mask, { w: e.w, h: e.h, data: Buffer.from(e.b, 'base64') }, r.pieces.ms) >= 0.985)) continue; // the same glyph again
@@ -3139,6 +3195,7 @@ ipcMain.handle('stash-confirm-count', (_e, { tab, apiId, count } = {}) => {
     const t = config.stashConfirmed[tab] || (config.stashConfirmed[tab] = {});
     if (count == null || !(count > 0)) delete t[apiId]; else t[apiId] = Math.round(count);
     saveConfig();
+    rememberSlot(tab, apiId, count > 0 ? Math.round(count) : null); // the slot memory keeps this count's picture
     return { ok: true, confirmed: config.stashConfirmed };
   } catch (err) { return { ok: false, error: String(err && err.message || err) }; }
 });
@@ -3366,7 +3423,7 @@ async function stashResultWithPrices(res, W, H) {
     }
     const valueEx = price != null ? r.count * price : null;
     if (valueEx != null) total += valueEx;
-    lines.push({ apiId: r.apiId, priceId, name, suffix, icon, count: r.count, price, est, valueEx, slot: i, conf: typeof r.conf === 'number' ? r.conf : null, short: r.short || null, rel: r.rel || null });
+    lines.push({ apiId: r.apiId, priceId, name, suffix, icon, count: r.count, price, est, valueEx, slot: i, conf: typeof r.conf === 'number' ? r.conf : null, short: r.short || null, memo: r.memo || null, memoFrom: r.memoFrom != null ? r.memoFrom : null, rel: r.rel || null });
   });
   lines.sort((a, b) => (b.valueEx || 0) - (a.valueEx || 0));
   return {
@@ -3403,12 +3460,14 @@ async function readStashFrame(shot, onDetected) {
     // stash-teach-count below) or an "align" session (see stash-adjust-open) can
     // re-extract the exact glyphs / rebuild the exact boxes the reader saw
     lastCaptureByTab.set(res.tab, { bitmap, W, H, box: res.box, res });
+    applySlotMemory(res); // an unchanged picture keeps its confirmed count
     collectDigits(res); // the digit gallery
     // first scan of this tab on this setup: boxes onto the cells (rule), kept if not worse
     {
       const placed = await autoPlaceNewTab(res.tab, { bitmap, W, H, box: res.box, res }, res);
       if (placed) {
         res = Object.assign(placed.res, { autoPlaced: placed.moved });
+        applySlotMemory(res);
         lastCaptureByTab.set(res.tab, { bitmap, W, H, box: res.box, res });
       }
     }

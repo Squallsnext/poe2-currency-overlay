@@ -233,6 +233,16 @@ Ziffern) zeigt pro Ziffer 0–9 die, die am besten zu den anderen passt. Rot umr
 Ziffern sehen sich zu ähnlich (mit ✕ die falsche verwerfen). **„Übernehmen“** – ab dann
 liest er mit deinen eigenen Ziffern; die alten sind nur noch Rückfall.
 
+**Freistell-Treue (6. Bild):** vergleicht, was der Leser nach deinen Reglern bekommt
+(Bild 4), mit der Zahl, die direkt aus dem Original freigestellt wird – ganz ohne Vorlagen.
+„Freistell-Treue 93 %“ – rot = da fehlt dem Leser Ziffer, blau = da hat er zu viel. Damit
+findest du heraus, ab welchen Reglern das Freistellen kippt.
+
+**Feld-Gedächtnis (≡):** Bestätigst du eine Zahl, merkt sich das Feld ihr freigestelltes
+Bild. Zeigt der nächste Scan dasselbe Bild, gilt die bestätigte Zahl – egal was die Vorlagen
+lesen. Vor der Prozentzahl steht dann **≡**. Ändert sich die Zahl im Spiel, ändert sich das
+Bild, und sie wird normal gelesen und einmal neu bestätigt.
+
 ### 3.3 Debug: eine Zahl sauber lesen
 
 **Einstellungen → „OCR-Debug-Bilder zeigen“** an, dann beim Fach **„Debug“** und in der

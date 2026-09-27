@@ -1331,6 +1331,24 @@ median 92 %, colour limit 60: 94 %, floor 160: 80 %, floor 200: 66 % - raising t
 thins the digits and the fidelity falls with it. The fixed truth has its own limits (a digit
 touching bright art), so a single low slot is worth a look with the magnifier, not a verdict.
 
+### 4.30 Slot memory: an unchanged picture keeps its confirmed count
+
+The player's idea: "jeder Scan ist die Vorlage" - templates age (new settings, a changed
+font), the freed picture of the number itself does not. Every read now hands main the
+number's freed picture digit by digit (also unread ones; `pieces`, labelled only where the
+read fits it, which the digit gallery still requires). When a count is confirmed (✓,
+typed, learned - `stash-confirm-count`), `rememberSlot` keeps that capture's picture of the
+slot in `slot-memory.json` (per tab and slot, with its matching resolution and edge-switch
+state; only if the picture shows as many digits as the count has). `applySlotMemory`, on
+every scan: a slot whose freed picture agrees digit by digit 93 %+ with the kept one IS
+that count - the read is replaced if the templates read something else, marked `memo`
+("≡" before the percentage, the tooltip says what the templates had read) and not asked
+about. A changed picture (the count changed) is read with the templates as before.
+Tested with main.js's own functions on the player's 5K currency capture (38 counts
+confirmed, 37 pictures kept): with every learned digit deliberately swapped for another,
+37 of 38 reads came back wrong without the memory, 1 with it (the slot whose picture
+could not be kept); a capture with different counts: no memory hit at all.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

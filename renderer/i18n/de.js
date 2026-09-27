@@ -931,6 +931,8 @@ window.I18N_CATALOGS.de = {
   "networth.line.debug_img_truth": "Freistell-Treue: die Zahl des Lesers (Bild 4) gegen die Zahl, direkt aus dem Original freigestellt (feste Werte, ohne Vorlagen). weiß = gleich, ROT = im Original Ziffer, beim Leser fehlt es, BLAU = beim Leser Ziffer, im Original nicht, grau = sonstiger Schmutz",
   "networth.line.debug_truth": "Freistell-Treue {pct} % ({miss} fehlen, {extra} zu viel).",
   "networth.line.loupe_6": "6 Freistell-Treue (Leser gegen Original)",
+  "networth.line.memo_title": "Bild unverändert seit deiner Bestätigung ({pct} % gleich) – die bestätigte Zahl gilt, ohne Vorlagen",
+  "networth.line.memo_fixed_title": "Die Vorlagen lasen {from}, aber das Bild ist dasselbe wie bei deiner Bestätigung – es bleibt {count}",
   "networth.row.remove_title": "Diesen Tab entfernen",
   "networth.sample.answer_first": "Beantworte die Frage zu jedem Screenshot, bevor du sendest.",
   "networth.sample.capture_black": "Das Spielfenster kam schwarz zurück. Das ist exklusiver Vollbildmodus. Wechsle zu Fenster oder Randlos und versuche es erneut.",

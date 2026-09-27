@@ -936,6 +936,8 @@ window.I18N_CATALOGS.en = {
   "networth.line.debug_img_truth": "Extraction fidelity: the reader's number (picture 4) against the number freed straight from the original (fixed values, no templates). white = same, RED = digit in the original, missing for the reader, BLUE = digit for the reader, not in the original, grey = other ink",
   "networth.line.debug_truth": "Extraction fidelity {pct} % ({miss} missing, {extra} extra).",
   "networth.line.loupe_6": "6 Fidelity (reader vs original)",
+  "networth.line.memo_title": "Picture unchanged since you confirmed it ({pct} % the same) - the confirmed count holds, no templates needed",
+  "networth.line.memo_fixed_title": "The templates read {from}, but the picture is the one you confirmed - it stays {count}",
   "networth.row.remove_title": "Remove this tab",
   "networth.sample.answer_first": "Answer the question on each screenshot before sending.",
   "networth.sample.capture_black": "The game window came back black. That's exclusive fullscreen. Switch to Windowed or Borderless and try again.",

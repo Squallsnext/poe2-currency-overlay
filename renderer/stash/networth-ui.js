@@ -1070,8 +1070,11 @@
         const pct = Math.round(ln.conf * 100);
         const cl = pct >= 88 ? 'ok' : (pct >= 80 ? 'mid' : 'low');
         const conf = isConfirmed(row, ln);
-        const cf = el('div', 'nw-conf nw-conf-' + (conf ? 'confirmed' : cl), pct + '%' + (conf ? ' ✓' : ''));
-        cf.title = conf ? t('networth.line.confirmed_title') : t('networth.line.confidence_title');
+        // ≡ = the slot memory: the freed picture is the one confirmed here (main.js applySlotMemory)
+        const cf = el('div', 'nw-conf nw-conf-' + (conf || ln.memo ? 'confirmed' : cl), (ln.memo ? '≡ ' : '') + pct + '%' + (conf ? ' ✓' : ''));
+        cf.title = ln.memo
+          ? (ln.memoFrom != null ? t('networth.line.memo_fixed_title', { from: ln.memoFrom == null ? '?' : ln.memoFrom, count: ln.count }) : t('networth.line.memo_title', { pct: Math.round(ln.memo * 100) }))
+          : conf ? t('networth.line.confirmed_title') : t('networth.line.confidence_title');
         line.appendChild(cf);
         // Low confidence but already-correct reads (a thin margin at OCR time, not a
         // wrong value) never reach the teach pipeline otherwise - it only fires on an
