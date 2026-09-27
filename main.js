@@ -2108,7 +2108,15 @@ function writeStashDebug(shot, res) {
       screen: { w: shot.W, h: shot.H },
       calibrated: !!config.stashCalibration,
       configBox: config.stashCalibration || null,
-      result: res || null,
+      // without the freed number pictures (reads' `pieces`): a few thousand pixels per
+      // digit, one line each when pretty-printed - a tab's debug file ran to many MB and
+      // the scan hung on "calculating" while it was written (reported)
+      result: res && res.reads ? Object.assign({}, res, { reads: res.reads.map((r) => {
+        if (!r || !r.pieces) return r;
+        const o = Object.assign({}, r);
+        o.pieces = { ms: r.pieces.ms, grow: !!r.pieces.grow, digits: r.pieces.masks.length, labels: r.pieces.masks.map((m) => m.d).join('') };
+        return o;
+      }) }) : (res || null),
     };
     writeDebugFile(`${stamp}.json`, JSON.stringify(meta, null, 2));
     if (box && box.w > 0 && box.h > 0) {
