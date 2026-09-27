@@ -539,6 +539,28 @@
         box.appendChild(b); box.appendChild(out);
         return box;
       })(),
+      (() => {
+        // start over (backup first); two clicks, the first one asks
+        const box = el('span', 'nw-audit');
+        const out = el('span', 'nw-audit-out');
+        const b = mk(t('networth.learned.reset'), t('networth.learned.reset_title'), null, true);
+        let armed = null;
+        b.onclick = async () => {
+          if (!window.api.stashLearnedReset) return;
+          if (!armed) { b.textContent = t('networth.learned.reset_confirm'); armed = setTimeout(() => { armed = null; b.textContent = t('networth.learned.reset'); }, 4000); return; }
+          clearTimeout(armed); armed = null; b.textContent = t('networth.learned.reset');
+          const r = await window.api.stashLearnedReset(false).catch(() => null);
+          out.textContent = r && r.ok ? t('networth.learned.reset_done', { n: r.removed }) : t('networth.audit.failed');
+          for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
+        };
+        const rb = mk(t('networth.learned.restore'), t('networth.learned.restore_title'), async () => {
+          const r = await window.api.stashLearnedReset(true).catch(() => null);
+          out.textContent = r && r.ok ? t('networth.learned.restore_done') : t('networth.learned.restore_none');
+          for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
+        }, true);
+        box.appendChild(b); box.appendChild(rb); box.appendChild(out);
+        return box;
+      })(),
     ]);
     group(t('networth.settings.cal_group_support'), [
       mk(t('networth.tour.support_start'), t('networth.tour.support_start_title'), () => startTour(true), true),
@@ -1059,8 +1081,22 @@
           const rawImg = el('img', 'nw-dbg-img'); rawImg.src = cached.rawUrl; rawImg.title = t('networth.line.debug_img_raw');
           const filtImg = el('img', 'nw-dbg-img'); filtImg.src = cached.filtUrl; filtImg.title = t('networth.line.debug_img_filtered');
           const binImg = el('img', 'nw-dbg-img'); binImg.src = cached.binUrl; binImg.title = t('networth.line.debug_img_binarized');
-          imgs.appendChild(rawImg); imgs.appendChild(filtImg); imgs.appendChild(binImg);
+          // 4th: the difference to the templates it matched (red missing / blue extra)
+          const diffImg = el('img', 'nw-dbg-img'); diffImg.title = t('networth.line.debug_img_diff');
+          const diffInfo = el('div', 'nw-dbg-diffinfo');
+          const showDiff = (r) => {
+            diffImg.style.display = r && r.diffUrl ? '' : 'none';
+            if (r && r.diffUrl) diffImg.src = r.diffUrl;
+            diffInfo.innerHTML = r && r.diffGlyphs && r.diffGlyphs.length
+              ? esc(t('networth.line.debug_diff_legend')) + ' ' + r.diffGlyphs.map((g) => esc(t('networth.line.debug_diff_glyph', {
+                digit: g.digit, pct: Math.round((g.score || 0) * 100), miss: g.miss, extra: g.extra,
+                src: t(String(g.source).startsWith('user-corrections') ? 'networth.line.debug_diff_src_learned' : 'networth.line.debug_diff_src_shipped') }))).join(' · ')
+              : '';
+          };
+          showDiff(cached);
+          imgs.appendChild(rawImg); imgs.appendChild(filtImg); imgs.appendChild(binImg); imgs.appendChild(diffImg);
           dbg.appendChild(imgs);
+          dbg.appendChild(diffInfo);
           // how to use the sliders - folded, opened once and remembered
           {
             const guide = el('details', 'nw-dbg-guide');
@@ -1159,9 +1195,10 @@
               const res = await window.api.stashSlotDebugImage(ln.apiId, v, row.tab).catch(() => null);
               if (!res || !res.ok) return;
               rawImg.src = res.rawUrl; filtImg.src = res.filtUrl; binImg.src = res.binUrl;
+              showDiff(res);
               showPreview(res.preview);
               showTemplates(res.templates);
-              Object.assign(cached, { templates: res.templates, defaults: res.defaults, effFloor: res.effFloor, rawUrl: res.rawUrl, filtUrl: res.filtUrl, binUrl: res.binUrl, preview: res.preview });
+              Object.assign(cached, { templates: res.templates, defaults: res.defaults, effFloor: res.effFloor, rawUrl: res.rawUrl, filtUrl: res.filtUrl, binUrl: res.binUrl, diffUrl: res.diffUrl, diffGlyphs: res.diffGlyphs, preview: res.preview });
               for (const sp of specs) cached[sp.key] = res[sp.key];
               if (!touched.has('floor')) sliders.floor.s.value = res.floor;
               sliders.floor.mark();

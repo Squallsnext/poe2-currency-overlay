@@ -670,7 +670,7 @@
     // misread can be inspected ("why did it pick THIS glyph") instead of guessed at.
     // Gap-filled glyphs (no c.score) are marked estimated rather than given a fake score.
     const glyphs = filtered.map((c) => ({
-      ch: c.ch, x: c.x,
+      ch: c.ch, x: c.x, dy: c.dy != null ? c.dy : null, // where it matched (the debug panel's difference picture)
       score: typeof c.score === 'number' ? +c.score.toFixed(3) : null,
       gapFilled: typeof c.score !== 'number',
     }));
@@ -755,7 +755,7 @@
     for (const ch of Object.keys(templates)) {
       const t = templates[ch];
       const ms = slideMatch(strip, t, P.dyLo, P.dyHi, P.minInkFrac, integral);
-      for (const m of ms) if (m.score >= thresh) out.push({ x: m.x, ch, score: m.score, tw: t.w });
+      for (const m of ms) if (m.score >= thresh) out.push({ x: m.x, dy: m.dy, ch, score: m.score, tw: t.w });
     }
     return out;
   }

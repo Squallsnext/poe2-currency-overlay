@@ -1184,6 +1184,31 @@ time - the `tab` parameter and the `tab` of the found slot collided ("Cannot acc
 taken back / everything reverted, no count changed; 1440p abyss already clean,
 untouched.
 
+### 4.23 Difference picture, starting over with the learned digits
+
+Reported with five pictures: the Jawbone's "20" made perfectly clean by hand still read
+at 83 % - "why learn templates when the middle picture already is one?". The percentage
+is the pixel agreement with the templates the digits matched - here mostly the SHIPPED
+2 and 0 (learned: one of each), drawn from 1080p captures and doubled for 5K, so a
+clean 5K glyph can never agree fully with them.
+
+- **Difference picture** (4th picture in the OCR panel, main.js `stash-slot-debug-image`
+  `diffUrl`): each read digit's template laid on the black/white picture exactly where it
+  matched (`x`/`dy` now travel with the read glyphs) - white = agrees, red = in the
+  template but missing, blue = extra, grey = picture outside the digits - with the
+  masking right of the number the reader applies. Below it per digit: "2: 82 % against
+  the shipped template - 31 red, 12 blue". Checked on the player's 5K currency capture:
+  28 of 30 digits give exactly the reader's percentage (white / (white + red + blue));
+  the 2 others are ~50 % reads from the reader's grey-tophat fallback, a different
+  picture.
+- **Reset learned digits** (settings, two clicks): the file goes to a dated backup
+  (`learned-digit-templates.backup-*.json`) and is emptied; the shipped digits stay.
+  "Restore backup" puts the newest one back. For starting over from clean pictures.
+- **Auto-tune** gets the player's second recipe (Jawbone: saturation 100, brightness
+  +20, picture contrast 90, colour limit 5, contrast 145, floor 60, specks 12) as a
+  second start, and saturation 100/200, brightness up to +20, contrast up to 145 and
+  floor 60 as stops.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

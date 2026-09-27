@@ -32,12 +32,18 @@
   // das Bild in der Mitte schon so wie es der Leser herstellt"); searched: specks up to
   // 20 px, contrast, floor, and a little brightness / picture contrast.
   const RECIPE = { satPct: 200, desatSat: 5, bright: -20, gain: 100, contrast: 0, minBlob: 11, floor: null, localThr: 0 };
+  // the player's second recipe, found by hand on the Abyss tab's Jawbone ("20" clean,
+  // everything else gone): saturation 100, brightness +20, picture contrast 90, colour
+  // limit 5, contrast raised to just before the read tips (145), floor all the way down
+  // (60), specks under 12 px
+  const RECIPE2 = { satPct: 100, desatSat: 5, bright: 20, gain: 90, contrast: 145, minBlob: 12, floor: 60, localThr: 0 };
   const PARAMS = [
-    ['minBlob', [5, 8, 11, 15, 20]],
-    ['contrast', [0, 25, 50, 75, 100]],
-    ['floor', [null, 65, 80, 95, 110, 130]],
-    ['bright', [-40, -20, 0]],
+    ['minBlob', [5, 8, 12, 15, 20]],
+    ['contrast', [0, 50, 75, 100, 125, 145]],
+    ['floor', [null, 60, 80, 95, 110, 130]],
+    ['bright', [-40, -20, 0, 20]],
     ['gain', [90, 100, 120]],
+    ['satPct', [100, 200]],
   ];
   const WRONG = -0.5;
   const MIN_GAIN = 0.03; // a tab setting must beat the tab as it is by this much (mean); a slot's own by twice that
@@ -80,7 +86,7 @@
     const before = Object.assign(summarize(truth, beforeReads), { reads: beforeReads });
     tick();
     let best = null, bestS = null;
-    for (const start of [RECIPE]) {
+    for (const start of [RECIPE, RECIPE2]) {
       const r = await evalS(start);
       if (!best || r.score > best.score) { best = r; bestS = Object.assign({}, start); }
     }
@@ -121,7 +127,7 @@
   }
 
   // evaluations per tab run, for the progress bar (upper bound)
-  const TAB_EVALS = 1 + 1 + 2 * PARAMS.reduce((a, [, s]) => a + s.length - 1, 0);
+  const TAB_EVALS = 1 + 2 + 2 * PARAMS.reduce((a, [, s]) => a + s.length - 1, 0);
 
-  return { KEYS, PARAMS, RECIPE, WRONG, WEAK, MIN_GAIN, slotScore, summarize, tuneTab, tuneSlot, TAB_EVALS };
+  return { KEYS, PARAMS, RECIPE, RECIPE2, WRONG, WEAK, MIN_GAIN, slotScore, summarize, tuneTab, tuneSlot, TAB_EVALS };
 });

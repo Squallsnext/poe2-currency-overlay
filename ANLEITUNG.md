@@ -211,6 +211,19 @@ werden die bekannten Zahlen nicht besser, bleibt alles, wie es war. Ein Fach, de
 Bilder schon sauber sind, wird nicht angefasst. Oben steht der Fortschritt, danach das
 Ergebnis und **Rückgängig**.
 
+**Warum nur 83 %, obwohl das Bild sauber ist?** Das vierte Bild im Filter-Panel zeigt es:
+Die Vorlage der Ziffer liegt genau da, wo sie gepasst hat – **weiß** = stimmt, **rot** =
+fehlt im Bild, **blau** = zu viel. Darunter steht, ob gegen eine **gelernte** oder eine
+**mitgelieferte** Vorlage verglichen wurde. Die mitgelieferten stammen aus 1080p und sind
+für 5K nur verdoppelt – ein sauberes 5K-Bild passt da nie ganz. Einmal aus dem sauberen
+Bild lernen (✓), dann passt die nächste saubere Ziffer fast zu 100 %.
+
+**Neu anfangen:** Einstellungen → Vermögen → **„Alle gelernten Ziffern zurücksetzen“**
+(zweimal klicken; vorher wird eine Sicherung angelegt, „Sicherung zurückholen“ macht es
+rückgängig). Dann pro Fach die saubere Einstellung setzen („Auf ganzes Fach anwenden“
+oder „Automatisch einstellen“), scannen und Zahlen mit ✓ bestätigen – er lernt nur noch
+aus sauberen Bildern.
+
 ### 3.3 Debug: eine Zahl sauber lesen
 
 **Einstellungen → „OCR-Debug-Bilder zeigen“** an, dann beim Fach **„Debug“** und in der

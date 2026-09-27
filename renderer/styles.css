@@ -2129,3 +2129,4 @@ footer {
 .nw-conf.nw-conf-confirmed { color: var(--green, #6fcf6f); }
 .nw-audit { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .nw-audit-out { font-size: 12px; color: var(--tx-body); display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.nw-dbg-diffinfo { font-size: 11px; color: var(--tx-dim); margin: 4px 0 2px; }

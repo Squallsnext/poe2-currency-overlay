@@ -2432,6 +2432,30 @@ function recomputeLearnedTemplates(learned, digits) {
 }
 // "Gelernte Ziffern prüfen": every learned digit against the shipped ones
 // (learned-audit.js); apply = remove the suspicious ones
+// "Start over" with the learned digits (asked for, to test from scratch: "alle Vorlagen
+// löschen ... und neu beginnen"): the file is copied to a dated backup first, then
+// emptied - the shipped digits stay. restore = the newest backup back in place.
+ipcMain.handle('stash-learned-reset', (_e, { restore } = {}) => {
+  try {
+    const file = learnedTemplatesFile();
+    const dir = path.dirname(file);
+    if (restore) {
+      const list = fs.readdirSync(dir).filter((f) => /^learned-digit-templates\.backup-.*\.json$/.test(f)).sort();
+      if (!list.length) return { ok: false, reason: 'no-backup' };
+      fs.copyFileSync(path.join(dir, list[list.length - 1]), file);
+      logToggle('stash-learn', `learned digits restored from ${list[list.length - 1]}`);
+      return { ok: true, restored: list[list.length - 1] };
+    }
+    const cur = loadLearnedTemplates();
+    const n = Object.values(cur.exemplars || {}).reduce((a, l) => a + l.length, 0)
+      + Object.values(cur.byScale || {}).reduce((a, set) => a + Object.values(set.exemplars || {}).reduce((b, l) => b + l.length, 0), 0);
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    if (fs.existsSync(file)) fs.copyFileSync(file, path.join(dir, `learned-digit-templates.backup-${stamp}.json`));
+    saveLearnedTemplates({ exemplars: {}, templates: {} });
+    logToggle('stash-learn', `learned digits reset (${n} kept in the backup)`);
+    return { ok: true, removed: n };
+  } catch (err) { return { ok: false, error: String(err && err.message || err) }; }
+});
 ipcMain.handle('stash-audit-learned', (_e, { apply } = {}) => {
   try {
     const LA = require('./renderer/stash/learned-audit.js');
@@ -2633,6 +2657,42 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
     // the cut actually applied: binarize() takes the higher of floor and the cell's own
     // Otsu threshold, so a floor below Otsu does nothing - show which one is in charge
     const effFloor = Math.max(DR.otsu(shrunk.data), floor);
+    // The difference picture (asked for: "ein Bild, wo man rot sieht, welche Pixel fehlen
+    // um auf 100 zu kommen"): each read digit's template laid on the black/white picture
+    // exactly where it matched - white = both, RED = in the template but missing in the
+    // picture, BLUE = in the picture but not in the template, grey = picture outside the
+    // digits. The percentage per digit is exactly white / (white + red + blue).
+    const Hd = binarized.h, Wd = binarized.w;
+    // compared on what the reader compares: everything right of the number masked off
+    // (readCellEx's detectDigitSpan), unless the slot pinned its own right edge
+    const cmp = Uint8Array.from(binarized.data);
+    if (P.stripRight == null && !P.noAutoRight) {
+      const Sx = P.matchScale > 1 ? P.matchScale : 1;
+      const span = DR.detectDigitSpan(binarized, Sx);
+      if (span) { const cutX = Math.min(Wd, span.endX + 3 * Sx); for (let y = 0; y < Hd; y++) for (let x = cutX; x < Wd; x++) cmp[y * Wd + x] = 0; }
+    }
+    const diffBuf = Buffer.alloc(Wd * Hd * 4);
+    for (let i = 0; i < Wd * Hd; i++) { const v = binarized.data[i] ? 90 : 0; diffBuf[i * 4] = v; diffBuf[i * 4 + 1] = v; diffBuf[i * 4 + 2] = v; diffBuf[i * 4 + 3] = 255; }
+    const diffGlyphs = [];
+    for (const g of read.glyphs || []) {
+      const tpl = g && g.ch != null && g.dy != null ? bankInfo.bank[g.ch] : null;
+      if (!tpl) continue;
+      const y0 = (((Hd / 2) | 0) + g.dy) - ((tpl.h / 2) | 0);
+      let both = 0, miss = 0, extra = 0;
+      for (let ty = 0; ty < tpl.h; ty++) {
+        for (let tx = 0; tx < tpl.w; tx++) {
+          const x = g.x + tx, y = y0 + ty;
+          if (x < 0 || y < 0 || x >= Wd || y >= Hd) continue;
+          const T = tpl.data[ty * tpl.w + tx] ? 1 : 0, B = cmp[y * Wd + x] ? 1 : 0;
+          const o = (y * Wd + x) * 4;
+          if (T && B) { both++; diffBuf[o] = 255; diffBuf[o + 1] = 255; diffBuf[o + 2] = 255; }
+          else if (T) { miss++; diffBuf[o] = 235; diffBuf[o + 1] = 40; diffBuf[o + 2] = 40; }
+          else if (B) { extra++; diffBuf[o] = 60; diffBuf[o + 1] = 130; diffBuf[o + 2] = 255; }
+        }
+      }
+      diffGlyphs.push({ digit: bankInfo.unmap(g.ch), source: bankInfo.sourceOf(g.ch), score: g.score, both, miss, extra });
+    }
+    const diffUrl = diffGlyphs.length ? toUrl(diffBuf, Wd, Hd, 6) : null;
     const binBuf = Buffer.alloc(binarized.w * binarized.h * 4);
     for (let i = 0; i < binarized.w * binarized.h; i++) {
       const v = binarized.data[i] ? 255 : 0;
@@ -2643,6 +2703,7 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
       rawUrl: toUrl(rawBuf, cw, chh, UPSCALE),
       filtUrl: toUrl(filtBuf, cw, chh, UPSCALE),
       binUrl: toUrl(binBuf, binarized.w, binarized.h, 6),
+      diffUrl, diffGlyphs,
       floor, effFloor, desatSat, contrast, minBlob, bright, gain, satPct, localThr,
       // matchScale as asked for (slider), effective one actually used, and the most
       // this capture allows (1 = not available in this regime)
