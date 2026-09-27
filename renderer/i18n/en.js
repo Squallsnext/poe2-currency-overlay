@@ -899,7 +899,7 @@ window.I18N_CATALOGS.en = {
   "networth.learned.reset": "Reset all learned digits",
   "networth.learned.reset_title": "Deletes all digits learned so far (the shipped ones stay) - a backup is made first, \"Restore backup\" undoes it. To start over with clean pictures.",
   "networth.learned.reset_confirm": "Really delete?",
-  "networth.learned.reset_done": "{n} learned digits reset (backup made). Now scan a tab and confirm counts with ✓ - it learns anew.",
+  "networth.learned.reset_done": "{n} learned digits and the collected digit gallery reset (backup made). The 69 shipped ones stay - they sort the new digits. Now scan tabs, then check the digit gallery.",
   "networth.learned.restore": "Restore backup",
   "networth.learned.restore_title": "Puts the last backed-up learned digits back.",
   "networth.learned.restore_done": "Backup restored.",

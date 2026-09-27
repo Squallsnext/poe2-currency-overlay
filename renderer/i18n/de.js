@@ -894,7 +894,7 @@ window.I18N_CATALOGS.de = {
   "networth.learned.reset": "Alle gelernten Ziffern zurücksetzen",
   "networth.learned.reset_title": "Löscht alle selbst gelernten Ziffern (die mitgelieferten bleiben) – vorher wird eine Sicherung angelegt, „Sicherung zurückholen“ macht es rückgängig. Zum Neu-Anfangen mit sauberen Bildern.",
   "networth.learned.reset_confirm": "Wirklich löschen?",
-  "networth.learned.reset_done": "{n} gelernte Ziffern zurückgesetzt (Sicherung angelegt). Jetzt Fach scannen, Zahlen mit ✓ bestätigen – er lernt neu.",
+  "networth.learned.reset_done": "{n} gelernte Ziffern und die gesammelte Ziffern-Tafel zurückgesetzt (Sicherung angelegt). Die 69 mitgelieferten bleiben – mit ihnen ordnet er die neuen Ziffern zu. Jetzt Fächer scannen, dann die Ziffern-Tafel prüfen.",
   "networth.learned.restore": "Sicherung zurückholen",
   "networth.learned.restore_title": "Holt die zuletzt gesicherten gelernten Ziffern zurück.",
   "networth.learned.restore_done": "Sicherung zurückgeholt.",

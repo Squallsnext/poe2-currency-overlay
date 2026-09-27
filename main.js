@@ -2555,6 +2555,11 @@ ipcMain.handle('stash-learned-reset', (_e, { restore } = {}) => {
     if (fs.existsSync(file)) fs.copyFileSync(file, path.join(dir, `learned-digit-templates.backup-${stamp}.json`));
     fs.writeFileSync(file, JSON.stringify({ exemplars: {}, templates: {} })); // not the catch-all save: a failure must reach the player
     // read it back - reported: "alle Vorlagen löschen klappt nicht, er hat noch welche drin"
+    // the gallery's collected digits start over too (asked: are the templates gone or do
+    // they stay to sort the new digits? - the SHIPPED ones stay and sort them; the
+    // collected ones from before would bring back old cuts, e.g. digits cut short before
+    // RP.glyphFrame) - kept in a dated backup as well
+    try { const gf = galleryFile(); if (fs.existsSync(gf)) fs.renameSync(gf, path.join(dir, `digit-gallery.backup-${stamp}.json`)); } catch {}
     const left = count(JSON.parse(fs.readFileSync(file, 'utf8')));
     logToggle('stash-learn', `learned digits reset: ${n} in the backup, ${left} left (${file})`);
     if (left) return { ok: false, error: `${left} left in ${file}` };
