@@ -780,6 +780,8 @@ window.I18N_CATALOGS.de = {
   "networth.line.price_uncertain": "⚠ Die Preisquellen widersprechen sich um mehr als das Dreifache – keiner Zahl ist hier wirklich zu trauen. Wenn du weißt, was es bringt: eigenen Preis setzen.",
   "networth.line.price_sources": "Quellen:",
   "networth.line.price_src_feed": "poe2scout",
+  "networth.line.price_src_ninja": "poe.ninja",
+  "networth.line.price_est_ninja": "Preis von poe.ninja – der Feed sagte {raw}, das war mehr als 1,5× daneben.",
   "networth.line.price_src_median": "Mittel letzte Tage",
   "networth.line.price_src_cx": "Börse (gegen Ex)",
   "networth.line.price_edit_hint": "Klick: eigenen Preis pro Stück setzen (z. B. 0,25 oder 1/4). Leer lassen = wieder die Preisquelle.",

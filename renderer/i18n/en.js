@@ -785,6 +785,8 @@ window.I18N_CATALOGS.en = {
   "networth.line.price_uncertain": "⚠ The price sources disagree by more than 3x - none of them can really be trusted here. If you know what it sells for: set your own price.",
   "networth.line.price_sources": "Sources:",
   "networth.line.price_src_feed": "poe2scout",
+  "networth.line.price_src_ninja": "poe.ninja",
+  "networth.line.price_est_ninja": "Price from poe.ninja – the feed said {raw}, more than 1.5× off.",
   "networth.line.price_src_median": "recent median",
   "networth.line.price_src_cx": "exchange (vs Ex)",
   "networth.line.price_edit_hint": "Click: set your own price per unit (e.g. 0.25 or 1/4). Leave empty = back to the price source.",

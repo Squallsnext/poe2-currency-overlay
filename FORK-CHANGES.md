@@ -760,6 +760,19 @@ its result now goes through the same pricing as a scan (`stashResultWithPrices`,
 out of `readStashFrame`) and is sent to the list like one (`publishTourRead`) - after the
 automatic box placement, so the list shows the better read.
 
+**Second opinion on prices: poe.ninja** (`ninja-feed.js`; reported: Orb of Transmutation
+0.85 Ex in the app, 2.40 in game). poe.ninja's PoE2 exchange overview
+(`/poe2/api/economy/exchange/current/overview?league=…&type=…`, no auth, built from GGG's
+Currency Exchange) uses the same item ids as poe2scout and this app. It is fetched every
+15 minutes for 12 categories (~510 items in Forbidden Rites) and becomes one more price
+source: listed with the others in the price tooltip, and where it has at least 1 Divine
+of volume behind an item and the price is more than 1.5x off it, its price is taken
+(marked ≈, "price from poe.ninja - the feed said …"). Looser than the 3x outlier rule on
+purpose - the transmutation case is 1.8x (poe.ninja: 1.51 Ex on 13 Div volume). Items
+poe.ninja trades thinly (under 1 Div) are left alone. The player's own price still wins.
+Config `ninjaCheck` (default on). Checked against the live API: transmute 0.85 -> 1.51,
+alch 3.0 stays (poe.ninja 3.17).
+
 These existed in the player's own build and were **deliberately left out** here:
 
 - The currency tab coordinates recalibrated for an enlarged in-game UI text and three extra
@@ -867,6 +880,7 @@ Is it worth buying the parts, combining (or splitting at a vendor) and selling?
 | `arbVendorSplit` | `false` | Arbitrage also considers vendor splits (Greater → 3 normal) |
 | `showRecipesTab`, `recipeBases`, `recipeRounds` | `true`, `{}`, `{}` | Recipes tab visible; per-recipe currency and rounds |
 | `priceOverrides` | `{}` | `apiId → { ex, at }`: the player's own price per unit |
+| `ninjaCheck` | `true` | compare prices with poe.ninja and take its price when the feed is > 1.5× off (≥ 1 Div volume) |
 
 Learned templates (`userData/learned-digit-templates.json`) gained `byScale[ms]` for
 high-resolution templates; "Forget template" clears both.

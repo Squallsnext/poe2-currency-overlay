@@ -963,6 +963,7 @@
     if (est && est.src === 'user') out.push(t('networth.line.price_user'));
     else if (est && est.src === 'cx') out.push(t('networth.line.price_est_cx', { raw: fmtUnit(est.raw) }));
     else if (est && est.src === 'median') out.push(t('networth.line.price_est_median', { raw: fmtUnit(est.raw) }));
+    else if (est && est.src === 'ninja') out.push(t('networth.line.price_est_ninja', { raw: fmtUnit(est.raw) }));
     if (est && est.uncertain) out.push(t('networth.line.price_uncertain'));
     if (est && est.refs && est.refs.length) {
       out.push(t('networth.line.price_sources') + ' ' + est.refs.map((r) => t('networth.line.price_src_' + r.src) + ' ' + fmtUnit(r.ex)).join(' · '));

@@ -58,6 +58,7 @@ const CONFIG_FILE = () => path.join(app.getPath('userData'), 'overlay-config.jso
 const trade2 = require('./trade2');
 // Currency pairs: GGG's public Currency Exchange CDN (executed trades, hourly).
 const cxFeed = require('./cx-feed');
+const ninjaFeed = require('./ninja-feed');
 let cxState = { ok: false, at: 0, pairs: 0 };
 // apiId -> { text, icon, category } for CX-market items (fragments, keys, etc.).
 // Lets the item tab price CX-only items poe2scout doesn't index (Raven's
@@ -572,9 +573,10 @@ async function getCategoryItems(league, category, force = false) {
       .sort((a, b) => new Date(a.t) - new Date(b.t))
   }));
   // thin-market outliers replaced by what actually trades (see sanitizeThinPrices)
-  let cx = null;
+  let cx = null, ninja = null;
   try { cx = await getCxPairMapShared(league); } catch { /* exchange feed down - logs still help */ }
-  sanitizeThinPrices(items, cx);
+  if (config.ninjaCheck !== false) { try { ninja = await ninjaFeed.getNinjaMap(league); } catch { /* poe.ninja down - the other checks stand */ } }
+  sanitizeThinPrices(items, cx, ninja);
   applyPriceRules(items);
   itemsCache.set(key, { at: Date.now(), items });
   return items;
@@ -593,7 +595,30 @@ async function getCategoryItems(league, category, force = false) {
 const PRICE_OUTLIER = 3;
 const CX_MIN_UNITS = 5;
 const THIN_UNITS = 20; // latest daily quantity below this = a thin market
-function sanitizeThinPrices(items, cx) {
+// Second opinion, poe.ninja (ninja-feed.js): where it has at least NINJA_MIN_VOL Divine
+// of volume behind an item and the price (after the checks above) is more than
+// NINJA_OUTLIER x off it, poe.ninja's price is taken. Looser than PRICE_OUTLIER on
+// purpose - reported: Orb of Transmutation 0.85 Ex in the app, 2.40 in game, poe.ninja
+// 1.51 (13 Div volume); a 3x rule would never have caught that. Setting: ninjaCheck.
+const NINJA_OUTLIER = 1.5;
+const NINJA_MIN_VOL = 1;
+function sanitizeThinPrices(items, cx, ninja) {
+  sanitizeAgainstRefs(items, cx, ninja);
+  if (!ninja) return items;
+  for (const it of items) {
+    const n = ninja[it.apiId];
+    if (!n || !(n.ex > 0) || !(n.volDiv >= NINJA_MIN_VOL) || !(it.price > 0)) continue;
+    const ratio = it.price / n.ex;
+    if (ratio > NINJA_OUTLIER || ratio < 1 / NINJA_OUTLIER) {
+      if (it.priceRaw == null) it.priceRaw = it.price;
+      it.price = n.ex;
+      it.priceEstimated = true;
+      it.priceSource = 'ninja';
+    }
+  }
+  return items;
+}
+function sanitizeAgainstRefs(items, cx, ninja) {
   for (const it of items) {
     if (!(it.price > 0)) continue;
     // reference 1: GGG exchange, direct against Exalted, with enough units traded
@@ -614,7 +639,7 @@ function sanitizeThinPrices(items, cx) {
       const ps = it.logs.map((l) => l.p).filter((p) => p > 0).sort((a, b) => a - b);
       if (ps.length >= 3) { ref = ps[Math.floor(ps.length / 2)]; src = 'median'; }
     }
-    it.priceRefs = priceRefs(it, cx);
+    it.priceRefs = priceRefs(it, cx, ninja);
     if (!(ref > 0)) continue;
     const ratio = it.price / ref;
     if (ratio > PRICE_OUTLIER || ratio < 1 / PRICE_OUTLIER) {
@@ -643,7 +668,7 @@ function sanitizeThinPrices(items, cx) {
 // direct sources disagree >3x on 113 of 635 items, among them Kopec's Orb of Sacrifice
 // (193 feed vs 54 exchange) - 1 Ex would be far more wrong there than either source.
 // The fix for one item the user knows better is their own price (priceOverrides).
-function priceRefs(it, cx) {
+function priceRefs(it, cx, ninja) {
   const refs = [];
   if (it.price > 0) refs.push({ src: 'feed', ex: it.price });
   const last = it.logs && it.logs.length ? it.logs[it.logs.length - 1] : null;
@@ -655,6 +680,8 @@ function priceRefs(it, cx) {
     const v = cxPairVal(cx, it.apiId, 'exalted');
     if (v != null && units >= CX_MIN_UNITS) refs.push({ src: 'cx', ex: v, units });
   }
+  const n = ninja && ninja[it.apiId];
+  if (n && n.ex > 0 && n.volDiv >= NINJA_MIN_VOL) refs.push({ src: 'ninja', ex: n.ex, vol: n.volDiv });
   return refs;
 }
 
