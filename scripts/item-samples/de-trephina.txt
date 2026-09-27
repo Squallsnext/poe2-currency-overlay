@@ -1,0 +1,26 @@
+Gegenstandsklasse: Zweihandstreitkolben
+Seltenheit: Einzigartig
+Trephina
+Ambosshammer
+--------
+Physischer Schaden: 40-58 (augmented)
+Kritische Trefferchance: 5.00%
+Angriffe pro Sekunde: 1.17 (augmented)
+--------
+Erfordert: Stufe 11, 23 Str
+--------
+Gegenstandsstufe: 80
+--------
+{ Impliziter Modifikator — Physisch }
+Zermalmt Gegner bei Treffer — Nicht skalierbarer Wert
+--------
+{ Einzigartiger Modifikator — Schaden, Physisch, Angriff }
+Fügt 14(12-15) bis 23(22-25) physischen Schaden hinzu
+{ Einzigartiger Modifikator — Angriff, Geschwindigkeit }
+11(10-15)% erhöhte Angriffsgeschwindigkeit
+{ Einzigartiger Modifikator }
+Bewirkt 33(30-50)% erhöhten Betäubungsaufbau
+{ Einzigartiger Modifikator }
+Verursacht immer kritische Treffer gegen schwer betäubte Gegner — Nicht skalierbarer Wert
+--------
+Die Kunst der Chirurgie macht einen Fehler nach dem anderen.
