@@ -32,6 +32,7 @@
       "preload.js",
       "trade2.js",
       "cx-feed.js",
+      "ninja-feed.js",
       "cx-map.json",
       "cx-catalog.json",
       "renderer/**",
