@@ -1365,9 +1365,12 @@ counts under 85 % 6 -> 3 (same capture the gallery came from); their old learned
 
 Asked for: "nur Lupe an kann ich Regler nicht nutzen ... Lupe extra Bild und Regler zum
 Spielen". The magnifier is no longer a full-screen cover showing the moment it was opened:
-it docks at one side (⇆ moves it to the other, remembered), the rest of the window - the
-sliders - stays usable, and it redraws on every preview refresh (every slider move),
+it is a floating window - moved by its title bar, resized at its corner, both remembered -
+so the sliders stay usable, and it redraws on every preview refresh (every slider move),
 including the fidelity line. A panel rebuilt for the same slot keeps it; ✕ or Esc closes it.
+(A first docked version could not be closed on the player's machine: its buttons lay over
+the window's title bar, an Electron drag region that takes every click whatever lies on
+top - the floating one never goes above the title bar and is marked no-drag.)
 
 ## 5. New config keys
 

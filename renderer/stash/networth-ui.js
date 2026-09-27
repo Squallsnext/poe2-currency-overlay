@@ -87,14 +87,20 @@
     const box = loupe.box;
     box.innerHTML = '';
     const bar = el('div', 'nw-loupe-bar');
+    bar.title = t('networth.line.loupe_move');
+    // move by the title bar (JS, not the window's drag region - that swallowed the clicks)
+    bar.onmousedown = (e) => {
+      if (e.target.closest('button')) return;
+      e.preventDefault();
+      const r = box.getBoundingClientRect(), dx = e.clientX - r.left, dy = e.clientY - r.top;
+      const mv = (ev) => { box.style.left = Math.max(0, Math.min(window.innerWidth - 60, ev.clientX - dx)) + 'px'; box.style.top = Math.max(loupeTopMin(), Math.min(window.innerHeight - 40, ev.clientY - dy)) + 'px'; };
+      const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); loupeSave(box); };
+      document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+    };
     bar.appendChild(el('span', 'nw-loupe-title', esc(t('networth.line.loupe_title'))));
-    // ⇆ moves it to the other side, so the sliders underneath come free (remembered)
-    const sw = el('button', 'nw-loupe-x', '⇆'); sw.title = t('networth.line.loupe_side');
-    sw.onclick = (e) => { e.stopPropagation(); box.classList.toggle('nw-loupe-right'); try { localStorage.setItem('nwLoupeSide', box.classList.contains('nw-loupe-right') ? 'r' : 'l'); } catch {} };
     const x = el('button', 'nw-loupe-x', '✕'); x.title = t('networth.line.loupe_close');
     x.onclick = (e) => { e.stopPropagation(); closeLoupe(); };
-    const btns = el('span', 'nw-loupe-btns'); btns.appendChild(sw); btns.appendChild(x);
-    bar.appendChild(btns);
+    bar.appendChild(x);
     box.appendChild(bar);
     for (const im of imgs) {
       const row = el('div', 'nw-loupe-row');
@@ -106,13 +112,30 @@
   }
   function openLoupe(key, get) {
     if (!loupe) {
-      const box = el('div', 'nw-loupe nw-loupe-dock');
-      try { if (localStorage.getItem('nwLoupeSide') === 'r') box.classList.add('nw-loupe-right'); } catch {}
+      // a floating window: dragged by its title bar, resized at its corner, both remembered
+      const box = el('div', 'nw-loupe nw-loupe-float');
+      let pos = null;
+      try { pos = JSON.parse(localStorage.getItem('nwLoupeBox') || 'null'); } catch {}
+      const W = window.innerWidth, H = window.innerHeight;
+      const top0 = loupeTopMin();
+      const p0 = pos && pos.w ? pos : { x: 8, y: top0, w: Math.round(W * 0.32), h: Math.round(H - top0 - 8) };
+      Object.assign(box.style, { left: Math.min(p0.x, W - 80) + 'px', top: Math.max(top0, Math.min(p0.y, H - 60)) + 'px', width: Math.min(p0.w, W) + 'px', height: Math.min(p0.h, H - top0) + 'px' });
+      box.addEventListener('mouseup', () => loupeSave(box)); // after a corner resize
       document.body.appendChild(box);
       loupe = { key, get, box };
       document.addEventListener('keydown', loupeEsc);
     } else { loupe.key = key; loupe.get = get; }
     loupeDraw();
+  }
+  // never with its bar over the window's title bar: that is a drag region, and Electron
+  // gives every click there to the window, whatever lies on top
+  function loupeTopMin() {
+    const tb = document.getElementById('titlebar');
+    const r = tb && tb.getBoundingClientRect();
+    return Math.max(56, r ? Math.ceil(r.bottom) + 4 : 0);
+  }
+  function loupeSave(box) {
+    try { const r = box.getBoundingClientRect(); localStorage.setItem('nwLoupeBox', JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) })); } catch {}
   }
   function closeLoupe() {
     if (!loupe) return;

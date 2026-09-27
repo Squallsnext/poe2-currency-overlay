@@ -2163,3 +2163,13 @@ footer {
 .nw-loupe-x:hover { color: var(--red, #e05555); border-color: var(--red, #e05555); }
 .nw-loupe.nw-loupe-dock.nw-loupe-right { inset: 0 0 0 auto; border-right: none; border-left: 1px solid var(--am); box-shadow: -4px 0 18px rgba(0,0,0,.5); }
 .nw-loupe-btns { display: inline-flex; gap: 6px; }
+/* floating magnifier (replaces the dock): movable by its bar, resizable at its corner, and
+   outside the window's drag region - the title bar's drag region swallowed its clicks */
+.nw-loupe.nw-loupe-float { inset: auto; position: fixed; resize: both; overflow: auto; min-width: 220px; min-height: 200px; max-width: 100vw; max-height: 100vh;
+  padding: 0 10px 10px; gap: 6px; cursor: default; justify-content: flex-start; align-items: stretch; background: rgba(10,9,8,.97);
+  border: 1px solid var(--am); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.6); -webkit-app-region: no-drag; z-index: 10000; }
+.nw-loupe-float * { -webkit-app-region: no-drag; }
+.nw-loupe-float .nw-loupe-bar { position: sticky; top: 0; z-index: 1; background: rgba(10,9,8,.97); padding: 8px 0 6px; cursor: move; user-select: none; }
+.nw-loupe-float .nw-loupe-row { justify-content: flex-start; }
+.nw-loupe-float .nw-loupe-lab { width: 72px; flex: 0 0 72px; }
+.nw-loupe-float .nw-loupe-img { height: auto; width: calc(100% - 84px); max-width: none; }
