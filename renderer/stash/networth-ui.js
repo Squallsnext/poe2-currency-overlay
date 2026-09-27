@@ -548,8 +548,10 @@
         let armed = null;
         b.onclick = async () => {
           if (!window.api.stashLearnedReset) return;
-          if (!armed) { b.textContent = t('networth.learned.reset_confirm'); armed = setTimeout(() => { armed = null; b.textContent = t('networth.learned.reset'); }, 4000); return; }
-          clearTimeout(armed); armed = null; b.textContent = t('networth.learned.reset');
+          // armed: red with white text, so the second click is not missed (reported: the
+          // "really?" in the same grey button went unnoticed)
+          if (!armed) { b.textContent = t('networth.learned.reset_confirm'); b.classList.add('nw-btn-danger'); armed = setTimeout(() => { armed = null; b.textContent = t('networth.learned.reset'); b.classList.remove('nw-btn-danger'); }, 6000); return; }
+          clearTimeout(armed); armed = null; b.textContent = t('networth.learned.reset'); b.classList.remove('nw-btn-danger');
           const r = await window.api.stashLearnedReset(false).catch((e) => ({ ok: false, error: String(e && e.message || e) }));
           out.textContent = r && r.ok ? t('networth.learned.reset_done', { n: r.removed }) : t('networth.learned.reset_failed', { error: (r && r.error) || '?' });
           // open OCR panels still show the old "learned" counts - fetch them again

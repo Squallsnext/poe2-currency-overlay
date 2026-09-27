@@ -898,7 +898,7 @@ window.I18N_CATALOGS.en = {
   "networth.line.debug_diff_src_shipped": "shipped template",
   "networth.learned.reset": "Reset all learned digits",
   "networth.learned.reset_title": "Deletes all digits learned so far (the shipped ones stay) - a backup is made first, \"Restore backup\" undoes it. To start over with clean pictures.",
-  "networth.learned.reset_confirm": "Sure? Click again",
+  "networth.learned.reset_confirm": "Really delete?",
   "networth.learned.reset_done": "{n} learned digits reset (backup made). Now scan a tab and confirm counts with ✓ - it learns anew.",
   "networth.learned.restore": "Restore backup",
   "networth.learned.restore_title": "Puts the last backed-up learned digits back.",

@@ -893,7 +893,7 @@ window.I18N_CATALOGS.de = {
   "networth.line.debug_diff_src_shipped": "mitgelieferte Vorlage",
   "networth.learned.reset": "Alle gelernten Ziffern zurücksetzen",
   "networth.learned.reset_title": "Löscht alle selbst gelernten Ziffern (die mitgelieferten bleiben) – vorher wird eine Sicherung angelegt, „Sicherung zurückholen“ macht es rückgängig. Zum Neu-Anfangen mit sauberen Bildern.",
-  "networth.learned.reset_confirm": "Wirklich? Nochmal klicken",
+  "networth.learned.reset_confirm": "Wirklich löschen?",
   "networth.learned.reset_done": "{n} gelernte Ziffern zurückgesetzt (Sicherung angelegt). Jetzt Fach scannen, Zahlen mit ✓ bestätigen – er lernt neu.",
   "networth.learned.restore": "Sicherung zurückholen",
   "networth.learned.restore_title": "Holt die zuletzt gesicherten gelernten Ziffern zurück.",
