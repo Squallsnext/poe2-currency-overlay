@@ -2102,3 +2102,11 @@ footer {
 .nw-units-lab { font-size: 12px; color: var(--tx-body); margin-right: 4px; }
 .nw-unit-btn { font-size: 11.5px; padding: 3px 10px; border-radius: 12px; border: 1px solid var(--in-bd); background: var(--in-bg); color: var(--tx-dim); cursor: pointer; }
 .nw-unit-btn.on { border-color: var(--am); color: var(--am-hi); }
+
+/* Net Worth line values: one right-aligned column per currency, so Ex sits under Ex and
+   Div under Div (networth-ui.js unitCols) */
+.nw-val-cols { display: flex; align-items: center; justify-content: flex-end; gap: 10px; font-variant-numeric: tabular-nums; }
+.nw-ucol { display: inline-block; text-align: right; white-space: nowrap; }
+.nw-ucol-ex { min-width: 82px; }
+.nw-ucol-div, .nw-ucol-chaos { min-width: 58px; }
+.nw-ucol + .nw-ucol { color: var(--tx-body); font-weight: 500; }

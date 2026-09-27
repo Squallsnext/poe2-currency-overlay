@@ -41,6 +41,18 @@
     }
     return out.length ? out : [fmtEx(ex)];
   }
+  // the line values as columns, one per currency (asked for: Ex under Ex, Div under Div)
+  function unitCols(ex, prices) {
+    const cols = [];
+    for (const u of unitsOn()) {
+      let v = null;
+      if (u === 'ex') v = ex == null ? null : fmtEx(ex);
+      else if (u === 'div') v = ex != null && prices && prices.div ? fmtDiv(ex / prices.div) : '';
+      else if (u === 'chaos') v = ex != null && prices && prices.chaos ? fmtChaos(ex / prices.chaos) : '';
+      cols.push(`<span class="nw-ucol nw-ucol-${u}">${v == null ? fmtEx(null) : v}</span>`);
+    }
+    return cols.join('');
+  }
   const unitsHtml = (ex, prices) => unitParts(ex, prices).map((p, i) => `<span class="${i ? 'nw-div' : 'nw-ex'}">${p}</span>`).join(' ');
 
   const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, showOcrDebug: false, hiRes: false, showRel: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null, wizard: null, debugRows: new Set(), dbgLine: null, tabFix: null };
@@ -770,7 +782,7 @@
       cnt.title = t('networth.line.edit_count_title');
       cnt.onclick = (e) => { e.stopPropagation(); startEdit(ln, cnt); };
       line.appendChild(cnt);
-      const valEl = el('div', 'nw-val nw-val-edit', ln.price == null ? t('networth.line.no_price') : priceMark(ln.est) + unitParts(lineVal(ln), { div: r.divPrice, chaos: r.chaosPrice }).join(' · '));
+      const valEl = el('div', 'nw-val nw-val-edit nw-val-cols', ln.price == null ? t('networth.line.no_price') : priceMark(ln.est) + unitCols(lineVal(ln), { div: r.divPrice, chaos: r.chaosPrice }));
       // why this price is not simply the feed's (main.js sanitizeThinPrices / applyPriceRules),
       // plus every source it had, then how to set an own one
       valEl.title = priceTitle(ln);

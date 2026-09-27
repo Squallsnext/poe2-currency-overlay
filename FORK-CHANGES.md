@@ -994,7 +994,8 @@ Lines, tab totals and the grand total show the picked ones in that order; a curr
 without a known rate is left out. Scans now carry the Chaos price too (`chaosPrice`).
 Numbers on Net Worth and the Swap tab follow the UI language (asked for: German "1.596 ex
 · 3,0 div" instead of "1,596 ex · 3.0 div"; English stays as it was). A typed price
-"1.000,5" reads as 1000.5.
+"1.000,5" reads as 1000.5. In the lines each currency is its own right-aligned column (Ex under Ex,
+Div under Div - asked for), tabular figures.
 
 ## 5. New config keys
 
