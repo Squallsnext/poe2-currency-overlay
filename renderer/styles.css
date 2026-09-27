@@ -2112,5 +2112,9 @@ footer {
 .nw-ucol + .nw-ucol { color: var(--tx-body); font-weight: 500; }
 
 /* Net Worth card: the tab's tools behind one ⚙ */
+.nw-card-cols { gap: 10px; align-items: baseline; }
+.nw-card-cols .nw-ucol-ex { min-width: 96px; color: var(--tx-gold); font-size: 15px; font-weight: 700; }
+.nw-card-cols .nw-ucol + .nw-ucol { color: var(--tx-dim); font-size: 12px; font-weight: 500; }
+.nw-card-total.nw-edited .nw-ucol { color: var(--am-hi) !important; }
 .nw-card-gear { background: transparent; border: 1px solid transparent; color: var(--tx-dim); border-radius: 5px; cursor: pointer; font-size: 13px; padding: 0 6px; margin-left: 4px; line-height: 20px; }
 .nw-card-gear:hover, .nw-card-gear.on { color: var(--am-hi); border-color: var(--am); }

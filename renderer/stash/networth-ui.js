@@ -725,11 +725,15 @@
       };
       head.appendChild(dbgBtn);
     }
-    head.appendChild(gear);
+    // total as fixed-width columns (same order as the line columns) so Ex sits under Ex
+    // and Div under Div across all cards; ⚙ and ✕ go after it, at the far right, so a
+    // short or long total no longer shifts the ⚙ sideways (asked for after the screenshot
+    // with "⚙ 15.721 ex 27,2 div ✕" wandering from card to card)
     const rowEx = rowTotalEx(r);
-    const tot = el('div', 'nw-card-total' + (rowEdited(r) ? ' nw-edited' : ''));
-    tot.insertAdjacentHTML('beforeend', unitsHtml(rowEx, { div: r.divPrice, chaos: r.chaosPrice }));
+    const tot = el('div', 'nw-card-total nw-val-cols nw-card-cols' + (rowEdited(r) ? ' nw-edited' : ''));
+    tot.insertAdjacentHTML('beforeend', unitCols(rowEx, { div: r.divPrice, chaos: r.chaosPrice }));
     head.appendChild(tot);
+    head.appendChild(gear);
     head.onclick = (e) => { if (e.target === cb) return; state.expanded[row.id] = !open; render(); };
 
     // per-row remove

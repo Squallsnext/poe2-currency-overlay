@@ -1019,6 +1019,9 @@ longer just says so: its picture is kept ("__unknown") and the notice asks "Whic
 this?" - picking one pairs it from that picture (stash-correct-tab, like the tour) and
 reads it; "+ New tab" opens the tab builder on the same picture. Tested in the browser
 (⚙ menu, align call, unknown scan -> pick -> paired and listed).
+The header reads title | total | ⚙ | ✕: the ⚙ sits at the far right, and the tab total is
+drawn as fixed-width columns (Ex 96px, Div/Chaos 58px, tabular digits), so Ex lines up
+under Ex and Div under Div across all cards instead of the ⚙ drifting with the total's width.
 A tab recognised only NARROWLY is asked about: measured on the player's 1080p captures
 with the shipped fingerprints, correct tabs led the runner-up by 0.20-0.65, the two
 misreads (Kalguur runes and soul cores taken for Ancient Augments) by 0.08 and 0.21. Under
