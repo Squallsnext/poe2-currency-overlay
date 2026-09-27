@@ -2688,6 +2688,49 @@ ipcMain.handle('stash-correct-tab', async (_e, { fromTab, toTab } = {}) => {
   }
 });
 
+// A reader result -> what the Net Worth list shows: prices, values, lines, totals.
+// Shared by the scan and the tab tour (whose reads now land in the list too).
+async function stashResultWithPrices(res, W, H) {
+  let prices = {};
+  try { prices = await getStashPriceMap(); } catch (err) { /* prices optional; counts still shown */ }
+  const divPrice = prices.divine && typeof prices.divine.price === 'number' ? prices.divine.price : null;
+  const mirrorPrice = prices.mirror && typeof prices.mirror.price === 'number' ? prices.mirror.price : null;
+
+  const lines = []; const flags = []; let total = 0;
+  res.reads.forEach((r, i) => {
+    // priceAs: an extra slot holding a currency that already has its own slot (the
+    // overflow Exalted cells) is priced and named as that currency
+    const info = prices[r.priceAs || r.apiId] || {};
+    const name = info.name || r.apiId;
+    const suffix = r.suffix || null;
+    // price replaced by the exchange rate / recent median (sanitizeThinPrices) or the
+    // user's own price, or sources that contradict each other (applyPriceRules)
+    const est = (info.estimated || info.uncertain)
+      ? { raw: info.priceRaw, src: info.estimated ? info.priceSource : null, uncertain: !!info.uncertain, refs: info.refs || null }
+      : null;
+    const priceId = r.priceAs || r.apiId; // the id the price (and a user price) belongs to
+    const price = typeof info.price === 'number' ? info.price : null;
+    const icon = info.icon || null;
+    // slot = read order = stash reading order (top-to-bottom, left-to-right)
+    if (r.count == null) {
+      // empty / unread slot: a 0-count line the UI shows (editable) only when
+      // "Show missing" is on. flags kept for the read-count summary.
+      flags.push({ apiId: r.apiId, name });
+      lines.push({ apiId: r.apiId, priceId, name, suffix, icon, count: 0, price, est, valueEx: price != null ? 0 : null, slot: i, missing: true, conf: null });
+      return;
+    }
+    const valueEx = price != null ? r.count * price : null;
+    if (valueEx != null) total += valueEx;
+    lines.push({ apiId: r.apiId, priceId, name, suffix, icon, count: r.count, price, est, valueEx, slot: i, conf: typeof r.conf === 'number' ? r.conf : null, rel: r.rel || null });
+  });
+  lines.sort((a, b) => (b.valueEx || 0) - (a.valueEx || 0));
+  return {
+    ok: true, tab: res.tab, w: W, h: H, readCount: res.readCount, slotCount: res.slotCount,
+    totalEx: total, divPrice, mirrorPrice, totalDiv: divPrice ? total / divPrice : null, lines, flags, mismatch: false,
+    autoFound: !!res.autoFound, // false = the panel finder came up empty, so manual calibration is worth offering
+  };
+}
+
 async function readStashFrame(shot, onDetected) {
   try {
     if (!shot) return { ok: false, error: 'no screen source' };
@@ -2720,44 +2763,7 @@ async function readStashFrame(shot, onDetected) {
       }
     }
 
-    let prices = {};
-    try { prices = await getStashPriceMap(); } catch (err) { /* prices optional; counts still shown */ }
-    const divPrice = prices.divine && typeof prices.divine.price === 'number' ? prices.divine.price : null;
-    const mirrorPrice = prices.mirror && typeof prices.mirror.price === 'number' ? prices.mirror.price : null;
-
-    const lines = []; const flags = []; let total = 0;
-    res.reads.forEach((r, i) => {
-      // priceAs: an extra slot holding a currency that already has its own slot (the
-      // overflow Exalted cells) is priced and named as that currency
-      const info = prices[r.priceAs || r.apiId] || {};
-      const name = info.name || r.apiId;
-      const suffix = r.suffix || null;
-      // price replaced by the exchange rate / recent median (sanitizeThinPrices) or the
-      // user's own price, or sources that contradict each other (applyPriceRules)
-      const est = (info.estimated || info.uncertain)
-        ? { raw: info.priceRaw, src: info.estimated ? info.priceSource : null, uncertain: !!info.uncertain, refs: info.refs || null }
-        : null;
-      const priceId = r.priceAs || r.apiId; // the id the price (and a user price) belongs to
-      const price = typeof info.price === 'number' ? info.price : null;
-      const icon = info.icon || null;
-      // slot = read order = stash reading order (top-to-bottom, left-to-right)
-      if (r.count == null) {
-        // empty / unread slot: a 0-count line the UI shows (editable) only when
-        // "Show missing" is on. flags kept for the read-count summary.
-        flags.push({ apiId: r.apiId, name });
-        lines.push({ apiId: r.apiId, priceId, name, suffix, icon, count: 0, price, est, valueEx: price != null ? 0 : null, slot: i, missing: true, conf: null });
-        return;
-      }
-      const valueEx = price != null ? r.count * price : null;
-      if (valueEx != null) total += valueEx;
-      lines.push({ apiId: r.apiId, priceId, name, suffix, icon, count: r.count, price, est, valueEx, slot: i, conf: typeof r.conf === 'number' ? r.conf : null, rel: r.rel || null });
-    });
-    lines.sort((a, b) => (b.valueEx || 0) - (a.valueEx || 0));
-    return {
-      ok: true, tab: res.tab, w: W, h: H, readCount: res.readCount, slotCount: res.slotCount,
-      totalEx: total, divPrice, mirrorPrice, totalDiv: divPrice ? total / divPrice : null, lines, flags, mismatch: false,
-      autoFound: !!res.autoFound, // false = the panel finder came up empty, so manual calibration is worth offering
-    };
+    return await stashResultWithPrices(res, W, H);
   } catch (err) {
     return { ok: false, error: String(err && err.message || err) };
   }
@@ -4007,6 +4013,15 @@ async function tourModelSnap(tab, cap, res) {
   } catch (e) { logToggle('stash-learn', `tab tour auto-snap failed: ${e && e.message}`); }
   return out;
 }
+// The tab tour reads every tab anyway - its result goes into the Net Worth list like a
+// scan's (reported: after "scan tabs" the tabs were not in the list and had to be
+// scanned again one by one).
+function publishTourRead(res, W, H) {
+  if (!res || !res.ok || res.mismatch) return;
+  stashResultWithPrices(res, W, H)
+    .then((out) => sendToUI('stash-captured', Object.assign({ seq: ++captureSeq }, out)))
+    .catch((e) => logToggle('stash', 'tour -> list failed: ' + (e && e.message)));
+}
 async function tourCapture(expected) {
   if (!TAB_MAPS[expected]) return { ok: false, error: 'unknown-tab' };
   tourPending = null;
@@ -4031,6 +4046,7 @@ async function tourCapture(expected) {
     }
     if (res.box) pruneTabSigs(expected, tourSig(bitmap, W, H, res.box));
     const auto = await tourAutoSnap(expected, { bitmap, W, H, box: res.box, res }, res);
+    publishTourRead(auto.kept ? auto.res : res, W, H);
     return Object.assign(tourKeep(expected, bitmap, W, H, auto.kept ? auto.res : res), { detected, auto: stripAuto(auto) });
   } catch (e) {
     syncOverlayState();
@@ -4056,6 +4072,7 @@ async function tourConfirm(expected) {
     const res = await runReaderWorker(pd.bitmap, pd.W, pd.H, null);
     const ok = res && res.ok && !res.mismatch && res.tab === expected;
     const auto = ok ? await tourAutoSnap(expected, { bitmap: pd.bitmap, W: pd.W, H: pd.H, box: res.box, res }, res) : null;
+    if (ok) publishTourRead(auto && auto.kept ? auto.res : res, pd.W, pd.H);
     return Object.assign(tourKeep(expected, pd.bitmap, pd.W, pd.H, auto && auto.kept ? auto.res : res), { detected: expected, learned: true, auto: auto && stripAuto(auto) });
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };

@@ -754,6 +754,12 @@ to teach all the different ones").
   32 -> 32; single slots move a few points either way (the adaptive threshold can pick
   another floor when there are more templates).
 
+**Tab tour reads land in the Net Worth list** (reported: after "scan tabs" none of the
+tabs was in the list; each had to be scanned again). The tour reads every tab anyway;
+its result now goes through the same pricing as a scan (`stashResultWithPrices`, split
+out of `readStashFrame`) and is sent to the list like one (`publishTourRead`) - after the
+automatic box placement, so the list shows the better read.
+
 These existed in the player's own build and were **deliberately left out** here:
 
 - The currency tab coordinates recalibrated for an enlarged in-game UI text and three extra
