@@ -931,6 +931,8 @@ window.I18N_CATALOGS.en = {
   "networth.line.loupe_4": "4 Black/white (what the reader gets)",
   "networth.line.debug_img_overlay": "The freed number on the original: blue = hard cut, green = brought back by the edge rescue, red = in the black/white picture but not part of the number (art)",
   "networth.line.loupe_5": "5 Comparison with the template",
+  "networth.settings.toggle_own_label": "Only my own digits (hide the shipped ones)",
+  "networth.settings.toggle_own_sub": "For every digit you have yourself (gallery approved or learned) it compares only with yours - the 69 shipped ones of that digit are hidden. Digits you do not have yet are still read with the shipped ones, or nothing could be read.",
   "networth.row.remove_title": "Remove this tab",
   "networth.sample.answer_first": "Answer the question on each screenshot before sending.",
   "networth.sample.capture_black": "The game window came back black. That's exclusive fullscreen. Switch to Windowed or Borderless and try again.",

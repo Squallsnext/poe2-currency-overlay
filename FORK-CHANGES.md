@@ -1302,6 +1302,20 @@ read from the same capture the gallery came from - the next scan is the real tes
 - **Magnifier** (asked for: "mit einer Lupe am besten"): a click on any of the four
   pictures shows all four big and pixel-sharp, one under the other; a click closes it.
 
+### 4.28 Colours of the debug pictures, "only my own digits"
+
+- **Colours** (reported: "das Rot ist eher Orange"): nativeImage bitmaps are BGRA, the
+  synthetic colours of the difference, edge and overlay pictures were written as RGB -
+  red and blue swapped (missing showed blue, extra orange, the freed digit yellow instead
+  of blue). Now written as B, G, R.
+- **Only my own digits** (setting `stashOwnDigitsOnly`, asked for: "einen Schalter, wo
+  ich die 69 Vorlagen verstecken kann, denn die 2 wird gerade mit was Schlechterem
+  verglichen"): `RP.buildBank(..., ownOnly)` leaves out the shipped templates of every
+  digit the player has own ones of at this resolution (gallery or learned); digits without
+  own ones keep the shipped, or they could not be read. On the player's 5K currency
+  capture after the gallery: no count changed, mean 92.1 -> 92.0 % - the own digits win
+  anyway; the switch makes sure a digit is never compared with a worse shipped one.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
@@ -1315,6 +1329,7 @@ read from the same capture the gallery came from - the next scan is the real tes
 | `stashShowReliability` | `false` | "Often misread" row tints |
 | `stashSkipGroups` | `[]` | "Don't count" lists `[{ id, name, on, items }]` |
 | `arbVendorSplit` | `false` | Arbitrage also considers vendor splits (Greater → 3 normal) |
+| `stashOwnDigitsOnly` | `false` | Digits with own templates are read against those only |
 | `stashGrowDigits` | `false` | Reader and learning grow the digits from the hard cut into the original's edge (own learned set) |
 | `stashConfirmed` | `{}` | Per tab and slot: the count the player confirmed; not asked about again while read the same |
 | `stashTuneBackup` | `{}` | Per tab: slot settings from before the last auto-tune (Undo) |

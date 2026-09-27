@@ -160,7 +160,11 @@
   }
   // grow: the learned digits of the "save the edge" mode, kept apart (learned.grow) - a
   // grown digit is fuller than a hard-cut one, the two sets must not mix
-  function buildBank(rawTemplates, learnedAll, matchScale, grow) {
+  // ownOnly (setting "only my own digits"): for every digit the player has own templates
+  // of at this resolution, the shipped ones of that digit are left out - asked for: "die
+  // 2 wird gerade mit was Schlechterem verglichen" (a shipped 2, 70 %). Digits without
+  // own templates keep the shipped ones, or they could not be read at all.
+  function buildBank(rawTemplates, learnedAll, matchScale, grow, ownOnly) {
     const learned = grow ? (learnedAll && learnedAll.grow) || null : learnedAll;
     const ms = matchScale > 1 ? Math.round(matchScale) : 1;
     const variants = (rawTemplates.variants || []).slice();
@@ -171,6 +175,15 @@
     if (ms > 1) {
       for (const key of Object.keys(built.bank)) {
         if (!String(built.sourceOf(key)).startsWith(scaledSrc)) built.bank[key] = DR.upscaleTemplate(built.bank[key], ms);
+      }
+    }
+    if (ownOnly && learned) {
+      const set = ms > 1 ? learned.byScale && learned.byScale[ms] : learned;
+      const ex = (set && set.exemplars) || {};
+      const own = new Set(Object.keys(ex).filter((d) => (ex[d] || []).length));
+      const ownSrc = ms > 1 ? scaledSrc : 'user-corrections';
+      for (const key of Object.keys(built.bank)) {
+        if (own.has(built.unmap(key)) && !String(built.sourceOf(key)).startsWith(ownSrc)) delete built.bank[key];
       }
     }
     return built;

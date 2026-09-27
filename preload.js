@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld('api', {
   stashSlotDebugImage: (apiId, opts, tab) => ipcRenderer.invoke('stash-slot-debug-image', apiId, opts, tab),
   stashLearnedReset: (restore) => ipcRenderer.invoke('stash-learned-reset', { restore: !!restore }),
   stashAuditLearned: (apply) => ipcRenderer.invoke('stash-audit-learned', { apply: !!apply }),
+  setStashOwnDigitsOnly: (on) => ipcRenderer.invoke('set-stash-own-digits-only', !!on),
   setStashGrowDigits: (on) => ipcRenderer.invoke('set-stash-grow-digits', !!on),
   stashGallery: () => ipcRenderer.invoke('stash-gallery'),
   stashGalleryApprove: (digits, drop) => ipcRenderer.invoke('stash-gallery-approve', { digits, drop }),

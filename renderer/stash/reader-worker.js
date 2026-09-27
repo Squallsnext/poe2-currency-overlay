@@ -107,10 +107,10 @@ function readOneSlot(s, c) {
   if (c.inspect) Object.assign(rec, RP.pictureQuality(ch, pos, Pm, r.floor)); // auto-tune: how clean
   return rec;
 }
-const makeBankFor = (learnedTemplates, grow) => {
+const makeBankFor = (learnedTemplates, grow, ownOnly) => {
   const cache = new Map();
   return (ms) => {
-    if (!cache.has(ms)) cache.set(ms, RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates, ms > 1 ? ms : undefined, grow));
+    if (!cache.has(ms)) cache.set(ms, RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates, ms > 1 ? ms : undefined, grow, ownOnly));
     return cache.get(ms);
   };
 };
@@ -131,7 +131,7 @@ function readSlotsParallel(slots, c, msg) {
     const w = new Worker(__filename);
     w.once('message', (m) => { w.terminate(); if (m && m.reads) { m.reads.forEach((rec, k) => { out[idx[k]] = rec; }); resolve(); } else reject(new Error((m && m.error) || 'helper failed')); });
     w.once('error', (e) => { w.terminate(); reject(e); });
-    w.postMessage({ mode: 'slots', shared, W: c.W, H: c.H, box: c.box, tab: c.tab, idx, learnedTemplates: msg.learnedTemplates, tabOverrides: c.tabOverrides, hiRes: c.hiRes, growDigits: !!c.grow, userTabMaps: msg.userTabMaps || null });
+    w.postMessage({ mode: 'slots', shared, W: c.W, H: c.H, box: c.box, tab: c.tab, idx, learnedTemplates: msg.learnedTemplates, tabOverrides: c.tabOverrides, hiRes: c.hiRes, growDigits: !!c.grow, ownDigitsOnly: !!msg.ownDigitsOnly, userTabMaps: msg.userTabMaps || null });
   }))).then(() => out);
 }
 
@@ -152,7 +152,7 @@ function makeTuneCtx(m) {
     if (!chCache.has(key)) { if (chCache.size > 6) chCache.clear(); chCache.set(key, RP.buildChannel(buf, m.W, m.H, m.box, refBox, o)); }
     return chCache.get(key);
   };
-  return { tab: m.tab, buf, W: m.W, H: m.H, box: m.box, refBox, map, scale: m.box.h / refBox.h, hiRes: m.hiRes, grow: !!m.growDigits, base: m.tabOverrides || {}, perSlot, chFor, bankFor: makeBankFor(m.learnedTemplates, m.growDigits) };
+  return { tab: m.tab, buf, W: m.W, H: m.H, box: m.box, refBox, map, scale: m.box.h / refBox.h, hiRes: m.hiRes, grow: !!m.growDigits, base: m.tabOverrides || {}, perSlot, chFor, bankFor: makeBankFor(m.learnedTemplates, m.growDigits, m.ownDigitsOnly) };
 }
 // S = the filter keys to try on every slot in idxs (null = each slot as saved now)
 function tuneRead(ctx, S, idxs) {
@@ -167,7 +167,7 @@ function tuneRead(ctx, S, idxs) {
 async function runTune(msg) {
   const shared = new SharedArrayBuffer(msg.bitmap.byteLength);
   new Uint8Array(shared).set(new Uint8Array(msg.bitmap));
-  const base = { shared, W: msg.W, H: msg.H, box: msg.box, tab: msg.tab, learnedTemplates: msg.learnedTemplates, hiRes: msg.hiRes, growDigits: !!msg.growDigits, userTabMaps: msg.userTabMaps || null, tabOverrides: msg.tabOverrides || null };
+  const base = { shared, W: msg.W, H: msg.H, box: msg.box, tab: msg.tab, learnedTemplates: msg.learnedTemplates, hiRes: msg.hiRes, growDigits: !!msg.growDigits, ownDigitsOnly: !!msg.ownDigitsOnly, userTabMaps: msg.userTabMaps || null, tabOverrides: msg.tabOverrides || null };
   const ctx = makeTuneCtx(base);
   let helpers = [];
   if (ctx.perSlot && HELPERS > 1) {
@@ -264,7 +264,7 @@ parentPort.on('message', (msg) => {
     try {
       installUserTabs(msg.userTabMaps);
       const map = TABS[msg.tab], refBox = TAB_TEMPLATES.box;
-      const c = { tab: msg.tab, buf: Buffer.from(msg.shared), W: msg.W, H: msg.H, box: msg.box, refBox, map, scale: msg.box.h / refBox.h, hiRes: msg.hiRes, grow: !!msg.growDigits, tabOverrides: msg.tabOverrides, perSlot: true, bankFor: makeBankFor(msg.learnedTemplates, msg.growDigits) };
+      const c = { tab: msg.tab, buf: Buffer.from(msg.shared), W: msg.W, H: msg.H, box: msg.box, refBox, map, scale: msg.box.h / refBox.h, hiRes: msg.hiRes, grow: !!msg.growDigits, tabOverrides: msg.tabOverrides, perSlot: true, bankFor: makeBankFor(msg.learnedTemplates, msg.growDigits, msg.ownDigitsOnly) };
       parentPort.postMessage({ reads: msg.idx.map((i) => readOneSlot(map.STATIC_SLOTS[i], c)) });
     } catch (err) { parentPort.postMessage({ error: String(err && err.message || err) }); }
     return;
@@ -295,12 +295,13 @@ async function readFrame(msg) {
     // bank for just this one read - a fresh Worker per capture means no caching to worry
     // about, so the very next F7 press already benefits from a correction made seconds
     // earlier.
-    const liveBank = RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates, undefined, grow);
+    const ownOnly = !!msg.ownDigitsOnly;
+    const liveBank = RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates, undefined, grow, ownOnly);
     // high-resolution slots (matchScale 2, see read-pipeline.js) need the bank at that
     // scale - built once per scale, only if some slot asks for it
     const bankCache = new Map([[1, liveBank]]);
     const bankFor = (ms) => {
-      if (!bankCache.has(ms)) bankCache.set(ms, RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates, ms, grow));
+      if (!bankCache.has(ms)) bankCache.set(ms, RP.buildBank(RAW_DIGIT_TEMPLATES, learnedTemplates, ms, grow, ownOnly));
       return bankCache.get(ms);
     };
     // Find the panel by its coloured frame, which is what makes calibration optional: the

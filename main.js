@@ -279,6 +279,7 @@ const DEFAULT_CONFIG = {
   priceOverrides: {}, // apiId -> {ex, at}: the user's own price for an item, wins over every feed (see applyPriceRules)
   commandHotkeys: [], // Hotkeys settings: [{command:'/hideout', accelerator:'F8'}] - whitelist-only safe chat commands, one key = one manual command
   stashCalibration: null, // Net Worth: {x,y,w,h} panel box from one-time calibration; null = assume reference res
+  stashOwnDigitsOnly: false, // digits with own templates are read against those only (the shipped ones of that digit left out)
   stashGrowDigits: false, // "save the digit's edge": the digit grows from the hard cut into the original's light edge (reader + learning, own learned set)
   stashConfirmed: {}, // per-tab, per-apiId count the player confirmed (✓ / typed / learned) - not asked about again while the scan reads that count
   stashTuneBackup: {}, // per-tab slot settings from before the last "Automatisch einstellen" (undo)
@@ -2078,7 +2079,7 @@ function runReaderWorker(bitmap, W, H, onDetected, opts) {
     const slotOverrides = config.stashSlotOverrides || null;
     // opts.calBox: a panel box to use instead of the calibration (tab tour: where the
     // panel was found for an earlier tab of the same run)
-    w.postMessage({ bitmap: ab, W, H, calBox: (opts && opts.calBox) || config.stashCalibration || null, learnedTemplates, slotOverrides, hiRes: !!config.stashHiRes, growDigits: !!config.stashGrowDigits, userTabSigs: config.stashUserTabSigs || null, userTabMaps: config.stashUserTabMaps || null }, [ab]); // transfer the ~8MB frame, no copy
+    w.postMessage({ bitmap: ab, W, H, calBox: (opts && opts.calBox) || config.stashCalibration || null, learnedTemplates, slotOverrides, hiRes: !!config.stashHiRes, growDigits: !!config.stashGrowDigits, ownDigitsOnly: !!config.stashOwnDigitsOnly, userTabSigs: config.stashUserTabSigs || null, userTabMaps: config.stashUserTabMaps || null }, [ab]); // transfer the ~8MB frame, no copy
   });
 }
 
@@ -2622,7 +2623,7 @@ function teachCount({ apiId, value, settings, tab: tabIn } = {}) {
     // winning floor, then its neighbours, until each digit is one piece (RP.teachCut)
     let learnedNow = null;
     try { learnedNow = loadLearnedTemplates(); } catch { /* none yet */ }
-    const bank = RP.buildBank(require('./renderer/stash/digit-templates.json'), learnedNow, ms, grow).bank;
+    const bank = RP.buildBank(require('./renderer/stash/digit-templates.json'), learnedNow, ms, grow, !!config.stashOwnDigitsOnly).bank;
     const cutT = RP.teachCut(ch, pos, P, bank, value, ov && ov.floor != null ? ov.floor : null);
     const { binarized, comps } = cutT;
     if (cutT.more && !(settings && settings.force)) {
@@ -2731,7 +2732,7 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
     if (ch.G) P.growV = ch.G;
     let learned = null;
     try { learned = loadLearnedTemplates(); } catch { /* none yet */ }
-    const bankInfo = RP.buildBank(require('./renderer/stash/digit-templates.json'), learned, matchScale, grow);
+    const bankInfo = RP.buildBank(require('./renderer/stash/digit-templates.json'), learned, matchScale, grow, !!config.stashOwnDigitsOnly);
     const read = RP.readSlot(ch, pos, bankInfo.bank, P, floorIn);
     const floor = read.floor;
     const previewText = read.text === '?' ? '?' : bankInfo.unmap(read.text);
@@ -2797,8 +2798,10 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
           const T = tpl.data[ty * tpl.w + tx] ? 1 : 0, B = cmp[y * Wd + x] ? 1 : 0;
           const o = (y * Wd + x) * 4;
           if (T && B) { both++; diffBuf[o] = 255; diffBuf[o + 1] = 255; diffBuf[o + 2] = 255; }
-          else if (T) { miss++; diffBuf[o] = 235; diffBuf[o + 1] = 40; diffBuf[o + 2] = 40; }
-          else if (B) { extra++; diffBuf[o] = 60; diffBuf[o + 1] = 130; diffBuf[o + 2] = 255; }
+          // nativeImage bitmaps are BGRA (reported: "das Rot ist eher Orange" - red and blue
+          // came out swapped): byte 0 = blue, 2 = red
+          else if (T) { miss++; diffBuf[o] = 40; diffBuf[o + 1] = 40; diffBuf[o + 2] = 235; }
+          else if (B) { extra++; diffBuf[o] = 255; diffBuf[o + 1] = 130; diffBuf[o + 2] = 60; }
         }
       }
       diffGlyphs.push({ digit: bankInfo.unmap(g.ch), source: bankInfo.sourceOf(g.ch), score: g.score, both, miss, extra });
@@ -2824,9 +2827,10 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
         for (let i = 0; i < Wd * Hd; i++) {
           const o = i * 4; ob[o] = wr.data[i]; ob[o + 1] = wg.data[i]; ob[o + 2] = wb.data[i]; ob[o + 3] = 255;
           if (!binarized.data[i]) continue;
-          if (!num[i]) mix(o, 235, 50, 50, 0.55);                   // in the black/white picture, not the number
-          else if (core && !core.data[i]) mix(o, 60, 220, 90, 0.7); // edge rescued from the original
-          else mix(o, 40, 200, 255, 0.45);                          // the hard cut's digit
+          // colours as B, G, R (BGRA bitmap, like the capture it is laid on)
+          if (!num[i]) mix(o, 50, 50, 235, 0.55);                   // red: in the black/white picture, not the number
+          else if (core && !core.data[i]) mix(o, 90, 220, 60, 0.7); // green: edge rescued from the original
+          else mix(o, 255, 200, 40, 0.45);                          // blue: the hard cut's digit
         }
         overlayUrl = toUrl(ob, Wd, Hd, 6);
       }
@@ -2839,7 +2843,7 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
       const v = binarized.data[i] ? 255 : 0;
       const edge = core && binarized.data[i] && !core.data[i];
       if (edge) rescued++;
-      binBuf[i * 4] = edge ? 60 : v; binBuf[i * 4 + 1] = edge ? 220 : v; binBuf[i * 4 + 2] = edge ? 90 : v; binBuf[i * 4 + 3] = 255;
+      binBuf[i * 4] = edge ? 90 : v; binBuf[i * 4 + 1] = edge ? 220 : v; binBuf[i * 4 + 2] = edge ? 60 : v; binBuf[i * 4 + 3] = 255; // BGRA
     }
     return {
       ok: true,
@@ -3089,6 +3093,11 @@ ipcMain.handle('stash-slot-save-read-settings', (_e, { apiId, settings, tab } = 
 // that slot, it is not asked about again - whatever its percentage (asked for: "wenn ich
 // dauernd neu lerne ist das dumm"). A different count is checked again. They are also
 // what "Automatisch einstellen" measures against (the counts known to be right).
+ipcMain.handle('set-stash-own-digits-only', (_e, on) => {
+  config.stashOwnDigitsOnly = !!on;
+  saveConfig();
+  return config.stashOwnDigitsOnly;
+});
 ipcMain.handle('set-stash-grow-digits', (_e, on) => {
   config.stashGrowDigits = !!on;
   saveConfig();
@@ -3139,7 +3148,7 @@ ipcMain.handle('stash-autotune', async (_e, { tab } = {}) => {
       try { learnedTemplates = loadLearnedTemplates(); } catch {}
       const bm = cap.bitmap;
       const ab = bm.buffer.slice(bm.byteOffset, bm.byteOffset + bm.byteLength);
-      w.postMessage({ mode: 'tune', bitmap: ab, W: cap.W, H: cap.H, box: cap.box, tab, truth, learnedTemplates, hiRes: !!config.stashHiRes, growDigits: !!config.stashGrowDigits,
+      w.postMessage({ mode: 'tune', bitmap: ab, W: cap.W, H: cap.H, box: cap.box, tab, truth, learnedTemplates, hiRes: !!config.stashHiRes, growDigits: !!config.stashGrowDigits, ownDigitsOnly: !!config.stashOwnDigitsOnly,
         tabOverrides: (config.stashSlotOverrides && config.stashSlotOverrides[tab]) || null, userTabMaps: config.stashUserTabMaps || null }, [ab]);
     });
     if (!out || !out.ok) return out || { ok: false, error: 'tune failed' };

@@ -926,6 +926,8 @@ window.I18N_CATALOGS.de = {
   "networth.line.loupe_4": "4 Schwarz-Weiß (bekommt der Leser)",
   "networth.line.debug_img_overlay": "Die freigestellte Zahl auf dem Original: blau = harter Schnitt, grün = vom Rand-Retter geholt, rot = im Schwarz-Weiß-Bild, aber nicht Teil der Zahl (Icon)",
   "networth.line.loupe_5": "5 Vergleich mit der Vorlage",
+  "networth.settings.toggle_own_label": "Nur eigene Ziffern (mitgelieferte ausblenden)",
+  "networth.settings.toggle_own_sub": "Hast du eine Ziffer selbst (Tafel übernommen oder gelernt), vergleicht er sie nur noch mit deinen – die 69 mitgelieferten dieser Ziffer werden ausgeblendet. Ziffern, die du noch nicht hast, liest er weiter mit den mitgelieferten, sonst ginge gar nichts.",
   "networth.row.remove_title": "Diesen Tab entfernen",
   "networth.sample.answer_first": "Beantworte die Frage zu jedem Screenshot, bevor du sendest.",
   "networth.sample.capture_black": "Das Spielfenster kam schwarz zurück. Das ist exklusiver Vollbildmodus. Wechsle zu Fenster oder Randlos und versuche es erneut.",
