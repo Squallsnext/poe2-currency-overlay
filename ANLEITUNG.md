@@ -106,9 +106,24 @@ Gegenstände und die umbenannten Wiederbelebungs-Runen. Nichts einzustellen.
 
 Andere Auflösung oder UI-Größe? Einfach neu kalibrieren.
 
-**Fragment-Fach** (Unter-Reiter „Fragmente“): ist dabei, als letztes Fach der Tour. Beim
-ersten Mal lernt das Programm das Fach über die Tour kennen (oder über „Falsches Fach?“ →
-Fragmente), danach wird es erkannt wie die anderen.
+**F7 und „Fächer scannen“ – der Unterschied:**
+- **„Fächer scannen“** (die Tour) ist zum **Kennenlernen**: das Programm sagt, welches Fach
+  dran ist, und fragt „Ist das wirklich dieses Fach?“ – mit Ja lernt es das Aussehen des
+  Fachs (es wird „gepaart“) und setzt die Kästchen auf die Zellen.
+- **F7** (bzw. deine Scan-Taste) liest danach **jedes gepaarte Fach** jederzeit, auch
+  außerhalb der Tour. Ein Fach, das noch nie gepaart wurde, erkennt F7 nicht sicher – dann
+  erst die Tour (oder beim Scan „Falsches Fach?“ → richtiges Fach wählen).
+
+**Ein neues Fach in Betrieb nehmen** (z. B. das **Fragment-Fach**, Unter-Reiter
+„Fragmente“ – es ist der letzte Schritt der Tour):
+1. **„Fächer scannen“** starten, bis zum neuen Fach durchklicken (vorhandene Fächer
+   überspringen), im Spiel das Fach öffnen, **Scan-Taste**.
+2. Die Frage **„Ist das dieses Fach?“ mit Ja** beantworten – jetzt ist es gepaart, die
+   Kästchen sitzen auf den Zellen.
+3. Ein neues Fach hat noch **keine eigenen Leser-Einstellungen**: jede Zahl prüfen. Wo
+   eine falsch oder unsicher ist → **Debug** (3.3): Filter einstellen, „Auf ganzes Fach
+   anwenden“, Ziffern anlernen.
+4. Ab jetzt reicht **F7**.
 
 ### 3.2 Ausrichten (Kästchen auf die Zahlen setzen)
 

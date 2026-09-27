@@ -119,6 +119,10 @@ The quick way, with keyboard or controller UI, at 1080p, 1440p, 4K or 5K:
 2. **Scan the tabs** (*Scan tabs*, offered right after calibrating): open each tab in game
    when asked and take its picture with the scan key. Each tab's boxes are placed onto its
    cells automatically.
+   The tour is what PAIRS a tab: it asks "is this that tab?" and learns its look. After
+   that the scan key reads any paired tab at any time; a tab never paired (e.g. the new
+   Fragment tab) goes through the tour once. A new tab has no reader settings of its own
+   yet - check its counts and use the OCR debug panel where one is off.
 3. **Align** only where a count is read wrong: mark all boxes (drag a frame around them),
    clear the models (V), *place by rule* (G), fix a drifted row/column with R / S, save.
 4. **OCR debug** for slots that still read wrong (Settings → *Show OCR debug*, then
