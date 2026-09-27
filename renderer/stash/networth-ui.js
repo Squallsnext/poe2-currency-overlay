@@ -19,6 +19,23 @@
   const fmtEx = (n) => n == null ? t('networth.value.none') : Math.round(n).toLocaleString('en-US') + ' ' + unit(t('networth.unit.ex_label'), 'exalted');
   const fmtDiv = (n) => n == null ? null : (n >= 100 ? Math.round(n) : n.toFixed(1)).toLocaleString('en-US') + ' ' + unit(t('networth.unit.div_label'), 'divine');
   const fmtCount = (n) => Number(n).toLocaleString('en-US');
+  const fmtChaos = (n) => n == null ? null : (n >= 100 ? Math.round(n) : n.toFixed(1)).toLocaleString('en-US') + ' ' + unit(t('networth.unit.chaos_label'), 'chaos');
+  // A value in the currencies the player picked (Settings -> Net Worth: Ex / Div / Chaos,
+  // any of them - asked for: "some want only Ex, or Chaos, I want all three"). The first
+  // picked one is the main figure; a currency without a known rate is left out.
+  const UNIT_ORDER = ['ex', 'div', 'chaos'];
+  const unitsOn = () => UNIT_ORDER.filter((u) => (state.units || ['ex', 'div']).includes(u));
+  function unitParts(ex, prices) {
+    if (ex == null) return [fmtEx(null)];
+    const out = [];
+    for (const u of unitsOn()) {
+      if (u === 'ex') out.push(fmtEx(ex));
+      else if (u === 'div' && prices && prices.div) out.push(fmtDiv(ex / prices.div));
+      else if (u === 'chaos' && prices && prices.chaos) out.push(fmtChaos(ex / prices.chaos));
+    }
+    return out.length ? out : [fmtEx(ex)];
+  }
+  const unitsHtml = (ex, prices) => unitParts(ex, prices).map((p, i) => `<span class="${i ? 'nw-div' : 'nw-ex'}">${p}</span>`).join(' ');
 
   const state = { rows: [], expanded: {}, nextId: 1, dup: false, sortLayout: false, showMissing: false, showConfidence: false, showOcrDebug: false, hiRes: false, showRel: false, calibrated: false, hotkey: 'F7', dragId: null, busy: false, phase: 'idle', pendingTab: null, queued: 0, notice: null, modal: null, wizard: null, debugRows: new Set(), dbgLine: null, tabFix: null };
   // apiId -> {rawUrl, binUrl} | 'loading', for the OCR-debug toggle. Cleared on every
@@ -51,7 +68,7 @@
   const TAB_LABEL = { currency: t('networth.tab.currency'), abyss: t('networth.tab.abyss'), essence: t('networth.tab.essence'), runes: t('networth.tab.runes'), 'runes-kalguuran': t('networth.tab.runes_kalguuran'), ritual: t('networth.tab.ritual'), soulcore: t('networth.tab.soulcore'), idol: t('networth.tab.idol'), 'ancient-augment': t('networth.tab.ancient_augment'), delirium: t('networth.tab.delirium'), breach: t('networth.tab.breach'), expedition: t('networth.tab.expedition'), fragment: t('networth.tab.fragment') };
   const MIRROR_ICON = 'https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lEdXBsaWNhdGUiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/26bc31680e/CurrencyDuplicate.png';
 
-  if (window.api && window.api.getConfig) window.api.getConfig().then((c) => { state.dup = !!(c && c.stashDupTabs); state.sortLayout = !!(c && c.stashSortLayout); state.showMissing = !!(c && c.stashShowMissing); state.showConfidence = !!(c && c.stashShowConfidence); state.showOcrDebug = !!(c && c.stashShowOcrDebug); state.hiRes = !!(c && c.stashHiRes); state.showRel = !!(c && c.stashShowReliability); state.calibrated = !!(c && c.stashCalibration); state.hotkey = (c && c.stashHotkey) || 'F7'; state.bannerHidden = !!(c && c.stashBannerHidden); render(); }).catch(() => {});
+  if (window.api && window.api.getConfig) window.api.getConfig().then((c) => { state.dup = !!(c && c.stashDupTabs); state.sortLayout = !!(c && c.stashSortLayout); state.showMissing = !!(c && c.stashShowMissing); state.showConfidence = !!(c && c.stashShowConfidence); state.showOcrDebug = !!(c && c.stashShowOcrDebug); state.units = Array.isArray(c && c.stashUnits) && c.stashUnits.length ? c.stashUnits : ['ex', 'div']; state.hiRes = !!(c && c.stashHiRes); state.showRel = !!(c && c.stashShowReliability); state.calibrated = !!(c && c.stashCalibration); state.hotkey = (c && c.stashHotkey) || 'F7'; state.bannerHidden = !!(c && c.stashBannerHidden); render(); }).catch(() => {});
 
   const rowsOfType = (tab) => state.rows.filter((r) => r.tab === tab);
   // The debug panel of a row: with the OCR-debug switch, or during a check the scan
@@ -258,15 +275,16 @@
   const rowEdited = (res) => (res.lines || []).some((ln) => ln.userCount != null);
 
   function grandTotals() {
-    let ex = 0, divPrice = null, mirrorPrice = null, edited = false;
+    let ex = 0, divPrice = null, chaosPrice = null, mirrorPrice = null, edited = false;
     for (const r of state.rows) {
       if (!r.included) continue;
       ex += rowTotalEx(r.result);
       if (rowEdited(r.result)) edited = true;
       if (r.result.divPrice) divPrice = r.result.divPrice;
+      if (r.result.chaosPrice) chaosPrice = r.result.chaosPrice;
       if (r.result.mirrorPrice) mirrorPrice = r.result.mirrorPrice;
     }
-    return { ex, div: divPrice ? ex / divPrice : null, mirrors: mirrorPrice && ex >= mirrorPrice ? Math.floor(ex / mirrorPrice) : null, edited };
+    return { ex, prices: { div: divPrice, chaos: chaosPrice }, div: divPrice ? ex / divPrice : null, mirrors: mirrorPrice && ex >= mirrorPrice ? Math.floor(ex / mirrorPrice) : null, edited };
   }
   const anyEdits = () => state.rows.some((r) => (r.result.lines || []).some((ln) => ln.userCount != null || ln.excluded));
 
@@ -297,6 +315,25 @@
     toggles.appendChild(mkToggle(state.showMissing, t('networth.settings.toggle_missing_label'),
       t('networth.settings.toggle_missing_sub'),
       (v) => { state.showMissing = v; try { window.api.setStashShowMissing(v); } catch {} }));
+    // values shown in: Ex / Div / Chaos, any of them (at least one)
+    {
+      const row = el('div', 'nw-units');
+      row.appendChild(el('span', 'nw-units-lab', t('networth.settings.units_label')));
+      for (const u of UNIT_ORDER) {
+        const on = unitsOn().includes(u);
+        const b = el('button', 'nw-unit-btn' + (on ? ' on' : ''), esc(t('networth.settings.unit_' + u)));
+        b.onclick = () => {
+          let list = unitsOn();
+          list = on ? list.filter((x) => x !== u) : list.concat(u);
+          if (!list.length) return; // one has to stay
+          state.units = UNIT_ORDER.filter((x) => list.includes(x));
+          try { window.api.setStashUnits(state.units); } catch {}
+          renderSettings(root); render();
+        };
+        row.appendChild(b);
+      }
+      toggles.appendChild(row);
+    }
     toggles.appendChild(mkToggle(state.showConfidence, t('networth.settings.toggle_confidence_label'),
       t('networth.settings.toggle_confidence_sub'),
       (v) => { state.showConfidence = v; try { window.api.setStashShowConfidence(v); } catch {} }));
@@ -604,8 +641,7 @@
     }
     const rowEx = rowTotalEx(r);
     const tot = el('div', 'nw-card-total' + (rowEdited(r) ? ' nw-edited' : ''));
-    tot.appendChild(el('span', 'nw-ex', fmtEx(rowEx)));
-    if (r.divPrice) tot.appendChild(el('span', 'nw-div', fmtDiv(rowEx / r.divPrice)));
+    tot.insertAdjacentHTML('beforeend', unitsHtml(rowEx, { div: r.divPrice, chaos: r.chaosPrice }));
     head.appendChild(tot);
     head.onclick = (e) => { if (e.target === cb) return; state.expanded[row.id] = !open; render(); };
 
@@ -728,7 +764,7 @@
       cnt.title = t('networth.line.edit_count_title');
       cnt.onclick = (e) => { e.stopPropagation(); startEdit(ln, cnt); };
       line.appendChild(cnt);
-      const valEl = el('div', 'nw-val nw-val-edit', ln.price == null ? t('networth.line.no_price') : priceMark(ln.est) + fmtEx(lineVal(ln)));
+      const valEl = el('div', 'nw-val nw-val-edit', ln.price == null ? t('networth.line.no_price') : priceMark(ln.est) + unitParts(lineVal(ln), { div: r.divPrice, chaos: r.chaosPrice }).join(' · '));
       // why this price is not simply the feed's (main.js sanitizeThinPrices / applyPriceRules),
       // plus every source it had, then how to set an own one
       valEl.title = priceTitle(ln);
@@ -1651,8 +1687,7 @@
     totBox.appendChild(el('div', 'nw-grand-lab', rows ? tn('networth.header.tabs_included', rows, { included, total: rows }) : t('networth.header.no_tabs_captured')));
     const gline = el('div', 'nw-grand-val' + (rows && gt.edited ? ' nw-edited' : ''));
     gline.appendChild(el('span', 'nw-total-lab', t('networth.header.total_label')));
-    gline.appendChild(el('span', 'nw-ex', fmtEx(rows ? gt.ex : null)));
-    if (gt.div != null) gline.appendChild(el('span', 'nw-div', fmtDiv(gt.div)));
+    gline.insertAdjacentHTML('beforeend', unitsHtml(rows ? gt.ex : null, gt.prices));
     if (rows && gt.mirrors != null) gline.appendChild(el('span', 'nw-mirror',
       `(${gt.mirrors.toLocaleString('en-US')}<img class="nw-mirror-ic" src="${MIRROR_ICON}" alt="${t('networth.grand.mirror_alt')}">)`));
     totBox.appendChild(gline);

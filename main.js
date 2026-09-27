@@ -268,6 +268,7 @@ const DEFAULT_CONFIG = {
   stashSortLayout: false, // Net Worth: list a tab's items in stash reading order instead of by value
   stashShowMissing: false, // Net Worth: show empty/unread slots as editable x0 lines
   stashShowConfidence: false, // Net Worth: show the per-line OCR confidence %
+  stashUnits: ['ex', 'div'], // Net Worth: values shown in Exalted / Divine / Chaos (any of them)
   stashShowOcrDebug: false, // Net Worth: show the exact crop the reader saw, per line
   stashUserTabSigs: {}, // Net Worth: extra tab-detection fingerprints the user taught via "wrong tab?" (tab -> [signature])
   stashShowReliability: false, // Net Worth: tint rows the shipped reliability table marks as often misread
@@ -2800,6 +2801,7 @@ async function stashResultWithPrices(res, W, H) {
   let prices = {};
   try { prices = await getStashPriceMap(); } catch (err) { /* prices optional; counts still shown */ }
   const divPrice = prices.divine && typeof prices.divine.price === 'number' ? prices.divine.price : null;
+  const chaosPrice = prices.chaos && typeof prices.chaos.price === 'number' ? prices.chaos.price : null;
   const mirrorPrice = prices.mirror && typeof prices.mirror.price === 'number' ? prices.mirror.price : null;
 
   const lines = []; const flags = []; let total = 0;
@@ -2832,7 +2834,7 @@ async function stashResultWithPrices(res, W, H) {
   lines.sort((a, b) => (b.valueEx || 0) - (a.valueEx || 0));
   return {
     ok: true, tab: res.tab, w: W, h: H, readCount: res.readCount, slotCount: res.slotCount,
-    totalEx: total, divPrice, mirrorPrice, totalDiv: divPrice ? total / divPrice : null, lines, flags, mismatch: false,
+    totalEx: total, divPrice, chaosPrice, mirrorPrice, totalDiv: divPrice ? total / divPrice : null, lines, flags, mismatch: false,
     autoFound: !!res.autoFound, // false = the panel finder came up empty, so manual calibration is worth offering
   };
 }
@@ -2941,6 +2943,13 @@ ipcMain.handle('set-stash-dup', (_e, on) => { config.stashDupTabs = !!on; saveCo
 ipcMain.handle('set-stash-sort', (_e, on) => { config.stashSortLayout = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-show-missing', (_e, on) => { config.stashShowMissing = !!on; saveConfig(); return true; });
 ipcMain.handle('set-stash-show-confidence', (_e, on) => { config.stashShowConfidence = !!on; saveConfig(); return true; });
+// Net Worth values shown in: any of 'ex' | 'div' | 'chaos' (at least one)
+ipcMain.handle('set-stash-units', (_e, list) => {
+  const ok = (Array.isArray(list) ? list : []).filter((u) => ['ex', 'div', 'chaos'].includes(u));
+  config.stashUnits = ok.length ? ok : ['ex'];
+  saveConfig();
+  return config.stashUnits;
+});
 ipcMain.handle('set-stash-show-ocr-debug', (_e, on) => { config.stashShowOcrDebug = !!on; saveConfig(); return true; });
 // The user's own price for one item (ex > 0), or null to drop it again.
 ipcMain.handle('set-price-override', (_e, { apiId, ex } = {}) => {

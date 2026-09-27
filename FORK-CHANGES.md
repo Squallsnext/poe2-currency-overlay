@@ -985,6 +985,13 @@ confidence and ✓ - without the debug switch (`dbgActive` in networth-ui.js: th
 a running check). **Done** closes it. With percentages hidden, an unsure number carries a
 small "?" (red under 65 %) that opens the check for just that one. Tested in the browser
 with a mocked scan (notice, bar, picture requested per number, next / done).
+### 4.15 Net Worth values in Ex / Div / Chaos
+
+Asked for: Divine next to Exalted in every line, and a choice - "some want only Ex, or
+Chaos, I want all three". Settings → Net Worth → "Show values in: Exalted / Divine /
+Chaos", any of them, at least one (`stashUnits`, default Exalted + Divine as before).
+Lines, tab totals and the grand total show the picked ones in that order; a currency
+without a known rate is left out. Scans now carry the Chaos price too (`chaosPrice`).
 
 ## 5. New config keys
 
@@ -1000,6 +1007,7 @@ with a mocked scan (notice, bar, picture requested per number, next / done).
 | `stashSkipGroups` | `[]` | "Don't count" lists `[{ id, name, on, items }]` |
 | `arbVendorSplit` | `false` | Arbitrage also considers vendor splits (Greater → 3 normal) |
 | `showSwapTab` | `true` | Swap tab visible |
+| `stashUnits` | `['ex', 'div']` | Net Worth values shown in Exalted / Divine / Chaos |
 | `stashUserTabMaps` | `{}` | Tabs built with the tab builder: `{ key: { label, created, cells: [{ apiId, x, y, w, h }] } }` |
 | `showRecipesTab`, `recipeBases`, `recipeRounds` | `true`, `{}`, `{}` | Recipes tab visible; per-recipe currency and rounds |
 | `priceOverrides` | `{}` | `apiId → { ex, at }`: the player's own price per unit |

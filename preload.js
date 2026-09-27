@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('api', {
   setExcludeExaltedArb: (on) => ipcRenderer.invoke('set-exclude-exalted-arb', on),
   setArbVendorSplit: (on) => ipcRenderer.invoke('set-arb-vendor-split', on),
   // tab builder (Net Worth: "Neues Fach anlegen")
+  setStashUnits: (list) => ipcRenderer.invoke('set-stash-units', list),
   stashBuilderStart: (opts) => ipcRenderer.invoke('stash-builder-start', opts || {}),
   stashBuilderDelete: (key) => ipcRenderer.invoke('stash-builder-delete', key),
   stashBuilderExport: (key) => ipcRenderer.invoke('stash-builder-export', key),

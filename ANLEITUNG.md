@@ -208,6 +208,9 @@ Einstellungen haben immer Vorrang.
 - **„Falsches Fach?“**: wenn ein Fach als ein anderes erkannt wurde – das Programm merkt
   sich das für deinen Bildschirm.
 
+- **Werte anzeigen in**: Einstellungen → Vermögen → **Exalted / Divine / Chaos** – beliebig
+  viele anhaken (mindestens einer). Gilt für jede Zeile, jedes Fach und die Summe.
+
 ### 3.5 Zurücksetzen, Support
 
 - **„Kalibrierung & Fächer zurücksetzen“** (Einstellungen → Weitere Wege; zweimal
