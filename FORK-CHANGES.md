@@ -1049,6 +1049,14 @@ off, 5K currency x2 and essence) came back identical, count and confidence. Time
 5K essence 22.1 -> 3.2 s, 5K currency 4.8 -> 1.1 s, 1440p essence 3.9 -> 0.75 s,
 1080p essence 2.3 -> 0.54 s; the OCR debug preview and teaching use the same code.
 
+### 4.18 A scan shows that it landed
+
+Asked for: with the faster reader (4.17) a scan is quick and quiet - the fans spinning
+up used to be the only sign - so on a tab-by-tab run you could not tell it had landed.
+Each card now carries its scan time ("✓ 23:41", full time on hover, kept with the saved
+rows), and for 4 s after a scan the header shows a green "✓ Essences · 23:41:05" and
+that card's time lights up green. Tested in the browser (four scans, stamp, fade).
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

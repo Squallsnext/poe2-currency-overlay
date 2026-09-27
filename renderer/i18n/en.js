@@ -859,6 +859,7 @@ window.I18N_CATALOGS.en = {
   "networth.row.drag_title": "Drag to reorder",
   "networth.row.include_title": "Include in total",
   "networth.row.label_with_index": "{tabName} #{index}",
+  "networth.row.scanned_at": "Scanned at {time}",
   "networth.row.remove_title": "Remove this tab",
   "networth.sample.answer_first": "Answer the question on each screenshot before sending.",
   "networth.sample.capture_black": "The game window came back black. That's exclusive fullscreen. Switch to Windowed or Borderless and try again.",

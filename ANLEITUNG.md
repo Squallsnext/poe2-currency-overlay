@@ -163,6 +163,13 @@ Weitere Tasten: Pfeile = 1 px, Shift+Pfeil = 5 px, Strg+Z = rückgängig, **F** 
 einrasten (nach einem von Hand gesetzten Vorbild), **H** = Hilfe. Gestrichelte Kästchen =
 unsicher, Maus darauf zeigt warum.
 
+### 3.0a Fach für Fach scannen (Marathon)
+
+Im Spiel ein Fach anklicken → **F7** (oder Mute) → nächstes Fach → F7 … Das Programm
+erkennt jedes Fach selbst. Nach jedem Scan steht oben kurz ein grünes **„✓ Essenzen ·
+23:41:05“**, und an jedem Fach die Uhrzeit seines letzten Scans (**✓ 23:41**). Ein Fach
+nochmal scannen ersetzt seine Karte, es wird nichts doppelt gezählt.
+
 ### 3.3a Unsichere Zahlen – meldet das Programm selbst
 
 Nach jedem Scan (F7, Tour, neues Fach) zählt das Programm die **unsicheren Zahlen** (unter

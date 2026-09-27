@@ -854,6 +854,7 @@ window.I18N_CATALOGS.de = {
   "networth.row.drag_title": "Ziehen zum Umsortieren",
   "networth.row.include_title": "In Summe einbeziehen",
   "networth.row.label_with_index": "{tabName} #{index}",
+  "networth.row.scanned_at": "Gescannt um {time}",
   "networth.row.remove_title": "Diesen Tab entfernen",
   "networth.sample.answer_first": "Beantworte die Frage zu jedem Screenshot, bevor du sendest.",
   "networth.sample.capture_black": "Das Spielfenster kam schwarz zurück. Das ist exklusiver Vollbildmodus. Wechsle zu Fenster oder Randlos und versuche es erneut.",

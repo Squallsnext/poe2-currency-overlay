@@ -267,6 +267,8 @@
 
   // Fold a capture result into the tally. Dedup-by-type unless the duplicate
   // setting is on, in which case ask what to do when the type already exists.
+  const SCAN_FLASH_MS = 4000;
+  const fmtTime = (ms, sec) => new Date(ms).toLocaleTimeString(numLoc(), { hour: '2-digit', minute: '2-digit', second: sec ? '2-digit' : undefined });
   function applyResult(res) {
     // remembered so Settings can offer manual calibration only once auto-detection
     // has actually come up empty
@@ -282,6 +284,14 @@
       return render();
     }
     state.notice = null;
+    // a visible "scanned" (asked for: the scan is fast and quiet now - the fans used to be
+    // the only sign - so during a tab-by-tab run you want to see it landed): the time
+    // stays on the card; for a few seconds a green ✓ with tab and time sits in the header
+    // and the card's stamp lights up
+    res.scannedAt = Date.now();
+    state.lastScan = { tab: res.tab, at: res.scannedAt, fresh: true };
+    clearTimeout(state.scanFlashTimer);
+    state.scanFlashTimer = setTimeout(() => { if (state.lastScan) state.lastScan.fresh = false; render(); }, SCAN_FLASH_MS);
     const existing = rowsOfType(res.tab);
     if (!existing.length) { addRow(res); return render(); }
     if (!state.dup) { existing[0].result = res; return render(); } // single row per type: update it
@@ -661,6 +671,12 @@
     const title = el('div', 'nw-card-title');
     title.appendChild(el('span', 'nw-chev', open ? '▾' : '▸'));
     title.appendChild(document.createTextNode(labelFor(row)));
+    if (r.scannedAt) {
+      const fresh = state.lastScan && state.lastScan.fresh && state.lastScan.at === r.scannedAt;
+      const st = el('span', 'nw-scan-at' + (fresh ? ' nw-scan-fresh' : ''), '✓ ' + fmtTime(r.scannedAt));
+      st.title = t('networth.row.scanned_at', { time: fmtTime(r.scannedAt, true) });
+      title.appendChild(st);
+    }
     head.appendChild(title);
     // The tab's tools behind one ⚙ (asked for: "Wrong tab?" and "Align" are rarely needed
     // now - the scan asks when it does not know a tab, and the check of unsure numbers
@@ -1808,6 +1824,8 @@
     if (state.busy) {
       const q = state.queued > 1 ? ' (' + state.queued + ')' : '';
       controls.appendChild(el('span', 'nw-scanning', t('networth.status.scanning') + q));
+    } else if (state.lastScan && state.lastScan.fresh) {
+      controls.appendChild(el('span', 'nw-scan-ok', esc('✓ ' + (TAB_LABEL[state.lastScan.tab] || state.lastScan.tab) + ' · ' + fmtTime(state.lastScan.at, true))));
     }
     const gear = el('button', 'nw-gear', '⚙'); gear.title = t('networth.header.settings_tooltip', { hotkey: state.hotkey });
     gear.onclick = () => { if (window.openNetWorthSettings) window.openNetWorthSettings(); };
