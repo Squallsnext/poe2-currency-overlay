@@ -904,6 +904,7 @@ window.I18N_CATALOGS.en = {
   "networth.learned.restore_title": "Puts the last backed-up learned digits back.",
   "networth.learned.restore_done": "Backup restored.",
   "networth.learned.restore_none": "No backup found.",
+  "networth.learned.reset_failed": "Reset failed: {error}. Please restart the app (npm start) and try again.",
   "networth.row.remove_title": "Remove this tab",
   "networth.sample.answer_first": "Answer the question on each screenshot before sending.",
   "networth.sample.capture_black": "The game window came back black. That's exclusive fullscreen. Switch to Windowed or Borderless and try again.",

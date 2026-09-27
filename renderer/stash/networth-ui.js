@@ -533,6 +533,7 @@
             const r2 = await window.api.stashAuditLearned(true).catch(() => null);
             out.textContent = r2 && r2.ok ? t('networth.audit.removed', { k: r2.removed }) : t('networth.audit.failed');
             for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
+            render();
           });
           out.appendChild(rm);
         };
@@ -549,14 +550,17 @@
           if (!window.api.stashLearnedReset) return;
           if (!armed) { b.textContent = t('networth.learned.reset_confirm'); armed = setTimeout(() => { armed = null; b.textContent = t('networth.learned.reset'); }, 4000); return; }
           clearTimeout(armed); armed = null; b.textContent = t('networth.learned.reset');
-          const r = await window.api.stashLearnedReset(false).catch(() => null);
-          out.textContent = r && r.ok ? t('networth.learned.reset_done', { n: r.removed }) : t('networth.audit.failed');
+          const r = await window.api.stashLearnedReset(false).catch((e) => ({ ok: false, error: String(e && e.message || e) }));
+          out.textContent = r && r.ok ? t('networth.learned.reset_done', { n: r.removed }) : t('networth.learned.reset_failed', { error: (r && r.error) || '?' });
+          // open OCR panels still show the old "learned" counts - fetch them again
           for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
+          render();
         };
         const rb = mk(t('networth.learned.restore'), t('networth.learned.restore_title'), async () => {
           const r = await window.api.stashLearnedReset(true).catch(() => null);
           out.textContent = r && r.ok ? t('networth.learned.restore_done') : t('networth.learned.restore_none');
           for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
+          render();
         }, true);
         box.appendChild(b); box.appendChild(rb); box.appendChild(out);
         return box;

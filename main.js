@@ -2446,14 +2446,17 @@ ipcMain.handle('stash-learned-reset', (_e, { restore } = {}) => {
       logToggle('stash-learn', `learned digits restored from ${list[list.length - 1]}`);
       return { ok: true, restored: list[list.length - 1] };
     }
-    const cur = loadLearnedTemplates();
-    const n = Object.values(cur.exemplars || {}).reduce((a, l) => a + l.length, 0)
-      + Object.values(cur.byScale || {}).reduce((a, set) => a + Object.values(set.exemplars || {}).reduce((b, l) => b + l.length, 0), 0);
+    const count = (d) => Object.values((d && d.exemplars) || {}).reduce((a, l) => a + l.length, 0)
+      + Object.values((d && d.byScale) || {}).reduce((a, set) => a + Object.values(set.exemplars || {}).reduce((b, l) => b + l.length, 0), 0);
+    const n = count(loadLearnedTemplates());
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     if (fs.existsSync(file)) fs.copyFileSync(file, path.join(dir, `learned-digit-templates.backup-${stamp}.json`));
-    saveLearnedTemplates({ exemplars: {}, templates: {} });
-    logToggle('stash-learn', `learned digits reset (${n} kept in the backup)`);
-    return { ok: true, removed: n };
+    fs.writeFileSync(file, JSON.stringify({ exemplars: {}, templates: {} })); // not the catch-all save: a failure must reach the player
+    // read it back - reported: "alle Vorlagen löschen klappt nicht, er hat noch welche drin"
+    const left = count(JSON.parse(fs.readFileSync(file, 'utf8')));
+    logToggle('stash-learn', `learned digits reset: ${n} in the backup, ${left} left (${file})`);
+    if (left) return { ok: false, error: `${left} left in ${file}` };
+    return { ok: true, removed: n, file };
   } catch (err) { return { ok: false, error: String(err && err.message || err) }; }
 });
 ipcMain.handle('stash-audit-learned', (_e, { apply } = {}) => {

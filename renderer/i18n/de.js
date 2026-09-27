@@ -899,6 +899,7 @@ window.I18N_CATALOGS.de = {
   "networth.learned.restore_title": "Holt die zuletzt gesicherten gelernten Ziffern zurück.",
   "networth.learned.restore_done": "Sicherung zurückgeholt.",
   "networth.learned.restore_none": "Keine Sicherung gefunden.",
+  "networth.learned.reset_failed": "Zurücksetzen ging nicht: {error}. Bitte Programm neu starten (npm start) und nochmal.",
   "networth.row.remove_title": "Diesen Tab entfernen",
   "networth.sample.answer_first": "Beantworte die Frage zu jedem Screenshot, bevor du sendest.",
   "networth.sample.capture_black": "Das Spielfenster kam schwarz zurück. Das ist exklusiver Vollbildmodus. Wechsle zu Fenster oder Randlos und versuche es erneut.",
