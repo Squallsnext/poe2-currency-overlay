@@ -195,6 +195,7 @@
   // the debug panel and "Align" for a restored row need that tab scanned again.
   const ROWS_KEY = 'nwRows.v1';
   function persistRows() {
+    if (state.profileSwitching) return; // the list already moved to the profile being left
     try {
       localStorage.setItem(ROWS_KEY, JSON.stringify({
         nextId: state.nextId,
@@ -746,44 +747,92 @@
         return box;
       })(),
     ]);
-    // reading-setup profiles ("Speicherslots"): save the whole setup under a name, load
-    // another (5K / 1080p), open its folder to export it (main.js stash-profile-*)
+    // reading-setup profiles ("Speicherslots"), each its own folder: pick one and load it,
+    // save the active one, start a NEW one from scratch (as a fresh install), export
+    // (main.js stash-profile-*). The Net Worth list switches with the profile.
     group(t('networth.profile.group'), [
       (() => {
         const box = el('span', 'nw-profiles');
         const sel = el('select', 'nw-profile-sel');
         const out = el('span', 'nw-audit-out');
+        let active = null;
+        // the scanned list is per profile: park the current one under the old name, bring
+        // the new one's back (or none) - then main reloads the window
+        const swapRows = (to) => {
+          try {
+            state.profileSwitching = true; // persistRows must not write the old list back
+            const cur = localStorage.getItem(ROWS_KEY);
+            localStorage.setItem(ROWS_KEY + ':' + (active || '_vor-dem-wechsel'), cur || '');
+            const next = to ? localStorage.getItem(ROWS_KEY + ':' + to) : null;
+            if (next) localStorage.setItem(ROWS_KEY, next); else localStorage.removeItem(ROWS_KEY);
+          } catch { /* storage blocked: the list just does not switch */ }
+        };
         const fill = async () => {
           const r = await window.api.stashProfiles().catch(() => null);
+          active = (r && r.active) || null;
           sel.innerHTML = '';
           const list = (r && r.ok && r.profiles) || [];
           if (!list.length) { const o = el('option', '', esc(t('networth.profile.none'))); o.value = ''; sel.appendChild(o); }
           for (const p of list) {
-            const o = el('option', '', esc(p.name + (p.screen ? ` (${p.screen.w}×${p.screen.h})` : '') + (r.active === p.name ? ' ✓' : '')));
-            o.value = p.name; if (r.active === p.name) o.selected = true;
+            const o = el('option', '', esc((active === p.name ? '✓ ' : '') + p.name + (p.screen ? ` (${p.screen.w}×${p.screen.h})` : '')));
+            o.value = p.name; if (active === p.name) o.selected = true;
             sel.appendChild(o);
           }
+          box.title = active ? t('networth.profile.active', { name: active }) : t('networth.profile.no_active');
         };
-        // a name field (Electron has no prompt()): empty = overwrite the chosen profile
+        // the name row, shown for "Neues Profil" (fresh) or saving without an active profile
+        const nameRow = el('span', 'nw-profile-namerow');
+        nameRow.style.display = 'none';
         const nameIn = el('input', 'nw-profile-name');
         nameIn.type = 'text'; nameIn.placeholder = t('networth.profile.name_prompt');
-        const save = mk(t('networth.profile.save'), t('networth.profile.save_title'), async () => {
-          const name = (nameIn.value || (sel.value !== '_vor-dem-laden' ? sel.value : '') || '').trim();
+        let nameMode = 'new';
+        const go = mk(t('networth.profile.create'), '', null);
+        const cancel = mk(t('networth.profile.cancel'), '', () => { nameRow.style.display = 'none'; }, true);
+        const askName = (mode) => {
+          nameMode = mode;
+          go.textContent = t(mode === 'new' ? 'networth.profile.create' : 'networth.profile.save_named');
+          go.title = t(mode === 'new' ? 'networth.profile.create_title' : 'networth.profile.save_named_title');
+          nameRow.style.display = ''; nameIn.value = ''; nameIn.focus();
+        };
+        go.onclick = async () => {
+          const name = nameIn.value.trim();
           if (!name) { nameIn.focus(); return; }
-          nameIn.value = '';
-          const r = await window.api.stashProfileSave(name).catch(() => null);
+          if (nameMode === 'new') {
+            if (!confirm(t('networth.profile.create_confirm', { name, cur: active || t('networth.profile.no_active_short') }))) return;
+            swapRows(name);
+            const r = await window.api.stashProfileNew(name).catch(() => null);
+            if (!r || !r.ok) { state.profileSwitching = false; out.textContent = r && r.error === 'exists' ? t('networth.profile.exists') : t('networth.profile.failed'); return; }
+            out.textContent = t('networth.profile.created', { name: r.name });
+          } else {
+            const r = await window.api.stashProfileSave(name).catch(() => null);
+            out.textContent = r && r.ok ? t('networth.profile.saved', { name: r.name }) : t('networth.profile.failed');
+            nameRow.style.display = 'none';
+            fill();
+          }
+        };
+        nameIn.onkeydown = (e) => { if (e.key === 'Enter') go.onclick(); if (e.key === 'Escape') cancel.onclick(); };
+        nameRow.appendChild(nameIn); nameRow.appendChild(go); nameRow.appendChild(cancel);
+        const load = mk(t('networth.profile.load'), t('networth.profile.load_title'), async () => {
+          if (!sel.value || sel.value === active) return;
+          if (!confirm(t('networth.profile.load_confirm', { name: sel.value, cur: active || t('networth.profile.no_active_short') }))) return;
+          swapRows(sel.value);
+          const r = await window.api.stashProfileLoad(sel.value).catch(() => null);
+          if (!r || !r.ok) { state.profileSwitching = false; out.textContent = t('networth.profile.failed'); return; }
+          out.textContent = t('networth.profile.loaded', { name: r.name });
+        }, true);
+        const save = mk(t('networth.profile.save'), t('networth.profile.save_title'), async () => {
+          if (!active) { askName('save'); return; }
+          const r = await window.api.stashProfileSave(active).catch(() => null);
           out.textContent = r && r.ok ? t('networth.profile.saved', { name: r.name }) : t('networth.profile.failed');
           fill();
         }, true);
-        const load = mk(t('networth.profile.load'), t('networth.profile.load_title'), async () => {
-          if (!sel.value) return;
-          if (!confirm(t('networth.profile.load_confirm', { name: sel.value }))) return;
-          const r = await window.api.stashProfileLoad(sel.value).catch(() => null);
-          out.textContent = r && r.ok ? t('networth.profile.loaded', { name: r.name }) : t('networth.profile.failed');
-        }, true);
+        const fresh = mk(t('networth.profile.new'), t('networth.profile.new_title'), () => askName('new'), true);
         const del = mk('✕', t('networth.profile.delete_title'), async () => {
-          if (!sel.value || !confirm(t('networth.profile.delete_confirm', { name: sel.value }))) return;
+          if (!sel.value) return;
+          if (sel.value === active) { out.textContent = t('networth.profile.delete_active'); return; }
+          if (!confirm(t('networth.profile.delete_confirm', { name: sel.value }))) return;
           await window.api.stashProfileDelete(sel.value).catch(() => null);
+          try { localStorage.removeItem(ROWS_KEY + ':' + sel.value); } catch {}
           fill();
         }, true);
         const exp = mk(t('networth.profile.export'), t('networth.profile.export_title'), async () => {
@@ -792,7 +841,7 @@
           out.textContent = r.scans ? t('networth.profile.export_scans', { n: r.scans })
             : !r.active ? t('networth.profile.export_not_active') : t('networth.profile.export_no_scans');
         }, true);
-        box.appendChild(sel); box.appendChild(nameIn); box.appendChild(save); box.appendChild(load); box.appendChild(del); box.appendChild(exp); box.appendChild(out);
+        for (const x of [sel, load, save, fresh, del, exp, nameRow, out]) box.appendChild(x);
         fill();
         return box;
       })(),

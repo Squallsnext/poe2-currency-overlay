@@ -5020,7 +5020,9 @@ ipcMain.handle('stash-reset-setup', async () => {
 // reading setup of one screen: calibration, resolution, every slot's position and filters,
 // the switches for the edge rescue / own digits, confirmed counts, tab fingerprints - and
 // the files the reader learns into: learned digits, the digit gallery, the slot memory.
-// Loading one saves the current state as "_vor-dem-laden" first, then reloads the window.
+// Switching (load / new) first saves the active profile into its own folder (without an
+// active one: "_vor-dem-wechsel"), then reloads the window. The tab tour's pictures and the
+// Net Worth list (renderer, per profile) switch with it.
 const PROFILE_KEYS = ['stashCalibration', 'stashHiRes', 'stashSlotOverrides', 'stashGrowDigits', 'stashOwnDigitsOnly', 'stashConfirmed', 'stashTuneBackup', 'stashUserTabSigs'];
 const PROFILE_FILES = () => [learnedTemplatesFile(), galleryFile(), slotMemoryFile()];
 const PROFILES_DIR = () => path.join(app.getPath('userData'), 'stash-profiles');
@@ -5035,8 +5037,37 @@ function profileSaveAs(name) {
     const to = path.join(dir, path.basename(f));
     if (fs.existsSync(f)) fs.copyFileSync(f, to); else { try { fs.unlinkSync(to); } catch {} }
   }
+  // the tab tour's pictures (which tabs are set up) belong to the setup too
+  const tour = path.join(dir, 'tour');
+  fs.rmSync(tour, { recursive: true, force: true });
+  for (const f of tourFiles()) { fs.mkdirSync(tour, { recursive: true }); fs.copyFileSync(path.join(TOUR_DIR(), f), path.join(tour, f)); }
   return dir;
 }
+function tourFiles() { try { return fs.readdirSync(TOUR_DIR()).filter((f) => /\.(png|json)$/i.test(f)); } catch { return []; } }
+// the reading setup as the profile in `dir` has it (null = factory fresh)
+function profileApply(dir) {
+  let meta = null;
+  if (dir) meta = JSON.parse(fs.readFileSync(path.join(dir, 'profile.json'), 'utf8'));
+  for (const k of PROFILE_KEYS) {
+    const v = meta && meta.config ? meta.config[k] : undefined;
+    config[k] = v == null ? (DEFAULT_CONFIG[k] === undefined ? null : JSON.parse(JSON.stringify(DEFAULT_CONFIG[k]))) : v;
+  }
+  for (const f of PROFILE_FILES()) {
+    const from = dir ? path.join(dir, path.basename(f)) : null;
+    if (from && fs.existsSync(from)) fs.copyFileSync(from, f); else { try { fs.unlinkSync(f); } catch {} }
+  }
+  for (const f of tourFiles()) { try { fs.unlinkSync(path.join(TOUR_DIR(), f)); } catch {} }
+  const tour = dir ? path.join(dir, 'tour') : null;
+  if (tour && fs.existsSync(tour)) { fs.mkdirSync(TOUR_DIR(), { recursive: true }); for (const f of fs.readdirSync(tour)) fs.copyFileSync(path.join(tour, f), path.join(TOUR_DIR(), f)); }
+  try { lastCaptureByTab.clear(); } catch {}
+}
+// before switching away: the active profile keeps its state; without one, a safety copy
+function profileKeepCurrent(target) {
+  const cur = config.stashProfileActive;
+  if (cur && cur !== target && fs.existsSync(path.join(PROFILES_DIR(), cur))) profileSaveAs(cur);
+  else if (!cur) profileSaveAs('_vor-dem-wechsel');
+}
+function profileReloadWindow() { setTimeout(() => { try { if (win && !win.isDestroyed()) win.webContents.reload(); } catch {} }, 300); }
 ipcMain.handle('stash-profiles', () => {
   try {
     const dir = PROFILES_DIR();
@@ -5061,20 +5092,30 @@ ipcMain.handle('stash-profile-load', (_e, { name } = {}) => {
   try {
     const n = profileName(name);
     const dir = path.join(PROFILES_DIR(), n);
-    const meta = JSON.parse(fs.readFileSync(path.join(dir, 'profile.json'), 'utf8'));
-    if (n !== '_vor-dem-laden') profileSaveAs('_vor-dem-laden'); // one step back, always
-    for (const k of PROFILE_KEYS) {
-      const v = meta.config ? meta.config[k] : undefined;
-      config[k] = v == null ? (DEFAULT_CONFIG[k] === undefined ? null : JSON.parse(JSON.stringify(DEFAULT_CONFIG[k]))) : v;
-    }
-    for (const f of PROFILE_FILES()) {
-      const from = path.join(dir, path.basename(f));
-      if (fs.existsSync(from)) fs.copyFileSync(from, f); else { try { fs.unlinkSync(f); } catch {} }
-    }
+    if (!fs.existsSync(path.join(dir, 'profile.json'))) return { ok: false, error: 'missing' };
+    profileKeepCurrent(n);
+    profileApply(dir);
     config.stashProfileActive = n; saveConfig();
-    try { lastCaptureByTab.clear(); } catch {}
     logToggle('stash', 'profile loaded: ' + n);
-    setTimeout(() => { try { if (win && !win.isDestroyed()) win.webContents.reload(); } catch {} }, 300);
+    profileReloadWindow();
+    return { ok: true, name: n };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+// "Neues Profil": the Net Worth reading setup as on a fresh install - no calibration, no
+// slot settings, no learned digits, no tour pictures - under a new name (asked for: "neues
+// Profil, Namen eingeben, frisch geöffnet ... so kann man testen wie ein neuer User").
+// Everything outside Net Worth stays as it is.
+ipcMain.handle('stash-profile-new', (_e, { name } = {}) => {
+  try {
+    const n = profileName(name);
+    if (!n) return { ok: false, error: 'name' };
+    if (fs.existsSync(path.join(PROFILES_DIR(), n, 'profile.json'))) return { ok: false, error: 'exists' };
+    profileKeepCurrent(n);
+    profileApply(null);
+    config.stashProfileActive = n; saveConfig();
+    profileSaveAs(n);
+    logToggle('stash', 'profile created fresh: ' + n);
+    profileReloadWindow();
     return { ok: true, name: n };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });

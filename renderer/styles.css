@@ -2179,3 +2179,4 @@ footer {
 .nw-profiles { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .nw-profile-sel { background: var(--bg-2, #1b1a17); color: inherit; border: 1px solid var(--line, #3a3730); border-radius: 5px; padding: 3px 6px; max-width: 220px; }
 .nw-profile-name { background: var(--bg-2, #1b1a17); color: inherit; border: 1px solid var(--line, #3a3730); border-radius: 5px; padding: 3px 6px; width: 200px; }
+.nw-profile-namerow { display: inline-flex; gap: 6px; align-items: center; }

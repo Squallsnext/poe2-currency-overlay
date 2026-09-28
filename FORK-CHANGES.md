@@ -1503,6 +1503,21 @@ never delays it. Export saves the current state into the active profile, refresh
 confirmed counts in every JSON (the player confirms after scanning) and opens the folder;
 another profile's export opens its folder with what it collected while it was active.
 
+Then reworked after the first try ("Name eingeben, dann 'Speichern unter' - man erwartet
+ein Speicher-Fenster"; "neues Profil, Namen eingeben, frisch geöffnet - keine Zahlen,
+keine Bilder, nichts ... so kann man testen wie ein neuer User; nur Vermögen"): the row is
+now profile list · Laden · Speichern · Neues Profil … · ✕ · Exportieren. "Speichern" saves
+into the active profile (no name asked; without one it asks for a name and keeps the
+current state). "Neues Profil …" shows a name field and "Anlegen": the active profile is
+saved into its own folder, then Net Worth starts as freshly installed - no calibration, no
+slot settings, no switches, no confirmed counts, no learned digits / gallery / slot memory,
+no tour pictures, an empty list - under the new name. Switching (load / new) always saves
+the active profile first (without one: "_vor-dem-wechsel"). The tab tour's pictures and the
+Net Worth list (renderer localStorage, parked per profile) switch with the profile.
+Everything outside Net Worth is untouched. The active profile cannot be deleted. Checked
+with a stand-in: 5K saved, new "1080p" empty, back and forth - calibration, learned
+digits and tour pictures follow; a taken name is refused.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

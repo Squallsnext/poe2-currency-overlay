@@ -185,6 +185,7 @@ contextBridge.exposeInMainWorld('api', {
   stashProfiles: () => ipcRenderer.invoke('stash-profiles'),
   stashProfileSave: (name) => ipcRenderer.invoke('stash-profile-save', { name }),
   stashProfileLoad: (name) => ipcRenderer.invoke('stash-profile-load', { name }),
+  stashProfileNew: (name) => ipcRenderer.invoke('stash-profile-new', { name }),
   stashProfileDelete: (name) => ipcRenderer.invoke('stash-profile-delete', { name }),
   stashProfileOpen: (name) => ipcRenderer.invoke('stash-profile-open', { name }),
   setItemSearchOpts: (o) => ipcRenderer.invoke('set-item-search-opts', o),

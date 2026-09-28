@@ -256,12 +256,13 @@ Bild. Zeigt der nächste Scan dasselbe Bild, gilt die bestätigte Zahl – egal 
 lesen. Vor der Prozentzahl steht dann **≡**. Ändert sich die Zahl im Spiel, ändert sich das
 Bild, und sie wird normal gelesen und einmal neu bestätigt.
 
-**Profile (Speicherslots):** Einstellungen → Vermögen → „Profile“. Namen eintragen
-(z. B. „5K“), „Speichern unter …“ – gespeichert wird die ganze Scan-Einrichtung:
-Kalibrierung, Auflösung, jedes Fach mit Position und Filtern, Rand-Retter, bestätigte
-Zahlen, gelernte Ziffern, Ziffern-Tafel. „Laden“ wechselt (der jetzige Stand wird vorher als
-„_vor-dem-laden“ gesichert), „Exportieren“ öffnet den Ordner zum Weitergeben. Jeder Scan landet
-automatisch mit Bild im aktiven Profil (✓) – einmal alle Fächer scannen, dann exportieren.
+**Profile (Speicherslots):** Einstellungen → Vermögen → „Profile“ – jedes Profil ist ein
+eigener Ordner mit der ganzen Vermögen-Einrichtung (Kalibrierung, Fächer mit Position und
+Filtern, Schalter, bestätigte Zahlen, gelernte Ziffern, Ziffern-Tafel, Tour-Bilder, Liste).
+**„Neues Profil …“** → Namen eintippen → „Anlegen“: Vermögen startet wie frisch installiert
+(das bisherige Profil wird vorher gesichert). **Laden** wechselt, **Speichern** sichert das
+aktive (✓). **Exportieren** öffnet den Ordner zum Weitergeben – jeder Scan landet mit Bild
+automatisch im aktiven Profil. Alles außerhalb von Vermögen bleibt, wie es ist.
 
 ### 3.3 Debug: eine Zahl sauber lesen
 
