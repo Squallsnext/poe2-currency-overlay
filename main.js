@@ -2926,16 +2926,35 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
           if (A && Bn) { both++; b = g = r = 255; }
           else if (A) { miss++; b = 40; g = 40; r = 235; }
           else if (Bn) { extra++; b = 255; g = 130; r = 60; }
-          else if (near.away[i]) { b = 20; g = 110; r = 175; }
+          else if (near.away[i]) { b = 20; g = 45; r = 70; } // dim: shown, not in the way
           else if (Bany) { junk++; b = g = r = 90; }
           tb[o] = b; tb[o + 1] = g; tb[o + 2] = r; tb[o + 3] = 255;
         }
         const u = both + miss + extra;
+        // "Form": the same, but a red/blue pixel right next to the other side's digit (1 px)
+        // does not count - is the SHAPE right, whatever the edge? On the 5K capture every
+        // setting but floor 200 had a median of 100 % here, so it cannot find the limit
+        // alone (the strict value can: 92 / 81 / 67 %); it tells a thin "7" at 76 % whose
+        // whole difference is its edge (reported) from one that lost a stroke.
+        const touches = (M, i) => {
+          const x = i % Wd, y = (i / Wd) | 0;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+            const X = x + dx, Y = y + dy;
+            if (X >= 0 && Y >= 0 && X < Wd && Y < Hd && M[Y * Wd + X]) return true;
+          }
+          return false;
+        };
+        let fMiss = 0, fExtra = 0;
+        for (let i = 0; i < Wd * Hd; i++) {
+          if (near.data[i] && !rn[i] && !touches(rn, i)) fMiss++;
+          else if (rn[i] && !near.data[i] && !touches(near.data, i)) fExtra++;
+        }
+        const form = both + fMiss + fExtra ? +(both / (both + fMiss + fExtra)).toFixed(3) : 0;
         // A reader digit the original cannot free: the measure itself failed - a digit
         // touching pale art cannot be freed with fixed values (a "22" whose second 2
         // touches a white crystal showed 49 %, all of that 2 "extra"); the number says
         // nothing about the reader then.
-        truth = { fidelity: u ? +(both / u).toFixed(3) : 0, miss, extra, junk, away: near.awayN, unsure: near.unsure };
+        truth = { fidelity: u ? +(both / u).toFixed(3) : 0, form, miss, extra, junk, away: near.awayN, unsure: near.unsure };
         truthUrl = toUrl(tb, Wd, Hd, 6);
       }
     } catch { /* a debugging aid only */ }

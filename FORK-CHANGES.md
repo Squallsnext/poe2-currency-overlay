@@ -1343,12 +1343,18 @@ Then a pale skull chunk beside a "7" passed as a second digit (all of it red, th
 reading only the 7 anyway). The player's idea: "die Geometrie der Freistellung nachfahren
 und außenrum wegmachen". The truth now only counts where the reader's number stands - its
 digit boxes, 2 px per match scale wider (`RP.truthNearReader`); what the original frees
-away from them is shown ORANGE and not counted (item art, or a whole digit the reader lost -
+away from them is shown dim BROWN and not counted (item art, or a whole digit the reader lost -
 the measure cannot tell which). Inside the boxes the original still decides which pixels
 are digit. "Unsure" is now: a reader digit the original frees less than 30 % of. The
 growth steps to side neighbours only (a diagonal slipped through the dark outline). Same
 capture: Jawbone median 92 % (5 unsure), colour limit 60: 94 %, floor 160: 81 %, floor
 200: 67 % - it still falls the same way when the picture gets worse.
+
+Next to it a second value, "Form": the same count, but a red or blue pixel right next to
+the other side's digit (1 px) is left out - is the SHAPE right, whatever the edge? A thin
+"7" read 76 % with all of its difference on its edge (reported: "Freistell-Treue kann man
+immer noch nicht werten"). Form alone cannot find the limit (median 100 % for every setting
+on the 5K capture but floor 200: 98 %), the strict value can - so both are shown.
 
 ### 4.30 Slot memory: an unchanged picture keeps its confirmed count
 
