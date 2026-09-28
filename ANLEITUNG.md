@@ -256,6 +256,12 @@ Bild. Zeigt der nächste Scan dasselbe Bild, gilt die bestätigte Zahl – egal 
 lesen. Vor der Prozentzahl steht dann **≡**. Ändert sich die Zahl im Spiel, ändert sich das
 Bild, und sie wird normal gelesen und einmal neu bestätigt.
 
+**Profile (Speicherslots):** Einstellungen → Vermögen → „Profile“. Namen eintragen
+(z. B. „5K“), „Speichern unter …“ – gespeichert wird die ganze Scan-Einrichtung:
+Kalibrierung, Auflösung, jedes Fach mit Position und Filtern, Rand-Retter, bestätigte
+Zahlen, gelernte Ziffern, Ziffern-Tafel. „Laden“ wechselt (der jetzige Stand wird vorher als
+„_vor-dem-laden“ gesichert), „Exportieren“ öffnet den Ordner zum Weitergeben.
+
 ### 3.3 Debug: eine Zahl sauber lesen
 
 **Einstellungen → „OCR-Debug-Bilder zeigen“** an, dann beim Fach **„Debug“** und in der

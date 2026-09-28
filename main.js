@@ -284,6 +284,7 @@ const DEFAULT_CONFIG = {
   stashConfirmed: {}, // per-tab, per-apiId count the player confirmed (✓ / typed / learned) - not asked about again while the scan reads that count
   stashTuneBackup: {}, // per-tab slot settings from before the last "Automatisch einstellen" (undo)
   stashLoupeBounds: null, // the OCR magnifier window's last place and size {x,y,width,height}; null = default
+  stashProfileActive: null, // name of the reading-setup profile last saved or loaded (userData/stash-profiles/<name>)
   stashSlotOverrides: {}, // per-tab, per-apiId {cx,cy,stripWidth,up,dn} from the in-app "align" tool; overrides the shipped map for slots a user's setup misreads
   itemQ20: true,       // search armour/weapons as if 20% quality
   itemFillRunes: true, // search as if empty rune sockets held Greater Iron Runes
@@ -5009,6 +5010,83 @@ ipcMain.handle('stash-reset-setup', async () => {
     logToggle('stash', 'setup reset, backup ' + file);
     return { ok: true, backup: path.basename(file) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+// ---- Profiles ("Speicherslots", asked for: "bevor ich meine Einstellung wieder vergeige,
+// erstelle bitte Speicherslots - dann speichere ich alles mit 5K, gehe auf ein neues Profil
+// und erstelle das mit 1080p ... und am Ende für dich exportieren"). A profile is the whole
+// reading setup of one screen: calibration, resolution, every slot's position and filters,
+// the switches for the edge rescue / own digits, confirmed counts, tab fingerprints - and
+// the files the reader learns into: learned digits, the digit gallery, the slot memory.
+// Loading one saves the current state as "_vor-dem-laden" first, then reloads the window.
+const PROFILE_KEYS = ['stashCalibration', 'stashHiRes', 'stashSlotOverrides', 'stashGrowDigits', 'stashOwnDigitsOnly', 'stashConfirmed', 'stashTuneBackup', 'stashUserTabSigs'];
+const PROFILE_FILES = () => [learnedTemplatesFile(), galleryFile(), slotMemoryFile()];
+const PROFILES_DIR = () => path.join(app.getPath('userData'), 'stash-profiles');
+const profileName = (n) => String(n || '').replace(/[^\w äöüÄÖÜß.()+-]/g, '_').trim().slice(0, 40);
+function profileSaveAs(name) {
+  const dir = path.join(PROFILES_DIR(), name);
+  fs.mkdirSync(dir, { recursive: true });
+  const cfg = {};
+  for (const k of PROFILE_KEYS) cfg[k] = config[k] == null ? (DEFAULT_CONFIG[k] === undefined ? null : DEFAULT_CONFIG[k]) : config[k];
+  fs.writeFileSync(path.join(dir, 'profile.json'), JSON.stringify({ app: app.getVersion(), at: new Date().toISOString(), screen: (() => { try { const d = screen.getPrimaryDisplay(); return { w: d.size.width * d.scaleFactor, h: d.size.height * d.scaleFactor }; } catch { return null; } })(), config: cfg }, null, 1));
+  for (const f of PROFILE_FILES()) {
+    const to = path.join(dir, path.basename(f));
+    if (fs.existsSync(f)) fs.copyFileSync(f, to); else { try { fs.unlinkSync(to); } catch {} }
+  }
+  return dir;
+}
+ipcMain.handle('stash-profiles', () => {
+  try {
+    const dir = PROFILES_DIR();
+    const names = fs.existsSync(dir) ? fs.readdirSync(dir).filter((n) => fs.existsSync(path.join(dir, n, 'profile.json'))) : [];
+    return { ok: true, active: config.stashProfileActive || null, profiles: names.map((n) => {
+      let meta = {}; try { meta = JSON.parse(fs.readFileSync(path.join(dir, n, 'profile.json'), 'utf8')); } catch {}
+      return { name: n, at: meta.at || null, screen: meta.screen || null };
+    }).sort((a, b) => String(b.at).localeCompare(String(a.at))) };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+ipcMain.handle('stash-profile-save', (_e, { name } = {}) => {
+  try {
+    const n = profileName(name);
+    if (!n) return { ok: false, error: 'name' };
+    profileSaveAs(n);
+    config.stashProfileActive = n; saveConfig();
+    logToggle('stash', 'profile saved: ' + n);
+    return { ok: true, name: n };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+ipcMain.handle('stash-profile-load', (_e, { name } = {}) => {
+  try {
+    const n = profileName(name);
+    const dir = path.join(PROFILES_DIR(), n);
+    const meta = JSON.parse(fs.readFileSync(path.join(dir, 'profile.json'), 'utf8'));
+    if (n !== '_vor-dem-laden') profileSaveAs('_vor-dem-laden'); // one step back, always
+    for (const k of PROFILE_KEYS) {
+      const v = meta.config ? meta.config[k] : undefined;
+      config[k] = v == null ? (DEFAULT_CONFIG[k] === undefined ? null : JSON.parse(JSON.stringify(DEFAULT_CONFIG[k]))) : v;
+    }
+    for (const f of PROFILE_FILES()) {
+      const from = path.join(dir, path.basename(f));
+      if (fs.existsSync(from)) fs.copyFileSync(from, f); else { try { fs.unlinkSync(f); } catch {} }
+    }
+    config.stashProfileActive = n; saveConfig();
+    try { lastCaptureByTab.clear(); } catch {}
+    logToggle('stash', 'profile loaded: ' + n);
+    setTimeout(() => { try { if (win && !win.isDestroyed()) win.webContents.reload(); } catch {} }, 300);
+    return { ok: true, name: n };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+ipcMain.handle('stash-profile-delete', (_e, { name } = {}) => {
+  try {
+    const n = profileName(name);
+    if (!n) return { ok: false };
+    fs.rmSync(path.join(PROFILES_DIR(), n), { recursive: true, force: true });
+    if (config.stashProfileActive === n) { config.stashProfileActive = null; saveConfig(); }
+    return { ok: true };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+// export = the profile's folder in the file manager (zip it and send it)
+ipcMain.handle('stash-profile-open', (_e, { name } = {}) => {
+  try { const d = name ? path.join(PROFILES_DIR(), profileName(name)) : PROFILES_DIR(); fs.mkdirSync(d, { recursive: true }); shell.openPath(d); return true; } catch { return false; }
 });
 ipcMain.handle('stash-support-open-folder', async () => { fs.mkdirSync(SUPPORT_DIR(), { recursive: true }); return shell.openPath(SUPPORT_DIR()); });
 ipcMain.handle('stash-tour-capture', async (_e, tab) => tourCapture(tab));

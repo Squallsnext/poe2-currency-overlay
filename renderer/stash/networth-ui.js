@@ -746,6 +746,52 @@
         return box;
       })(),
     ]);
+    // reading-setup profiles ("Speicherslots"): save the whole setup under a name, load
+    // another (5K / 1080p), open its folder to export it (main.js stash-profile-*)
+    group(t('networth.profile.group'), [
+      (() => {
+        const box = el('span', 'nw-profiles');
+        const sel = el('select', 'nw-profile-sel');
+        const out = el('span', 'nw-audit-out');
+        const fill = async () => {
+          const r = await window.api.stashProfiles().catch(() => null);
+          sel.innerHTML = '';
+          const list = (r && r.ok && r.profiles) || [];
+          if (!list.length) { const o = el('option', '', esc(t('networth.profile.none'))); o.value = ''; sel.appendChild(o); }
+          for (const p of list) {
+            const o = el('option', '', esc(p.name + (p.screen ? ` (${p.screen.w}×${p.screen.h})` : '') + (r.active === p.name ? ' ✓' : '')));
+            o.value = p.name; if (r.active === p.name) o.selected = true;
+            sel.appendChild(o);
+          }
+        };
+        // a name field (Electron has no prompt()): empty = overwrite the chosen profile
+        const nameIn = el('input', 'nw-profile-name');
+        nameIn.type = 'text'; nameIn.placeholder = t('networth.profile.name_prompt');
+        const save = mk(t('networth.profile.save'), t('networth.profile.save_title'), async () => {
+          const name = (nameIn.value || (sel.value !== '_vor-dem-laden' ? sel.value : '') || '').trim();
+          if (!name) { nameIn.focus(); return; }
+          nameIn.value = '';
+          const r = await window.api.stashProfileSave(name).catch(() => null);
+          out.textContent = r && r.ok ? t('networth.profile.saved', { name: r.name }) : t('networth.profile.failed');
+          fill();
+        }, true);
+        const load = mk(t('networth.profile.load'), t('networth.profile.load_title'), async () => {
+          if (!sel.value) return;
+          if (!confirm(t('networth.profile.load_confirm', { name: sel.value }))) return;
+          const r = await window.api.stashProfileLoad(sel.value).catch(() => null);
+          out.textContent = r && r.ok ? t('networth.profile.loaded', { name: r.name }) : t('networth.profile.failed');
+        }, true);
+        const del = mk('✕', t('networth.profile.delete_title'), async () => {
+          if (!sel.value || !confirm(t('networth.profile.delete_confirm', { name: sel.value }))) return;
+          await window.api.stashProfileDelete(sel.value).catch(() => null);
+          fill();
+        }, true);
+        const exp = mk(t('networth.profile.export'), t('networth.profile.export_title'), () => { window.api.stashProfileOpen(sel.value || null).catch(() => {}); }, true);
+        box.appendChild(sel); box.appendChild(nameIn); box.appendChild(save); box.appendChild(load); box.appendChild(del); box.appendChild(exp); box.appendChild(out);
+        fill();
+        return box;
+      })(),
+    ]);
     group(t('networth.settings.cal_group_support'), [
       mk(t('networth.tour.support_start'), t('networth.tour.support_start_title'), () => startTour(true), true),
       mk(t('networth.tour.export'), t('networth.tour.export_title'), () => { window.api.stashExportSettings().catch(() => {}); }, true),

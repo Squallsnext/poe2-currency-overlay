@@ -182,6 +182,11 @@ contextBridge.exposeInMainWorld('api', {
   setItemRanges: (ranges) => ipcRenderer.invoke('set-item-ranges', ranges),
   setGarbagePool: (ids) => ipcRenderer.invoke('set-garbage-pool', ids),
   tradeSiteUrl: (o) => ipcRenderer.invoke('trade-site-url', o),
+  stashProfiles: () => ipcRenderer.invoke('stash-profiles'),
+  stashProfileSave: (name) => ipcRenderer.invoke('stash-profile-save', { name }),
+  stashProfileLoad: (name) => ipcRenderer.invoke('stash-profile-load', { name }),
+  stashProfileDelete: (name) => ipcRenderer.invoke('stash-profile-delete', { name }),
+  stashProfileOpen: (name) => ipcRenderer.invoke('stash-profile-open', { name }),
   setItemSearchOpts: (o) => ipcRenderer.invoke('set-item-search-opts', o),
   itemPeekShow: (payload) => ipcRenderer.send('item-peek-show', payload),
   // pinned route window (📌 in a route tooltip): this renderer computes, main relays

@@ -1480,6 +1480,20 @@ site with the base type (or unique name) the fetched listings carry in that lang
 the English names are valid (main.js `trade-site-url`). Checked by decoding the reported
 id and re-encoding it: the same query with only the type translated.
 
+### 4.36 Profiles (save slots) for the reading setup
+
+Asked for before switching from 5K back to 1080p: "bevor ich meine Einstellung wieder
+vergeige, erstelle bitte Speicherslots ... am Ende für dich exportieren". Settings → Net
+Worth → "Profile (Speicherslots)": a list, a name field, "Speichern unter …", "Laden", ✕,
+"Exportieren". A profile (`userData/stash-profiles/<name>/`) holds the whole reading setup:
+`stashCalibration`, `stashHiRes`, `stashSlotOverrides` (every slot's position and filters),
+`stashGrowDigits`, `stashOwnDigitsOnly`, `stashConfirmed`, `stashTuneBackup`,
+`stashUserTabSigs`, plus the learned digits, the digit gallery and the slot memory files,
+and the screen size it was made on. Loading one first saves the current state as
+"_vor-dem-laden" (one step back, always), then reloads the window. Export opens the
+profile's folder (zip it). Checked with a stand-in for the app's paths: two profiles saved
+and loaded back and forth, config and files swap, a file absent in a profile is removed.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
@@ -1503,6 +1517,7 @@ id and re-encoding it: the same query with only the type translated.
 | `stashUnits` | `['ex', 'div']` | Net Worth values shown in Exalted / Divine / Chaos |
 | `stashUserTabMaps` | `{}` | Tabs built with the tab builder: `{ key: { label, created, cells: [{ apiId, x, y, w, h }] } }` |
 | `showRecipesTab`, `recipeBases`, `recipeRounds` | `true`, `{}`, `{}` | Recipes tab visible; per-recipe currency and rounds |
+| `stashProfileActive` | `null` | Name of the reading-setup profile last saved or loaded |
 | `priceOverrides` | `{}` | `apiId → { ex, at }`: the player's own price per unit |
 | `gamepadItemBrowse` | `true` | Controller price check: D-pad checks the next item, right stick closes |
 | `ninjaCheck` | `true` | poe.ninja as a price source; replaces a price > 1.5× off only when its own value is direct against Exalted (≥ 1 Div volume) |
