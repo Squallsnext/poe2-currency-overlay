@@ -341,7 +341,10 @@
       if (mx >= TRUTH.weak && sp <= TRUTH.weakSpread) weak[i] = 1;
     }
     const S = P.matchScale > 1 ? P.matchScale : 1;
-    const seeds = DR.numberPieces(DR.components({ data: strong, w, h }, S), S);
+    // 8-connected: at 1080p a stroke is 1-2 px and its sure pixels touch only corner to
+    // corner - side neighbours only broke a "3" into specks, and 28 of 38 currency slots
+    // came out "unsure" (the 5K capture: 5 -> 1 unsure, medians unchanged)
+    const seeds = DR.numberPieces(DR.components({ data: strong, w, h }, S, true), S);
     const out = new Uint8Array(N);
     let front = [];
     for (const c of seeds) for (let y = 0; y < c.mask.h; y++) for (let x = 0; x < c.mask.w; x++) {

@@ -1350,6 +1350,12 @@ growth steps to side neighbours only (a diagonal slipped through the dark outlin
 capture: Jawbone median 92 % (5 unsure), colour limit 60: 94 %, floor 160: 81 %, floor
 200: 67 % - it still falls the same way when the picture gets worse.
 
+At 1080p the measure hardly worked: a stroke there is 1-2 px, its sure-bright pixels touch
+only corner to corner, and the side-neighbour pieces fell apart below digit size - 28 of 38
+currency slots and 22 of 44 essence slots of the player's 1080p crops were "unsure". The
+sure pixels are now joined 8-connected: 3 and 3 unsure there, ritual and abyss none; on the
+5K capture 1 instead of 5, medians unchanged.
+
 Next to it a second value, "Form": the same count, but a red or blue pixel right next to
 the other side's digit (1 px) is left out - is the SHAPE right, whatever the edge? A thin
 "7" read 76 % with all of its difference on its edge (reported: "Freistell-Treue kann man
