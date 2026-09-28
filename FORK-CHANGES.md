@@ -1440,6 +1440,34 @@ thin 1080p "1" sat inside the 6's left stroke at 0.77 - more than the "6" itself
 - "Gelernte Ziffern prüfen" uses the same referee, so a stranger learned before this
   is found there.
 
+### 4.34 Trade search: no more 1800 s lockouts
+
+Reported: the price search works well, but waits run up to 1800 seconds. That is GGG's
+penalty for breaking the search rule "30 per 300 s" (the IP headers read
+`5:10:60,15:60:300,30:300:1800`: hits, window, penalty). One price check with the smart
+widening is up to 7 searches and 7 fetches, so the budget is small, and trade2.js already
+kept below it - but three gaps let it break:
+
+- **The window is longer than the header says.** The trade site shows "5 over 12s",
+  "15 over 62s", "30 over 302s" for the 10/60/300 s rules. A hit let go the moment our
+  10 s ran out could still count on the server. Windows are now padded by 2 s.
+- **Only the Ip rule was read.** `X-Rate-Limit-Rules` can name more ("Ip,Account" once the
+  session is logged in); an account rule, its state and its penalty went unseen. Every
+  named rule is applied now, the strictest wins, a ban in any of them is honoured.
+- **Hits the server counted beyond ours were ignored** - the trade site in a browser,
+  another tool on the same IP, this app before a restart. They now count against their own
+  window until it has run once (not one shared list stamped "now" - that old backfill made
+  a 6 h count look like 32 requests in the last minute).
+- The same search again within 2 minutes answers from memory (the log showed one jewel's
+  query sent three times in five minutes).
+
+Checked against a simulated trade server (rules as above, windows 2 s longer than their
+headers - an assumption taken from the site's own display): 40 searches back to back broke
+a rule 7 times before (13 with a stricter account rule, 2 after 13 browser searches in the
+last minute), 0 times now in all three cases; 40 searches take about 5.5 minutes, the
+budget itself. A fixed 1 s pause per request would not have helped - the 300 s rule is a
+count, not a speed.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

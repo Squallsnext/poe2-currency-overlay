@@ -1,7 +1,8 @@
 // trade2.js - main-process PoE2 trade API client with a self-configuring rate limiter.
 // Unauthenticated search + fetch (v1). Routes through Electron `net` so the session cookie
 // jar is available later for live-search/whispers without changing this layer.
-// Rate limits are learned from the server's X-Rate-Limit-* headers (confirmed live 2026-07-20:
+// Rate limits are learned from the server's X-Rate-Limit-* headers - every rule it names
+// (Ip, Account), windows padded by 2 s, hits it counted beyond ours respected (confirmed live 2026-07-20:
 // search = 5/10s,15/60s,30/300s; fetch = its own bucket). We enforce client-side sliding
 // windows per policy and honor server-reported bans + 429 Retry-After.
 
@@ -51,14 +52,20 @@ let onWaitHook = null; // (policy, waitMs) => void - lets the UI show "waiting N
 
 function getLimiter(policy) {
   let l = limiters.get(policy);
-  if (!l) { l = { rules: DEFAULT_RULES.slice(), hits: [], bannedUntil: 0 }; limiters.set(policy, l); }
+  if (!l) { l = { rules: DEFAULT_RULES.map((r) => ({ max: r.max, window: r.window + WINDOW_PAD_S })), hits: [], ext: {}, bannedUntil: 0 }; limiters.set(policy, l); }
   return l;
 }
+// The server's window is a little longer than its header says: the trade site itself shows
+// the search rule "5:10:60" as "5 over 12s", "15:60" as "over 62s", "30:300" as "over
+// 302s". A hit let go the moment our 10 s ran out could still count there - with the one
+// spare hit of the margin used up that way twice, the next one broke the rule, and the
+// 300 s rule's penalty is 1800 s (reported: waits "bis hoch zu 1800 Sekunden").
+const WINDOW_PAD_S = 2;
 function parseRules(s) {
-  // "5:10:60,15:60:300" -> margin-reduced [{max:4, window:10}, {max:14, window:60}]
+  // "5:10:60,15:60:300" -> margin-reduced [{max:4, window:12}, {max:14, window:62}]
   return (s || '').split(',').filter(Boolean).map((p) => {
     const [max, window] = p.split(':').map(Number);
-    return { max: Math.max(1, max - 1), window };
+    return { max: Math.max(1, max - 1), window: window + WINDOW_PAD_S };
   });
 }
 
@@ -81,10 +88,15 @@ async function waitForSlot(policy) {
     let wait = 0;
     for (const r of lim.rules) {
       const inWin = lim.hits.filter((ts) => t - ts < r.window * 1000);
-      if (inWin.length >= r.max) {
-        // the (max)-th newest hit inside the window must age out before we may send
-        const mustExpire = inWin[inWin.length - r.max];
-        wait = Math.max(wait, mustExpire + r.window * 1000 - t + 50);
+      // hits the server counted that we did not send (see ingestHeaders)
+      const e = lim.ext[r.window];
+      const extra = e && e.until > t ? e.n : 0;
+      if (inWin.length + extra >= r.max) {
+        // the (max)-th newest hit inside the window must age out before we may send;
+        // hits we only know by count age out when the server's report does
+        const k = inWin.length - (r.max - extra);
+        const mustExpire = k >= 0 && k < inWin.length ? inWin[k] + r.window * 1000 : (e ? e.until : t);
+        wait = Math.max(wait, mustExpire - t + 50);
       }
     }
     if (wait <= 0) { lim.hits.push(t); return; }
@@ -98,21 +110,35 @@ function setOnWait(cb) { onWaitHook = cb; }
 function ingestHeaders(fallbackPolicy, headers) {
   const policy = headers['x-rate-limit-policy'] || fallbackPolicy;
   const lim = getLimiter(policy);
-  const ruleStr = headers['x-rate-limit-ip'];
-  if (ruleStr) lim.rules = parseRules(ruleStr);
-  const state = headers['x-rate-limit-ip-state'];
-  if (state) {
-    // Honor a server-reported ban (the one signal that actually means "stop").
-    // We deliberately DO NOT backfill synthetic "used" hits: the old code stuffed
-    // each window's used-count into one shared timestamp list, all stamped NOW - so
-    // the 6h count (e.g. 32 used) made the 60s/300s windows think 32 requests fired
-    // this instant and impose bogus 3-5 minute self-waits while the server reported
-    // the IP perfectly healthy. That self-inflicted stall WAS the "instant ban".
-    const t = nowMs();
+  // EVERY rule the server names (X-Rate-Limit-Rules: "Ip", or "Ip,Account" once the
+  // session is logged in) - only the Ip one was read, so an account rule and its
+  // penalty went unseen. The strictest of them all applies.
+  const names = String(headers['x-rate-limit-rules'] || 'ip').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const rules = [];
+  for (const n of names) rules.push(...parseRules(headers['x-rate-limit-' + n]));
+  if (rules.length) lim.rules = rules;
+  const t = nowMs();
+  const extra = {}; // window -> most extra hits any rule reports for it
+  for (const n of names) {
+    const state = headers['x-rate-limit-' + n + '-state'];
+    if (!state) continue;
     for (const p of state.split(',')) {
-      const ban = Number(p.split(':')[2]);
+      const [used, window, ban] = p.split(':').map(Number);
+      // Honor a server-reported ban (the one signal that actually means "stop").
       if (ban > 0) lim.bannedUntil = Math.max(lim.bannedUntil, t + ban * 1000);
+      // Hits the server counted beyond ours - the trade site in a browser, another tool
+      // on the same IP, or this app before a restart - count against THAT window only,
+      // until it has run once. (The old backfill stuffed every window's count into one
+      // shared list, all stamped now: a 6 h count made the 60 s window think 32 requests
+      // had just fired - bogus minutes-long waits. Per window it cannot.)
+      if (!(window > 0) || !(used >= 0)) continue;
+      const w = window + WINDOW_PAD_S;
+      const ours = lim.hits.filter((ts) => t - ts < w * 1000).length;
+      extra[w] = Math.max(extra[w] || 0, used - ours);
     }
+  }
+  for (const [w, n] of Object.entries(extra)) {
+    if (n > 0) lim.ext[w] = { n, until: t + w * 1000 }; else delete lim.ext[w];
   }
   return policy;
 }
@@ -208,12 +234,24 @@ async function exchange(league, have, want) {
 // list (capped at 100, the API's practical ceiling) + the query id so the renderer
 // can page the rest on demand via fetchListings(nextIds, queryId) - one fetch per
 // "Load more", nothing wasted on pages the user never opens.
+// The same search again within 2 minutes answers from memory: the price-search log showed
+// one jewel's exact query (and its widened steps) sent three times in five minutes - a
+// second look at the same item, each time up to 7 searches of a budget of 30 per 5 min.
+const SEARCH_CACHE_MS = 120e3;
+const searchCache = new Map(); // key -> { at, value }
 async function searchAndFetch(league, query, limit = 10) {
+  const key = league + '|' + limit + '|' + FETCH_HOST + '|' + JSON.stringify(query);
+  const t = nowMs();
+  for (const [k, v] of searchCache) if (t - v.at > SEARCH_CACHE_MS) searchCache.delete(k);
+  const hit = searchCache.get(key);
+  if (hit) return hit.value;
   const s = await search(league, query);
   const ids = (s.result || []).slice(0, 100);
   const page = ids.slice(0, limit);
   const listings = page.length ? await fetchListings(page, s.id) : [];
-  return { id: s.id, total: s.total, result: ids, listings };
+  const value = { id: s.id, total: s.total, result: ids, listings };
+  searchCache.set(key, { at: nowMs(), value });
+  return value;
 }
 
 // Is the session logged in to pathofexile.com? Weighted Sum groups are rejected for
