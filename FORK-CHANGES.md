@@ -1331,6 +1331,14 @@ median 92 %, colour limit 60: 94 %, floor 160: 80 %, floor 200: 66 % - raising t
 thins the digits and the fidelity falls with it. The fixed truth has its own limits (a digit
 touching bright art), so a single low slot is worth a look with the magnifier, not a verdict.
 
+Two such limits reported with pictures and fixed: the growth into the digit's soft edge ran
+unbounded - from a "7" across a pale skull touching it (7 %, the whole skull "missing") - and
+now goes at most 2 px per match scale and never into sure-bright pixels that are not the
+number's. And a digit touching a white crystal cannot be freed from the original at all (a
+"22" at 49 %, the second 2 all "extra"): when the original frees another digit count than
+the reader's picture shows, the line says "unsure" instead of a percentage. On the 5K
+capture 5 of the 7 worst values were exactly that case; the medians above are unchanged.
+
 ### 4.30 Slot memory: an unchanged picture keeps its confirmed count
 
 The player's idea: "jeder Scan ist die Vorlage" - templates age (new settings, a changed

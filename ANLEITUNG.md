@@ -237,6 +237,9 @@ liest er mit deinen eigenen Ziffern; die alten sind nur noch Rückfall.
 (Bild 4), mit der Zahl, die direkt aus dem Original freigestellt wird – ganz ohne Vorlagen.
 „Freistell-Treue 93 %“ – rot = da fehlt dem Leser Ziffer, blau = da hat er zu viel. Damit
 findest du heraus, ab welchen Reglern das Freistellen kippt.
+Steht dort **„unsicher“**, berührt eine Ziffer helles Item-Bild (weißer Kristall, heller
+Schädel) und lässt sich im Original mit festen Werten nicht sauber freistellen – dann sagt
+die Zahl nichts über den Leser; schau auf Bild 4.
 
 **Feld-Gedächtnis (≡):** Bestätigst du eine Zahl, merkt sich das Feld ihr freigestelltes
 Bild. Zeigt der nächste Scan dasselbe Bild, gilt die bestätigte Zahl – egal was die Vorlagen

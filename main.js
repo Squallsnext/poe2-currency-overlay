@@ -2913,7 +2913,8 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
       if (ref && ref.w === Wd && ref.h === Hd) {
         const Sx = P.matchScale > 1 ? P.matchScale : 1;
         const rn = new Uint8Array(Wd * Hd);
-        for (const c of DR.numberPieces(DR.components(binarized, Sx), Sx)) for (let y = 0; y < c.mask.h; y++) for (let x = 0; x < c.mask.w; x++) if (c.mask.data[y * c.mask.w + x]) rn[(c.y + y) * Wd + c.x + x] = 1;
+        const readerPieces = DR.numberPieces(DR.components(binarized, Sx), Sx);
+        for (const c of readerPieces) for (let y = 0; y < c.mask.h; y++) for (let x = 0; x < c.mask.w; x++) if (c.mask.data[y * c.mask.w + x]) rn[(c.y + y) * Wd + c.x + x] = 1;
         const tb = Buffer.alloc(Wd * Hd * 4);
         let both = 0, miss = 0, extra = 0, junk = 0;
         for (let i = 0; i < Wd * Hd; i++) {
@@ -2926,7 +2927,12 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
           tb[o] = b; tb[o + 1] = g; tb[o + 2] = r; tb[o + 3] = 255;
         }
         const u = both + miss + extra;
-        truth = { fidelity: u ? +(both / u).toFixed(3) : 0, miss, extra, junk, digitsOrig: ref.digits };
+        // Another digit count than the reader's picture: the measure itself failed - a digit
+        // touching pale art cannot be freed from the original with fixed values (a "22"
+        // whose second 2 touches a white crystal showed 49 %, all of that 2 "extra"). On
+        // the 5K capture 5 of the 7 worst values were exactly this; the number says
+        // nothing about the reader then.
+        truth = { fidelity: u ? +(both / u).toFixed(3) : 0, miss, extra, junk, digitsOrig: ref.digits, digitsReader: readerPieces.length, unsure: ref.digits !== readerPieces.length };
         truthUrl = toUrl(tb, Wd, Hd, 6);
       }
     } catch { /* a debugging aid only */ }

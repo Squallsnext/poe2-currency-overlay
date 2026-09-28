@@ -321,9 +321,10 @@
   // The number as the ORIGINAL shows it, with fixed neutral values - independent of every
   // slider (the "truth" of the extraction test, asked for: "die Grenze ausloten"): sure
   // digit pixels (bright >= 200, colour spread <= 40), the number's chain of them, grown
-  // into the connected light, nearly colourless pixels (>= 120, spread <= 90). Same cell
+  // into the light, nearly colourless pixels around them (>= 120, spread <= 90; at most
+  // growDepth px per matchScale, see below). Same cell
   // window as the black/white picture, so both line up pixel for pixel.
-  const TRUTH = { strong: 200, strongSpread: 40, weak: 120, weakSpread: 90 };
+  const TRUTH = { strong: 200, strongSpread: 40, weak: 120, weakSpread: 90, growDepth: 2 };
   function originalNumber(ch, pos, P) {
     const n = ch.W2 * ch.H2, R = new Uint8Array(n), G = new Uint8Array(n), B = new Uint8Array(n);
     for (let i = 0; i < n; i++) { R[i] = ch.orig[i * 4]; G[i] = ch.orig[i * 4 + 1]; B[i] = ch.orig[i * 4 + 2]; }
@@ -342,18 +343,26 @@
     const S = P.matchScale > 1 ? P.matchScale : 1;
     const seeds = DR.numberPieces(DR.components({ data: strong, w, h }, S), S);
     const out = new Uint8Array(N);
-    const stack = [];
+    let front = [];
     for (const c of seeds) for (let y = 0; y < c.mask.h; y++) for (let x = 0; x < c.mask.w; x++) {
-      if (c.mask.data[y * c.mask.w + x]) { const k = (c.y + y) * w + c.x + x; if (!out[k]) { out[k] = 1; stack.push(k); } }
+      if (c.mask.data[y * c.mask.w + x]) { const k = (c.y + y) * w + c.x + x; if (!out[k]) { out[k] = 1; front.push(k); } }
     }
-    while (stack.length) {
-      const q = stack.pop(), qx = q % w, qy = (q / w) | 0;
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-        const nx = qx + dx, ny = qy + dy;
-        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-        const k = ny * w + nx;
-        if (!out[k] && weak[k]) { out[k] = 1; stack.push(k); }
+    // The growth is the digit's soft EDGE only: a few px deep, and never into sure-bright
+    // pixels that are not the number's (art the chain rule left out). Unbounded, it ran
+    // from a "7" across a pale skull touching it and called the whole skull "missing"
+    // (reported: "Freistell-Treue 7 %, warum erkennt er den Schädel?").
+    for (let d = 0; d < TRUTH.growDepth * S && front.length; d++) {
+      const next = [];
+      for (const q of front) {
+        const qx = q % w, qy = (q / w) | 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const nx = qx + dx, ny = qy + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const k = ny * w + nx;
+          if (!out[k] && weak[k] && !strong[k]) { out[k] = 1; next.push(k); }
+        }
       }
+      front = next;
     }
     return { w, h, data: out, digits: seeds.length };
   }
