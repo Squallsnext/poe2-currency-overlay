@@ -80,6 +80,9 @@
   // und Regler zum Spielen"). `loupe.get` returns the current pictures of the slot it
   // was opened for; a rebuilt panel for the same slot re-points it (loupeFollow).
   let loupe = null; // { key, get, box }
+  // an open digit gallery re-reads its set when the mode it shows changes (edge on/off,
+  // high-res): it showed "mit Rand" after the edge was switched off (reported)
+  let galleryRefresh = null;
   // Its own window where the app has one (main.js "loupe-update": the in-panel box could
   // only move inside the overlay - "die Lupe lässt sich nur im Fenster vom Overlay
   // bewegen"); the floating box below stays for a build without it.
@@ -478,7 +481,7 @@
       t('networth.settings.toggle_hires_sub'),
       (v) => {
         state.hiRes = v;
-        try { window.api.setStashHiRes(v); } catch {}
+        Promise.resolve().then(() => window.api.setStashHiRes(v)).catch(() => {}).then(() => { if (galleryRefresh) galleryRefresh(); });
         for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k]; // previews re-read with the new default
       }));
     // "save the digit's edge": reader and learning both grow the digit from the hard cut
@@ -487,7 +490,7 @@
       t('networth.settings.toggle_grow_sub'),
       (v) => {
         state.growDigits = v;
-        try { window.api.setStashGrowDigits(v); } catch {}
+        Promise.resolve().then(() => window.api.setStashGrowDigits(v)).catch(() => {}).then(() => { if (galleryRefresh) galleryRefresh(); });
         for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
         render();
       }));
@@ -705,6 +708,7 @@
           out.appendChild(ok);
         };
         b.onclick = show;
+        galleryRefresh = () => { if (out.isConnected && out.childNodes.length) show(); };
         box.appendChild(b); box.appendChild(out);
         return box;
       })(),
