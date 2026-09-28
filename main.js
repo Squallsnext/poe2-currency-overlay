@@ -6015,6 +6015,31 @@ ipcMain.handle('submit-feedback', async (_e, payload) => {
   }
 });
 
+// "Auf der Handelsseite öffnen": the search id the API returns IS the search (gzip +
+// base64url of the query JSON), and our queries carry ENGLISH base/unique names - the only
+// ones the API parses. The German site could not read "Irradiated Tablet" and answered
+// "Fehler beim Laden des Suchstatus. Die Suche ist nicht mehr gültig." (reported), then
+// fell back to an empty search. For a language site the id is rebuilt with the names the
+// fetched listings carry in that language; an id that is not such a blob, or no local
+// name, opens on www, where the English names are valid.
+ipcMain.handle('trade-site-url', (_e, { league, queryId, sub, localType, localName } = {}) => {
+  const zlib = require('zlib');
+  const host = (x) => 'https://' + x + '.pathofexile.com/trade2/search/poe2/' + encodeURIComponent(String(league || '')) + '/';
+  const id = String(queryId || '');
+  if (!sub || sub === 'www') return host('www') + encodeURIComponent(id);
+  try {
+    if (!/^H4sI/.test(id)) throw new Error('not a query blob');
+    const q = JSON.parse(zlib.gunzipSync(Buffer.from(id.replace(/-/g, '+').replace(/_/g, '/'), 'base64')).toString('utf8'));
+    if ((q.type && !localType) || (q.name && !localName)) throw new Error('no local name');
+    if (q.type) q.type = String(localType);
+    if (q.name) q.name = String(localName);
+    const blob = zlib.gzipSync(Buffer.from(JSON.stringify(q), 'utf8')).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return host(sub) + blob;
+  } catch {
+    return host('www') + encodeURIComponent(id);
+  }
+});
+
 // open a vetted external link in the user's default browser. Host-whitelisted so
 // the renderer can never be tricked into launching an arbitrary URL.
 const EXTERNAL_HOST_ALLOW = ['ko-fi.com', 'docs.google.com', 'forms.gle', 'poe2-vibetools.github.io', 'poe2scout.com'];

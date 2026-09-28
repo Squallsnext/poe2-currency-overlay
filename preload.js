@@ -181,6 +181,7 @@ contextBridge.exposeInMainWorld('api', {
   setCommandHotkeys: (rows) => ipcRenderer.invoke('set-command-hotkeys', rows),
   setItemRanges: (ranges) => ipcRenderer.invoke('set-item-ranges', ranges),
   setGarbagePool: (ids) => ipcRenderer.invoke('set-garbage-pool', ids),
+  tradeSiteUrl: (o) => ipcRenderer.invoke('trade-site-url', o),
   setItemSearchOpts: (o) => ipcRenderer.invoke('set-item-search-opts', o),
   itemPeekShow: (payload) => ipcRenderer.send('item-peek-show', payload),
   // pinned route window (📌 in a route tooltip): this renderer computes, main relays

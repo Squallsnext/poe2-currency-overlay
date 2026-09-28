@@ -726,12 +726,16 @@
         const row = el('div', 'res-open-row');
         const link = el('div', 'res-open-link', t('item.listings.open_on_site'));
         link.title = t('item.listings.open_on_site_tooltip');
-        link.onclick = () => {
-          // same language site the API queried, so the opened page matches the results
+        link.onclick = async () => {
+          // same language site the API queried, so the opened page matches the results -
+          // with the base / unique name in that language (main.js trade-site-url)
           const sub = { ru: 'ru', de: 'de', fr: 'fr', es: 'es', pt: 'br' }[
             (window.I18N && window.I18N.lang && window.I18N.lang()) || 'en'] || 'www';
-          const url = 'https://' + sub + '.pathofexile.com/trade2/search/poe2/'
-            + encodeURIComponent(state.league) + '/' + encodeURIComponent(ctx.queryId);
+          const it = ((ctx.rawAll || []).find((l) => l && l.item && l.item.baseType) || {}).item || {};
+          let url = 'https://www.pathofexile.com/trade2/search/poe2/' + encodeURIComponent(state.league) + '/' + encodeURIComponent(ctx.queryId);
+          if (window.api && window.api.tradeSiteUrl) {
+            url = await window.api.tradeSiteUrl({ league: state.league, queryId: ctx.queryId, sub, localType: it.baseType || null, localName: it.name || null }).catch(() => url) || url;
+          }
           if (window.logAction) window.logAction('open on trade site: ' + url);
           if (window.api && window.api.openExternal) window.api.openExternal(url);
         };

@@ -1468,6 +1468,18 @@ last minute), 0 times now in all three cases; 40 searches take about 5.5 minutes
 budget itself. A fixed 1 s pause per request would not have helped - the 300 s rule is a
 count, not a speed.
 
+### 4.35 "Auf der Handelsseite öffnen" on the German site
+
+Reported with the two URLs: the link opened the search, then the site answered "Fehler
+beim Laden des Suchstatus. Die Suche ist nicht mehr gültig." and fell back to an empty
+search. The search id the API returns is the query itself (gzip + base64url of its JSON),
+and our queries carry English names ("type": "Irradiated Tablet") - the only ones the API
+parses, but not ones the German site knows. The link now rebuilds the id for a language
+site with the base type (or unique name) the fetched listings carry in that language
+("Bestrahlte Tafel"); an id that is not such a blob, or no local name, opens on www, where
+the English names are valid (main.js `trade-site-url`). Checked by decoding the reported
+id and re-encoding it: the same query with only the type translated.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
