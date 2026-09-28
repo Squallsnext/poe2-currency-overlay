@@ -3578,6 +3578,9 @@ async function readStashFrame(shot, onDetected) {
         lastCaptureByTab.set(res.tab, { bitmap, W, H, box: res.box, res });
       }
     }
+    // the active profile keeps every tab's latest scan (picture + truth) for its export -
+    // after the answer is sent, so the PNG never delays the scan
+    if (config.stashProfileActive) { const tab = res.tab; setTimeout(() => profileRecordScan(tab), 50); }
 
     return await stashResultWithPrices(res, W, H);
   } catch (err) {
@@ -5084,17 +5087,19 @@ ipcMain.handle('stash-profile-delete', (_e, { name } = {}) => {
     return { ok: true };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
-// export = the profile's folder in the file manager (zip it and send it). For the ACTIVE
-// profile it first writes this session's last scan of every tab into scans/ (asked for:
-// "die Automatik an deinen echten Fächern prüfen"): the panel with a margin as PNG, and per
-// tab what is needed to rebuild the frame and check a reader against it - screen size,
-// panel box, crop origin, the reads and the counts the player confirmed (the truth).
-function profileWriteScans(dir) {
-  const out = path.join(dir, 'scans');
-  fs.rmSync(out, { recursive: true, force: true });
-  let n = 0;
-  for (const [tab, cap] of lastCaptureByTab) {
-    if (tab === '__unknown' || !cap || !cap.bitmap || !cap.box) continue;
+// export = the profile's folder in the file manager (zip it and send it). Every scan made
+// while a profile is active already put that tab's newest picture into its scans/ (the
+// player's idea: "ein Support-Ordner pro Profil ... beim Export kommen die Daten, die du
+// brauchst"): the panel with a margin as PNG, and per tab what rebuilds the frame and
+// checks a reader against it - screen size, panel box, crop origin, the reads and the
+// counts the player confirmed (the truth, refreshed at export).
+function profileScanDir(name) { return path.join(PROFILES_DIR(), name, 'scans'); }
+// one tab's latest scan into the active profile's scans/ (called after every scan)
+function profileRecordScan(tab) {
+  try {
+    const n = config.stashProfileActive, cap = lastCaptureByTab.get(tab);
+    if (!n || !cap || !cap.bitmap || !cap.box || tab === '__unknown') return;
+    const out = profileScanDir(n);
     fs.mkdirSync(out, { recursive: true });
     const { W, H, box } = cap;
     const mx = Math.round(box.w * 0.1), my = Math.round(box.h * 0.1);
@@ -5103,8 +5108,20 @@ function profileWriteScans(dir) {
     const img = nativeImage.createFromBitmap(Buffer.from(cap.bitmap), { width: W, height: H });
     fs.writeFileSync(path.join(out, tab + '.png'), img.crop({ x, y, width: w, height: h }).toPNG());
     const reads = ((cap.res && cap.res.reads) || []).map((r) => r && { apiId: r.apiId, count: r.count, conf: r.conf != null ? +(+r.conf).toFixed(3) : null, short: r.short || null });
-    fs.writeFileSync(path.join(out, tab + '.json'), JSON.stringify({ tab, screen: { W, H }, box, crop: { x, y, w, h }, hiRes: !!config.stashHiRes, grow: !!config.stashGrowDigits, confirmed: (config.stashConfirmed && config.stashConfirmed[tab]) || {}, reads }, null, 1));
-    n++;
+    fs.writeFileSync(path.join(out, tab + '.json'), JSON.stringify({ tab, at: new Date().toISOString(), screen: { W, H }, box, crop: { x, y, w, h }, hiRes: !!config.stashHiRes, grow: !!config.stashGrowDigits, confirmed: (config.stashConfirmed && config.stashConfirmed[tab]) || {}, reads }, null, 1));
+  } catch (e) { logToggle('stash', 'profile scan save failed: ' + (e && e.message || e)); }
+}
+// at export: the confirmed counts as they are NOW (the player confirms after scanning)
+function profileRefreshTruth(name) {
+  const out = profileScanDir(name);
+  let n = 0;
+  for (const f of fs.existsSync(out) ? fs.readdirSync(out).filter((x) => x.endsWith('.json')) : []) {
+    try {
+      const j = JSON.parse(fs.readFileSync(path.join(out, f), 'utf8'));
+      j.confirmed = (config.stashConfirmed && config.stashConfirmed[j.tab]) || {};
+      fs.writeFileSync(path.join(out, f), JSON.stringify(j, null, 1));
+      n++;
+    } catch {}
   }
   return n;
 }
@@ -5116,8 +5133,9 @@ ipcMain.handle('stash-profile-open', (_e, { name } = {}) => {
     let scans = null;
     if (n && n === config.stashProfileActive) {
       profileSaveAs(n); // the export carries the current state, not the one of the last save
-      scans = profileWriteScans(d);
-    }
+      for (const tab of lastCaptureByTab.keys()) profileRecordScan(tab); // this session's newest
+      scans = profileRefreshTruth(n);
+    } else if (n) scans = fs.existsSync(profileScanDir(n)) ? fs.readdirSync(profileScanDir(n)).filter((x) => x.endsWith('.json')).length : 0;
     shell.openPath(d);
     return { ok: true, scans, active: n === config.stashProfileActive };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }

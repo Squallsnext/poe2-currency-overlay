@@ -1494,11 +1494,14 @@ and the screen size it was made on. Loading one first saves the current state as
 profile's folder (zip it). Checked with a stand-in for the app's paths: two profiles saved
 and loaded back and forth, config and files swap, a file absent in a profile is removed.
 
-Export of the ACTIVE profile (✓) also saves the current state into it and writes this
-session's last scan of every tab into `scans/`: the panel with a 10 % margin as PNG and a
-JSON with screen size, panel box, crop origin, the reads and the confirmed counts - what a
-test of the automatic tuning needs to rebuild the frame and know the truth (asked for: "ja,
-bau das mit ein"). Another profile's export only opens its folder and says why.
+While a profile is active, every scan puts that tab's newest picture into the profile's
+`scans/` (the player's idea: "ein Support-Ordner pro Profil, beim Export kommen die Daten,
+die du brauchst"): the panel with a 10 % margin as PNG and a JSON with screen size, panel
+box, crop origin, the reads and the confirmed counts - what a test of the automatic tuning
+needs to rebuild the frame and know the truth. Written after the scan's answer, so the PNG
+never delays it. Export saves the current state into the active profile, refreshes the
+confirmed counts in every JSON (the player confirms after scanning) and opens the folder;
+another profile's export opens its folder with what it collected while it was active.
 
 ## 5. New config keys
 

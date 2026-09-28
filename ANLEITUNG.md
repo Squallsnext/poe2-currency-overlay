@@ -260,8 +260,8 @@ Bild, und sie wird normal gelesen und einmal neu bestätigt.
 (z. B. „5K“), „Speichern unter …“ – gespeichert wird die ganze Scan-Einrichtung:
 Kalibrierung, Auflösung, jedes Fach mit Position und Filtern, Rand-Retter, bestätigte
 Zahlen, gelernte Ziffern, Ziffern-Tafel. „Laden“ wechselt (der jetzige Stand wird vorher als
-„_vor-dem-laden“ gesichert), „Exportieren“ öffnet den Ordner zum Weitergeben – beim aktiven
-Profil (✓) mit den letzten Scan-Bildern jedes Fachs: vorher alle Fächer einmal scannen.
+„_vor-dem-laden“ gesichert), „Exportieren“ öffnet den Ordner zum Weitergeben. Jeder Scan landet
+automatisch mit Bild im aktiven Profil (✓) – einmal alle Fächer scannen, dann exportieren.
 
 ### 3.3 Debug: eine Zahl sauber lesen
 
