@@ -5084,9 +5084,43 @@ ipcMain.handle('stash-profile-delete', (_e, { name } = {}) => {
     return { ok: true };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
-// export = the profile's folder in the file manager (zip it and send it)
+// export = the profile's folder in the file manager (zip it and send it). For the ACTIVE
+// profile it first writes this session's last scan of every tab into scans/ (asked for:
+// "die Automatik an deinen echten Fächern prüfen"): the panel with a margin as PNG, and per
+// tab what is needed to rebuild the frame and check a reader against it - screen size,
+// panel box, crop origin, the reads and the counts the player confirmed (the truth).
+function profileWriteScans(dir) {
+  const out = path.join(dir, 'scans');
+  fs.rmSync(out, { recursive: true, force: true });
+  let n = 0;
+  for (const [tab, cap] of lastCaptureByTab) {
+    if (tab === '__unknown' || !cap || !cap.bitmap || !cap.box) continue;
+    fs.mkdirSync(out, { recursive: true });
+    const { W, H, box } = cap;
+    const mx = Math.round(box.w * 0.1), my = Math.round(box.h * 0.1);
+    const x = Math.max(0, Math.round(box.x) - mx), y = Math.max(0, Math.round(box.y) - my);
+    const w = Math.min(W - x, Math.round(box.w) + 2 * mx), h = Math.min(H - y, Math.round(box.h) + 2 * my);
+    const img = nativeImage.createFromBitmap(Buffer.from(cap.bitmap), { width: W, height: H });
+    fs.writeFileSync(path.join(out, tab + '.png'), img.crop({ x, y, width: w, height: h }).toPNG());
+    const reads = ((cap.res && cap.res.reads) || []).map((r) => r && { apiId: r.apiId, count: r.count, conf: r.conf != null ? +(+r.conf).toFixed(3) : null, short: r.short || null });
+    fs.writeFileSync(path.join(out, tab + '.json'), JSON.stringify({ tab, screen: { W, H }, box, crop: { x, y, w, h }, hiRes: !!config.stashHiRes, grow: !!config.stashGrowDigits, confirmed: (config.stashConfirmed && config.stashConfirmed[tab]) || {}, reads }, null, 1));
+    n++;
+  }
+  return n;
+}
 ipcMain.handle('stash-profile-open', (_e, { name } = {}) => {
-  try { const d = name ? path.join(PROFILES_DIR(), profileName(name)) : PROFILES_DIR(); fs.mkdirSync(d, { recursive: true }); shell.openPath(d); return true; } catch { return false; }
+  try {
+    const n = name ? profileName(name) : null;
+    const d = n ? path.join(PROFILES_DIR(), n) : PROFILES_DIR();
+    fs.mkdirSync(d, { recursive: true });
+    let scans = null;
+    if (n && n === config.stashProfileActive) {
+      profileSaveAs(n); // the export carries the current state, not the one of the last save
+      scans = profileWriteScans(d);
+    }
+    shell.openPath(d);
+    return { ok: true, scans, active: n === config.stashProfileActive };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 ipcMain.handle('stash-support-open-folder', async () => { fs.mkdirSync(SUPPORT_DIR(), { recursive: true }); return shell.openPath(SUPPORT_DIR()); });
 ipcMain.handle('stash-tour-capture', async (_e, tab) => tourCapture(tab));

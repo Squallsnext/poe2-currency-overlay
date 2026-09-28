@@ -1494,6 +1494,12 @@ and the screen size it was made on. Loading one first saves the current state as
 profile's folder (zip it). Checked with a stand-in for the app's paths: two profiles saved
 and loaded back and forth, config and files swap, a file absent in a profile is removed.
 
+Export of the ACTIVE profile (✓) also saves the current state into it and writes this
+session's last scan of every tab into `scans/`: the panel with a 10 % margin as PNG and a
+JSON with screen size, panel box, crop origin, the reads and the confirmed counts - what a
+test of the automatic tuning needs to rebuild the frame and know the truth (asked for: "ja,
+bau das mit ein"). Another profile's export only opens its folder and says why.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

@@ -786,7 +786,12 @@
           await window.api.stashProfileDelete(sel.value).catch(() => null);
           fill();
         }, true);
-        const exp = mk(t('networth.profile.export'), t('networth.profile.export_title'), () => { window.api.stashProfileOpen(sel.value || null).catch(() => {}); }, true);
+        const exp = mk(t('networth.profile.export'), t('networth.profile.export_title'), async () => {
+          const r = await window.api.stashProfileOpen(sel.value || null).catch(() => null);
+          if (!r || !r.ok) { out.textContent = t('networth.profile.failed'); return; }
+          out.textContent = !r.active ? t('networth.profile.export_not_active')
+            : r.scans ? t('networth.profile.export_scans', { n: r.scans }) : t('networth.profile.export_no_scans');
+        }, true);
         box.appendChild(sel); box.appendChild(nameIn); box.appendChild(save); box.appendChild(load); box.appendChild(del); box.appendChild(exp); box.appendChild(out);
         fill();
         return box;
