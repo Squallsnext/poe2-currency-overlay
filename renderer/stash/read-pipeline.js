@@ -355,7 +355,7 @@
       const next = [];
       for (const q of front) {
         const qx = q % w, qy = (q / w) | 0;
-        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        for (const [dx, dy] of TRUTH_STEPS) { // side neighbours only: a diagonal slips through the dark outline
           const nx = qx + dx, ny = qy + dy;
           if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
           const k = ny * w + nx;
@@ -365,6 +365,49 @@
       front = next;
     }
     return { w, h, data: out, digits: seeds.length };
+  }
+  const TRUTH_STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  // The truth only WHERE the reader's number stands (the player's idea: "die Geometrie der
+  // Freistellung nachfahren und außenrum wegmachen"): what the original frees outside the
+  // reader's digit boxes (2 px per match scale wider) is `away` - item art the chain rule
+  // let through, or a whole digit the reader lost; the measure cannot tell which, so it is
+  // shown apart and not counted (a pale skull chunk beside a "7" was counted as a second
+  // digit, all of it "missing"). Inside the boxes, which pixels are digit stays the
+  // original's own call - independent of the sliders. unsure = a reader digit the
+  // original frees less than 30 % of. ref: originalNumber(); pieces: the reader's
+  // numberPieces (same window).
+  function truthNearReader(ref, pieces, S) {
+    const { w, h } = ref, m = S || 1, N = w * h;
+    const out = new Uint8Array(N), seen = new Uint8Array(N), away = new Uint8Array(N);
+    let awayN = 0;
+    // the reader's digit boxes, a little wider (a digit edge the reader lost still counts)
+    const boxes = pieces.map((p) => ({ x0: p.x - 2 * m, x1: p.x + p.mask.w - 1 + 2 * m, y0: p.y - 2 * m, y1: p.y + p.mask.h - 1 + 2 * m }));
+    for (let i0 = 0; i0 < N; i0++) {
+      if (!ref.data[i0] || seen[i0]) continue;
+      // one piece of the truth (8-connected, any size - components() keeps digit sizes only)
+      const px = [i0]; seen[i0] = 1;
+      let x0 = w, x1 = -1, y0 = h, y1 = -1;
+      for (let j = 0; j < px.length; j++) {
+        const q = px[j], qx = q % w, qy = (q / w) | 0;
+        if (qx < x0) x0 = qx; if (qx > x1) x1 = qx; if (qy < y0) y0 = qy; if (qy > y1) y1 = qy;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const nx = qx + dx, ny = qy + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const k = ny * w + nx;
+          if (ref.data[k] && !seen[k]) { seen[k] = 1; px.push(k); }
+        }
+      }
+      const near = (q) => boxes.some((b) => { const qx = q % w, qy = (q / w) | 0; return qx >= b.x0 && qx <= b.x1 && qy >= b.y0 && qy <= b.y1; });
+      if (!boxes.some((b) => x0 <= b.x1 && x1 >= b.x0 && y0 <= b.y1 && y1 >= b.y0)) { for (const q of px) away[q] = 1; awayN += px.length; continue; }
+      for (const q of px) if (near(q)) out[q] = 1; else { away[q] = 1; awayN++; }
+    }
+    // a reader digit is covered when the original frees a real part of it
+    const covered = pieces.map((p, i) => {
+      const b = boxes[i]; let inkR = 0, inT = 0;
+      for (let y = 0; y < p.mask.h; y++) for (let x = 0; x < p.mask.w; x++) if (p.mask.data[y * p.mask.w + x]) { inkR++; if (ref.data[(p.y + y) * w + p.x + x]) inT++; }
+      return b && inT >= 0.3 * inkR;
+    });
+    return { w, h, data: out, away, awayN, unsure: covered.some((v) => !v) };
   }
   function digitsInPicture(ch, pos, P, floor) { return numberInPicture(ch, pos, P, floor).digits; }
   // The number's digits as the picture shows them (for the digit gallery): each piece cut
@@ -379,5 +422,5 @@
     return { digits: pieces.length, masks };
   }
 
-  return { EXTREME_SCALE, MARGIN, GROW_SAT, TRUTH, originalNumber, glyphFrame, teachCut, segmentDigits, digitsInPicture, numberInPicture, pictureQuality, cropAroundSlot, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
+  return { EXTREME_SCALE, MARGIN, GROW_SAT, TRUTH, originalNumber, truthNearReader, glyphFrame, teachCut, segmentDigits, digitsInPicture, numberInPicture, pictureQuality, cropAroundSlot, effectiveMatchScale, paramsAtScale, buildChannel, channelOpts, channelKey, slotPos, slotParams, paramsFor, paramsForScale, buildBank, readSlot };
 });

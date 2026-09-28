@@ -240,6 +240,9 @@ findest du heraus, ab welchen Reglern das Freistellen kippt.
 Steht dort **„unsicher“**, berührt eine Ziffer helles Item-Bild (weißer Kristall, heller
 Schädel) und lässt sich im Original mit festen Werten nicht sauber freistellen – dann sagt
 die Zahl nichts über den Leser; schau auf Bild 4.
+Gezählt wird nur dort, wo die Zahl des Lesers steht. **Orange** = im Original hell und
+farblos, aber abseits der Zahl (Item-Bild – oder eine Ziffer, die dem Leser ganz fehlt):
+wird nicht mitgezählt, ist aber zu sehen.
 
 **Feld-Gedächtnis (≡):** Bestätigst du eine Zahl, merkt sich das Feld ihr freigestelltes
 Bild. Zeigt der nächste Scan dasselbe Bild, gilt die bestätigte Zahl – egal was die Vorlagen

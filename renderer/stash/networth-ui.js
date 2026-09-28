@@ -1280,8 +1280,9 @@
               : '';
             if (r && r.grow) diffInfo.innerHTML = esc(t('networth.line.debug_grow_legend')) + ' (' + (r.rescued || 0) + ' px). ' + diffInfo.innerHTML;
             if (r && r.truth) diffInfo.innerHTML = '<b>' + esc(r.truth.unsure
-              ? t('networth.line.debug_truth_unsure', { orig: r.truth.digitsOrig, reader: r.truth.digitsReader })
-              : t('networth.line.debug_truth', { pct: Math.round(r.truth.fidelity * 100), miss: r.truth.miss, extra: r.truth.extra })) + '</b> ' + diffInfo.innerHTML;
+              ? t('networth.line.debug_truth_unsure')
+              : t('networth.line.debug_truth', { pct: Math.round(r.truth.fidelity * 100), miss: r.truth.miss, extra: r.truth.extra })) + '</b> '
+              + (r.truth.away ? esc(t('networth.line.debug_truth_away', { n: r.truth.away })) + ' ' : '') + diffInfo.innerHTML;
             if (loupe && loupe.key === slotKey(row.tab, ln.apiId)) setTimeout(loupeDraw, 0); // follows every slider move
           };
           showDiff(cached);

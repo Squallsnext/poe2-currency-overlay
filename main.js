@@ -2915,24 +2915,27 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
         const rn = new Uint8Array(Wd * Hd);
         const readerPieces = DR.numberPieces(DR.components(binarized, Sx), Sx);
         for (const c of readerPieces) for (let y = 0; y < c.mask.h; y++) for (let x = 0; x < c.mask.w; x++) if (c.mask.data[y * c.mask.w + x]) rn[(c.y + y) * Wd + c.x + x] = 1;
+        // only where the reader's number stands; ORANGE = freed in the original away from it
+        // (item art or a lost digit - not counted, see RP.truthNearReader)
+        const near = RP.truthNearReader(ref, readerPieces, Sx);
         const tb = Buffer.alloc(Wd * Hd * 4);
         let both = 0, miss = 0, extra = 0, junk = 0;
         for (let i = 0; i < Wd * Hd; i++) {
-          const o = i * 4, A = ref.data[i], Bn = rn[i], Bany = binarized.data[i];
+          const o = i * 4, A = near.data[i], Bn = rn[i], Bany = binarized.data[i];
           let b = 0, g = 0, r = 0; // BGRA
           if (A && Bn) { both++; b = g = r = 255; }
           else if (A) { miss++; b = 40; g = 40; r = 235; }
           else if (Bn) { extra++; b = 255; g = 130; r = 60; }
+          else if (near.away[i]) { b = 20; g = 110; r = 175; }
           else if (Bany) { junk++; b = g = r = 90; }
           tb[o] = b; tb[o + 1] = g; tb[o + 2] = r; tb[o + 3] = 255;
         }
         const u = both + miss + extra;
-        // Another digit count than the reader's picture: the measure itself failed - a digit
-        // touching pale art cannot be freed from the original with fixed values (a "22"
-        // whose second 2 touches a white crystal showed 49 %, all of that 2 "extra"). On
-        // the 5K capture 5 of the 7 worst values were exactly this; the number says
+        // A reader digit the original cannot free: the measure itself failed - a digit
+        // touching pale art cannot be freed with fixed values (a "22" whose second 2
+        // touches a white crystal showed 49 %, all of that 2 "extra"); the number says
         // nothing about the reader then.
-        truth = { fidelity: u ? +(both / u).toFixed(3) : 0, miss, extra, junk, digitsOrig: ref.digits, digitsReader: readerPieces.length, unsure: ref.digits !== readerPieces.length };
+        truth = { fidelity: u ? +(both / u).toFixed(3) : 0, miss, extra, junk, away: near.awayN, unsure: near.unsure };
         truthUrl = toUrl(tb, Wd, Hd, 6);
       }
     } catch { /* a debugging aid only */ }

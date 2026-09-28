@@ -1339,6 +1339,17 @@ number's. And a digit touching a white crystal cannot be freed from the original
 the reader's picture shows, the line says "unsure" instead of a percentage. On the 5K
 capture 5 of the 7 worst values were exactly that case; the medians above are unchanged.
 
+Then a pale skull chunk beside a "7" passed as a second digit (all of it red, the reader
+reading only the 7 anyway). The player's idea: "die Geometrie der Freistellung nachfahren
+und außenrum wegmachen". The truth now only counts where the reader's number stands - its
+digit boxes, 2 px per match scale wider (`RP.truthNearReader`); what the original frees
+away from them is shown ORANGE and not counted (item art, or a whole digit the reader lost -
+the measure cannot tell which). Inside the boxes the original still decides which pixels
+are digit. "Unsure" is now: a reader digit the original frees less than 30 % of. The
+growth steps to side neighbours only (a diagonal slipped through the dark outline). Same
+capture: Jawbone median 92 % (5 unsure), colour limit 60: 94 %, floor 160: 81 %, floor
+200: 67 % - it still falls the same way when the picture gets worse.
+
 ### 4.30 Slot memory: an unchanged picture keeps its confirmed count
 
 The player's idea: "jeder Scan ist die Vorlage" - templates age (new settings, a changed
