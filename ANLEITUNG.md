@@ -232,6 +232,10 @@ Scannen sammelt das Programm deine Ziffern. **„Ziffern-Tafel“** (Einstellung
 Ziffern) zeigt pro Ziffer 0–9 die, die am besten zu den anderen passt. Rot umrandet = zwei
 Ziffern sehen sich zu ähnlich (mit ✕ die falsche verwerfen). **„Übernehmen“** – ab dann
 liest er mit deinen eigenen Ziffern; die alten sind nur noch Rückfall.
+Steht unter einer Ziffer rot **„falsch einsortiert (sieht aus wie 6)“**, hat ein falsch
+gelesener Scan dort ein Bild einer anderen Ziffer abgelegt – das wird **nie übernommen**.
+Hast du vorher schon übernommen: **„Gelernte Ziffern prüfen“** findet so eine Ziffer auch
+in den gelernten und entfernt sie.
 
 **Freistell-Treue (6. Bild):** vergleicht, was der Leser nach deinen Reglern bekommt
 (Bild 4), mit der Zahl, die direkt aus dem Original freigestellt wird – ganz ohne Vorlagen.

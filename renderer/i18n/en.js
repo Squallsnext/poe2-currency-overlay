@@ -913,6 +913,8 @@ window.I18N_CATALOGS.en = {
   "networth.gallery.open": "Digit gallery",
   "networth.gallery.open_title": "Shows the digits collected while scanning: per digit the one that fits the others best. Approve once - then those are your templates.",
   "networth.gallery.meta": "{n}× collected · agree {pct} %",
+  "networth.gallery.strangers": "{n} filed wrong (looks like {list}) - not approved",
+  "networth.gallery.strangers_title": "A glyph under this digit clearly looks like another one - a misread scan filed it here. It is never approved; ✕ empties the digit if you want to collect it anew.",
   "networth.gallery.missing": "none yet - scan a tab with this digit",
   "networth.gallery.head": "{n} of 10 digits collected ({mode}, resolution ×{ms}). Green = already approved.",
   "networth.gallery.mode_grow": "with edge",

@@ -2551,6 +2551,7 @@ function collectDigits(res) {
     for (const r of res.reads || []) {
       if (!r || !r.pieces || !r.pieces.masks) continue;
       if (!(r.conf >= 0.7 || (confirmed[r.apiId] > 0 && confirmed[r.apiId] === r.count))) continue;
+      if (confirmed[r.apiId] > 0 && confirmed[r.apiId] !== r.count) continue; // the player said otherwise: a wrong read, its labels too
       const set = g.sets[gallerySetKey(grow, r.pieces.ms)] || (g.sets[gallerySetKey(grow, r.pieces.ms)] = {});
       for (const m of r.pieces.masks) {
         if (m.d == null) continue; // the read did not fit the picture: no label
@@ -2576,14 +2577,53 @@ function galleryView() {
   const set = (key && g.sets[key]) || {};
   const S = key ? +key.split('@')[1] : 1;
   const unpack = (e) => ({ w: e.w, h: e.h, data: Buffer.from(e.b, 'base64') });
+  const RAW = require('./renderer/stash/digit-templates.json');
+  // A STRANGER: a glyph filed under the wrong digit - a wrong read of 70 %+ hands its
+  // digits over under the wrong labels. Reported at 1080p: a "6" collected as "1" (the
+  // 1's tile "4x, passen 62 %"), approved with the others, and from then on every 6 fitted
+  // that "1" exactly - 136 read 131 at 100 %, 168 read 118 at 99 %. Two tests, either
+  // one is enough: the shipped digits (learned-audit, independent of anything learned)
+  // see another digit clearly better; or it fits another digit's best glyph clearly
+  // better than its own digit's. Strangers stay in the gallery (shown) but are never
+  // approved, and the best glyph and the agreement are taken without them.
+  const lists = {}, strange = {};
+  for (let d = 0; d <= 9; d++) {
+    lists[d] = (set[d] || []).map(unpack);
+    strange[d] = lists[d].map((m) => { const c = LA.check(m, String(d), RAW, S); return c.ok ? null : c.other; });
+  }
+  const medoidOf = (list, use) => {
+    let best = -1, bestMean = -1;
+    const mean = list.map((a, i) => {
+      if (!use[i]) return -1;
+      let s = 0, k = 0; list.forEach((b, j) => { if (i !== j && use[j]) { s += LA.maskIoU(a, b, S); k++; } });
+      return k ? s / k : 1;
+    });
+    mean.forEach((m, i) => { if (m > bestMean) { bestMean = m; best = i; } });
+    return { best, bestMean, mean };
+  };
+  const firstMed = {};
+  for (let d = 0; d <= 9; d++) {
+    if (!lists[d].length) continue;
+    const use = strange[d].map((x) => x == null);
+    const r = medoidOf(lists[d], use.some(Boolean) ? use : use.map(() => true));
+    firstMed[d] = lists[d][r.best];
+  }
+  for (let d = 0; d <= 9; d++) lists[d].forEach((m, i) => {
+    if (strange[d][i] != null || !firstMed[d]) return;
+    const own = LA.maskIoU(m, firstMed[d], S);
+    let other = null, otherV = 0;
+    for (let e = 0; e <= 9; e++) { if (e === d || !firstMed[e]) continue; const v = LA.maskIoU(m, firstMed[e], S); if (v > otherV) { otherV = v; other = e; } }
+    if (otherV >= 0.6 && otherV > own + 0.05) strange[d][i] = String(other);
+  });
   const digits = {};
   for (let d = 0; d <= 9; d++) {
-    const list = (set[d] || []).map(unpack);
+    const list = lists[d];
     if (!list.length) { digits[d] = { n: 0 }; continue; }
-    let best = 0, bestMean = -1;
-    const mean = list.map((a, i) => { let s = 0; list.forEach((b, j) => { if (i !== j) s += LA.maskIoU(a, b, S); }); return list.length > 1 ? s / (list.length - 1) : 1; });
-    mean.forEach((m, i) => { if (m > bestMean) { bestMean = m; best = i; } });
-    digits[d] = { n: list.length, agree: +bestMean.toFixed(3), medoid: { w: list[best].w, h: list[best].h, data: Array.from(list[best].data) }, order: mean.map((m, i) => [m, i]).sort((a, b) => b[0] - a[0]).map((x) => x[1]) };
+    const use = strange[d].map((x) => x == null);
+    const strangers = strange[d].filter((x) => x != null);
+    if (!use.some(Boolean)) { digits[d] = { n: list.length, agree: 0, strangers, medoid: null, order: [] }; continue; }
+    const { best, bestMean, mean } = medoidOf(list, use);
+    digits[d] = { n: list.length, agree: +bestMean.toFixed(3), strangers, medoid: { w: list[best].w, h: list[best].h, data: Array.from(list[best].data) }, order: mean.map((m, i) => [m, i]).filter((x) => use[x[1]]).sort((a, b) => b[0] - a[0]).map((x) => x[1]) };
   }
   // a swap: two digits whose best glyphs look alike
   const clash = [];
@@ -2613,9 +2653,9 @@ ipcMain.handle('stash-gallery-approve', (_e, { digits, drop } = {}) => {
     target.exemplars = target.exemplars || {};
     const done = [];
     for (const d of digits || []) {
-      const info = galleryView().digits[d];
+      const info = v.digits[d];
       const list = set[d] || [];
-      if (!info || !info.n || !info.order) continue;
+      if (!info || !info.n || !info.order || !info.order.length) continue; // strangers only: nothing to approve
       target.exemplars[d] = info.order.slice(0, 8).map((i) => ({ w: list[i].w, h: list[i].h, data: Array.from(Buffer.from(list[i].b, 'base64')) })); // each its own template (RP learnedVariants)
       done.push(String(d));
     }

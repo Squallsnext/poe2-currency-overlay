@@ -1410,6 +1410,30 @@ a moment; with the slider moved on, an older answer arriving after the newer one
 old pictures over the new - the slider seemed dead. Every preview now carries a number and
 only the answer to the latest one is drawn.
 
+### 4.33 Glyphs filed under the wrong digit never become templates
+
+Found in the player's 1080p currency tab (debug crops): 136 read 131 at 100 %, 168 read 118
+at 99 % - every 6 fitted a learned "1" exactly. A wrong read of 70 %+ had handed its digits
+to the gallery under the wrong labels, a 6 among the 1s (the tile said "4x, passen 62 %"),
+and approving took it with the others. The shipped-digit referee (learned-audit) did not
+see it: it slides a template over the glyph and scores only the window it covers, and the
+thin 1080p "1" sat inside the 6's left stroke at 0.77 - more than the "6" itself.
+
+- `learned-audit.check` now compares SHAPES: the glyph's ink box area-sampled onto the
+  template's ink box, IoU, times how well their width-to-height ratios agree - scale-free,
+  so grown and 5K glyphs compare the same. On that tab every one of 69 glyphs scored its
+  own digit highest (smallest margin 0.05); the 6 scores 0.72 as 6 and under 0.4 as 1. The
+  player's 5K learned set audits as before (the same single suspicious glyph).
+- The gallery marks a STRANGER when that referee sees another digit clearly better, or
+  when it fits another digit's best glyph clearly better than its own digit's (IoU >=
+  0.6 and 0.05 more). Strangers stay visible on the tile ("1 falsch einsortiert (sieht aus
+  wie 6)") but are never approved; the best glyph and the agreement leave them out.
+  Checked with the 6 put under the 1s, with and without 6s collected: caught both times.
+- A read whose count differs from the count the player confirmed for that slot hands
+  nothing to the gallery.
+- "Gelernte Ziffern prüfen" uses the same referee, so a stranger learned before this
+  is found there.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

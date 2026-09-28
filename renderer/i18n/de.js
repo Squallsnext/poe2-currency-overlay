@@ -908,6 +908,8 @@ window.I18N_CATALOGS.de = {
   "networth.gallery.open": "Ziffern-Tafel",
   "networth.gallery.open_title": "Zeigt die beim Scannen gesammelten Ziffern: pro Ziffer die, die am besten zu den anderen passt. Einmal abnehmen – dann sind das deine Vorlagen.",
   "networth.gallery.meta": "{n}× gesammelt · passen {pct} % zusammen",
+  "networth.gallery.strangers": "{n} falsch einsortiert (sieht aus wie {list}) – wird nicht übernommen",
+  "networth.gallery.strangers_title": "Ein Bild unter dieser Ziffer sieht klar nach einer anderen aus – ein falsch gelesener Scan hat es hier abgelegt. Es wird nie übernommen; ✕ leert die Ziffer, wenn du neu sammeln willst.",
   "networth.gallery.missing": "noch keine – ein Fach mit dieser Ziffer scannen",
   "networth.gallery.head": "{n} von 10 Ziffern gesammelt ({mode}, Auflösung ×{ms}). Grün = schon übernommen.",
   "networth.gallery.mode_grow": "mit Rand",

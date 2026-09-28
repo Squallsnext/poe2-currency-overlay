@@ -681,6 +681,12 @@
             tile.appendChild(el('div', 'nw-gal-d', String(d)));
             if (info.medoid) tile.appendChild(draw(info.medoid)); else tile.appendChild(el('div', 'nw-gal-none', '–'));
             tile.appendChild(el('div', 'nw-gal-meta', info.n ? esc(t('networth.gallery.meta', { n: info.n, pct: Math.round(info.agree * 100) })) : esc(t('networth.gallery.missing'))));
+            // glyphs filed under the wrong digit (main.js galleryView): shown, never approved
+            if (info.strangers && info.strangers.length) {
+              const st = el('div', 'nw-gal-strange', esc(t('networth.gallery.strangers', { n: info.strangers.length, list: Array.from(new Set(info.strangers)).join(', ') })));
+              st.title = t('networth.gallery.strangers_title');
+              tile.appendChild(st);
+            }
             if (clashOf(d).length) tile.title = t('networth.gallery.clash', { list: clashOf(d).map((c) => (c.a === d ? c.b : c.a) + ' ' + Math.round(c.iou * 100) + ' %').join(', ') });
             if (info.n) {
               ready++;
@@ -693,10 +699,10 @@
           out.appendChild(el('div', 'nw-gal-head', esc(t('networth.gallery.head', { n: ready, mode: t(r.grow ? 'networth.gallery.mode_grow' : 'networth.gallery.mode_hard'), ms: r.ms }))));
           out.appendChild(grid);
           if (r.clash.length) out.appendChild(el('div', 'nw-gal-warn', esc(t('networth.gallery.clash_head', { list: r.clash.map((c) => c.a + '↔' + c.b).join(', ') }))));
-          const approvable = [...Array(10).keys()].filter((d) => r.digits[d] && r.digits[d].n && !clashOf(d).length).length; // clashing ones stay out
+          const approvable = [...Array(10).keys()].filter((d) => r.digits[d] && r.digits[d].medoid && !clashOf(d).length).length; // clashing ones stay out
           const ok = mk(t('networth.gallery.approve', { n: approvable }), t('networth.gallery.approve_title'), async () => {
             ok.disabled = true;
-            const ds = []; for (let d = 0; d <= 9; d++) if (r.digits[d] && r.digits[d].n && !clashOf(d).length) ds.push(d);
+            const ds = []; for (let d = 0; d <= 9; d++) if (r.digits[d] && r.digits[d].medoid && !clashOf(d).length) ds.push(d);
             const res = await window.api.stashGalleryApprove(ds).catch(() => null);
             for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
             // approved: the gallery folds up, the result stays (reported: it stayed open)

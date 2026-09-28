@@ -41,9 +41,44 @@
     }
     return out;
   }
+  // The glyph's ink box laid onto a template's ink box (area-sampled to its size), IoU,
+  // times how well their widths-to-heights agree. digitScores above slides the template
+  // over the glyph and scores only the window it covers: a thin "1" template sat inside
+  // the left stroke of a 1080p "6" and scored it 0.77 as "1" - more than as "6" - so a
+  // 6 filed under 1 passed (reported: 136 read 131 at 100 %). Scale-free, so a glyph
+  // grown by the edge rescue or cut at another resolution compares all the same; on the
+  // player's 1080p currency tab (69 glyphs) every one scored its own digit highest.
+  function inkBox(m) {
+    let x0 = m.w, x1 = -1, y0 = m.h, y1 = -1;
+    for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) if (m.data[y * m.w + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    return x1 < 0 ? null : { x0, y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  }
+  function shapeScore(g, t) {
+    const a = inkBox(g), b = inkBox(t);
+    if (!a || !b) return 0;
+    let I = 0, U = 0;
+    for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) {
+      const gx0 = a.x0 + x * a.w / b.w, gx1 = a.x0 + (x + 1) * a.w / b.w, gy0 = a.y0 + y * a.h / b.h, gy1 = a.y0 + (y + 1) * a.h / b.h;
+      let on = 0, n = 0;
+      for (let yy = Math.floor(gy0); yy < Math.ceil(gy1); yy++) for (let xx = Math.floor(gx0); xx < Math.ceil(gx1); xx++) { on += g.data[yy * g.w + xx] ? 1 : 0; n++; }
+      const G = n && on / n >= 0.5, T = t.data[(b.y0 + y) * t.w + b.x0 + x];
+      if (G && T) I++; if (G || T) U++;
+    }
+    const ar = (a.w / a.h) / (b.w / b.h);
+    return (U ? I / U : 0) * Math.min(ar, 1 / ar);
+  }
+  function shapeScores(mask, raw, ms) {
+    const ref = referee(raw, ms);
+    const out = {};
+    for (const k of Object.keys(ref.bank)) {
+      const v = shapeScore(mask, ref.bank[k]), d = ref.unmap(k);
+      if (!(d in out) || v > out[d]) out[d] = v;
+    }
+    return out;
+  }
   // { ok, own, other, otherScore } for a glyph said to be `digit`
   function check(mask, digit, raw, ms) {
-    const sc = digitScores(mask, raw, ms);
+    const sc = shapeScores(mask, raw, ms);
     const own = sc[digit] || 0;
     let other = null, otherScore = 0;
     for (const [d, v] of Object.entries(sc)) if (d !== digit && v > otherScore) { other = d; otherScore = v; }
@@ -89,5 +124,5 @@
     }
     return best;
   }
-  return { MARGIN, MIN_OTHER, digitScores, check, audit, maskIoU };
+  return { MARGIN, MIN_OTHER, digitScores, shapeScore, shapeScores, check, audit, maskIoU };
 });
