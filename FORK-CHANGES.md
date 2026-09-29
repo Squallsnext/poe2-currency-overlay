@@ -1518,6 +1518,23 @@ Everything outside Net Worth is untouched. The active profile cannot be deleted.
 with a stand-in: 5K saved, new "1080p" empty, back and forth - calibration, learned
 digits and tour pictures follow; a taken name is refused.
 
+### 4.37 The app reopens where you left it
+
+Asked for: "das Menü soll sich merken, wo ich zuletzt war (z. B. Vermögen) und wie weit
+unten". Two causes:
+- **Last tab.** `config.lastTab` existed, but main only stored it for Currency, Price Check
+  and Desecrate - Net Worth, Regex, GrandEx, Recipes and Swap were never saved, so the app
+  came back on whichever of the three had been open last. All tabs are stored now.
+- **Scroll position.** Every tab root is its own scroll container, and hiding it
+  (`display:none`) drops the position. It is kept per tab in `localStorage`
+  (`tabScroll:<tab>`) and put back after the tab rendered, retried for ~1.5 s while async
+  content (Net Worth rows) grows; any wheel/click by the user ends the retries. Price Check
+  is left out: its page belongs to the item, a new item starts at the top.
+- **Settings.** The gear used to open on the App section at the top every time; it now
+  opens the last section at its last scroll position (`settingsSection`,
+  `settingsScroll:<section>`). Links that jump to a section (Net Worth -> settings, league
+  banner) still go where they point.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
