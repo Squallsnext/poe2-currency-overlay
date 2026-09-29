@@ -2557,7 +2557,8 @@ function collectDigits(res) {
       for (const m of r.pieces.masks) {
         if (m.d == null) continue; // the read did not fit the picture: no label
         const list = set[m.d] || (set[m.d] = []);
-        const mask = { w: m.w, h: m.h, data: Uint8Array.from(m.data) };
+        // outlier pixels off before it is kept (learned-audit cleanGlyph)
+        const mask = LA.cleanGlyph({ w: m.w, h: m.h, data: Uint8Array.from(m.data) }, r.pieces.ms);
         if (list.some((e) => LA.maskIoU(mask, { w: e.w, h: e.h, data: Buffer.from(e.b, 'base64') }, r.pieces.ms) >= 0.985)) continue; // the same glyph again
         list.push({ w: m.w, h: m.h, b: Buffer.from(mask.data).toString('base64'), conf: confirmed[r.apiId] === r.count ? 1 : +(r.conf || 0).toFixed(3), tab: res.tab, at: Date.now() }); // confirmed ranks first
         list.sort((a, b) => b.conf - a.conf);
@@ -2577,7 +2578,8 @@ function galleryView() {
   const key = g.sets[gallerySetKey(grow, ms)] ? gallerySetKey(grow, ms) : Object.keys(g.sets).find((k) => k.startsWith(grow ? 'grow' : 'hard'));
   const set = (key && g.sets[key]) || {};
   const S = key ? +key.split('@')[1] : 1;
-  const unpack = (e) => ({ w: e.w, h: e.h, data: Buffer.from(e.b, 'base64') });
+  // cleaned here too, so glyphs collected before the cleaning existed get it as well
+  const unpack = (e) => { const m = LA.cleanGlyph({ w: e.w, h: e.h, data: Buffer.from(e.b, 'base64') }, S); return { w: m.w, h: m.h, data: Uint8Array.from(m.data) }; };
   const RAW = require('./renderer/stash/digit-templates.json');
   // A STRANGER: a glyph filed under the wrong digit - a wrong read of 70 %+ hands its
   // digits over under the wrong labels. Reported at 1080p: a "6" collected as "1" (the
@@ -2641,6 +2643,7 @@ ipcMain.handle('stash-gallery', () => { try { const v = galleryView(); for (cons
 // of the learned file first)
 ipcMain.handle('stash-gallery-approve', (_e, { digits, drop } = {}) => {
   try {
+    const LA = require('./renderer/stash/learned-audit.js');
     const g = loadGallery();
     const v = galleryView();
     const set = (v.key && g.sets[v.key]) || {};
@@ -2657,7 +2660,7 @@ ipcMain.handle('stash-gallery-approve', (_e, { digits, drop } = {}) => {
       const info = v.digits[d];
       const list = set[d] || [];
       if (!info || !info.n || !info.order || !info.order.length) continue; // strangers only: nothing to approve
-      target.exemplars[d] = info.order.slice(0, 8).map((i) => ({ w: list[i].w, h: list[i].h, data: Array.from(Buffer.from(list[i].b, 'base64')) })); // each its own template (RP learnedVariants)
+      target.exemplars[d] = info.order.slice(0, 8).map((i) => { const m = LA.cleanGlyph({ w: list[i].w, h: list[i].h, data: Buffer.from(list[i].b, 'base64') }, v.ms); return { w: m.w, h: m.h, data: Array.from(m.data, (x) => (x ? 1 : 0)) }; }); // each its own template (RP learnedVariants), cleaned like the gallery shows it
       done.push(String(d));
     }
     recomputeLearnedTemplates(target, done);

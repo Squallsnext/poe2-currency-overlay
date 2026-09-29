@@ -124,5 +124,88 @@
     }
     return best;
   }
-  return { MARGIN, MIN_OTHER, digitScores, shapeScore, shapeScores, check, audit, maskIoU };
+  // Pixel cleaning before a glyph goes into the gallery (asked: "Ausreißer-Pixel weg,
+  // z. B. bei der 4 und der 1, bevor die Ziffer in die Tafel kommt"). Seen in the
+  // player's learned 5K digits: a lone pixel right of the 4's bar ("####....####..#."),
+  // one under the 1's flag (".#..###") - the cut's noise, not the font, and every
+  // exemplar approved from the gallery carried it into matching. Two steps:
+  // - loose pieces: an 8-connected piece under 12 % of the largest goes (any resolution;
+  //   every digit of this font is one piece);
+  // - bumps: a pixel sitting alone on a flat edge - in no fully inked 2x2 block, and
+  //   its inked neighbours are exactly the 3 cells of one side (the edge it sits on).
+  //   A stroke's tapering tip (the 1's flag) has 2 of 3 there and stays. Outside the
+  //   frame counts as a copy of the frame's edge, so a stroke cut by the frame (the 2's
+  //   base row, the 9's tail) is not taken for a bump. Only at high-res (x2) or strokes
+  //   4 px and wider: at 1080p the 1's whole flag IS one pixel on a flat edge.
+  // First tried: every pixel outside a 2x2 block with <= 3 neighbours. On the player's
+  // 117 learned exemplars that cut the 1's flag tip and the frame-cut base rows (10 px
+  // off a 2) - the rule above changes only single pixels.
+  // Returns the mask unchanged (same object) when nothing was touched.
+  function strokeWidth(m) {
+    const runs = [];
+    for (let y = 0; y < m.h; y++) {
+      let r = 0;
+      for (let x = 0; x <= m.w; x++) {
+        if (x < m.w && m.data[y * m.w + x]) r++;
+        else if (r) { runs.push(r); r = 0; }
+      }
+    }
+    if (!runs.length) return 0;
+    runs.sort((a, b) => a - b);
+    return runs[runs.length >> 1];
+  }
+  function cleanGlyph(m, S) {
+    const { w, h } = m;
+    const d = Uint8Array.from(m.data, (v) => (v ? 1 : 0));
+    // clamped: outside the frame repeats its edge
+    const at = (x, y) => d[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))];
+    let removed = 0;
+    // loose pieces
+    const lab = new Int32Array(w * h).fill(-1), sizes = [];
+    for (let i = 0; i < w * h; i++) {
+      if (!d[i] || lab[i] >= 0) continue;
+      const id = sizes.length; let n = 0; const st = [i]; lab[i] = id;
+      while (st.length) {
+        const j = st.pop(); n++;
+        const x = j % w, y = (j / w) | 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const X = x + dx, Y = y + dy;
+          if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
+          const k = Y * w + X;
+          if (d[k] && lab[k] < 0) { lab[k] = id; st.push(k); }
+        }
+      }
+      sizes.push(n);
+    }
+    if (sizes.length > 1) {
+      const big = Math.max(...sizes);
+      for (let i = 0; i < w * h; i++) if (d[i] && sizes[lab[i]] < big * 0.12) { d[i] = 0; removed++; }
+    }
+    if ((S || 1) >= 2 || strokeWidth({ w, h, data: d }) >= 4) {
+      const SIDES = [[[-1, -1], [0, -1], [1, -1]], [[-1, 1], [0, 1], [1, 1]], [[-1, -1], [-1, 0], [-1, 1]], [[1, -1], [1, 0], [1, 1]]];
+      for (let pass = 0; pass < 2; pass++) {
+        const drop = [];
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          if (!d[y * w + x]) continue;
+          let inBlock = false;
+          for (let oy = -1; oy <= 0 && !inBlock; oy++) for (let ox = -1; ox <= 0 && !inBlock; ox++) {
+            if (at(x + ox, y + oy) && at(x + ox + 1, y + oy) && at(x + ox, y + oy + 1) && at(x + ox + 1, y + oy + 1)) inBlock = true;
+          }
+          if (inBlock) continue;
+          let nb = 0;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && at(x + dx, y + dy)) nb++;
+          if (nb === 3 && SIDES.some((side) => side.every(([dx, dy]) => at(x + dx, y + dy)))) drop.push(y * w + x);
+        }
+        if (!drop.length) break;
+        for (const i of drop) d[i] = 0;
+        removed += drop.length;
+      }
+    }
+    if (!removed) return m;
+    // never clean a glyph away: more than a tenth gone means the test misjudged it
+    const ink = m.data.reduce((a, v) => a + (v ? 1 : 0), 0);
+    if (removed > ink * 0.1) return m;
+    return { w, h, data: d, cleaned: removed };
+  }
+  return { MARGIN, MIN_OTHER, digitScores, shapeScore, shapeScores, check, audit, maskIoU, cleanGlyph, strokeWidth };
 });

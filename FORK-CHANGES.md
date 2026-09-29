@@ -1545,6 +1545,24 @@ redraw), and each scan fetches a fresh one (main collects the scan's digits befo
 answers, so they are already in). Tiles that gained glyphs with the last scan are framed
 and show "+n". The button now toggles (second click folds the gallery up).
 
+### 4.39 Outlier pixels cleaned before a digit is collected
+
+Asked for: "Ausreißer-Pixel weg (z. B. bei der 4 und der 1), bevor die Ziffer in die Tafel
+kommt". In the player's learned 5K digits: a lone pixel right of the 4's bar, one under
+the 1's flag, specks above a 3 and a 4, loose bits beside a 6 and a 9 - noise of the cut
+that every approved exemplar carried into matching. `learned-audit.cleanGlyph`:
+- a loose 8-connected piece under 12 % of the largest goes (any resolution);
+- a pixel alone on a flat edge goes: in no fully inked 2x2 block, and its inked
+  neighbours are exactly the 3 cells of one side. A tapering tip (the 1's flag) has 2 of
+  3 and stays; outside the frame counts as the frame's edge, so a stroke cut by the frame
+  is no bump. Only at high-res (x2) or strokes 4 px+: at 1080p the 1's whole flag is one
+  such pixel;
+- more than a tenth of the ink gone -> the glyph is kept as it was.
+A first, looser rule (any pixel outside a 2x2 block with <= 3 neighbours) cut the 1's flag
+tip and 10 px of a frame-cut 2 base; the rule above changes 12 of the 117 learned
+exemplars, single pixels only, and none fits its shipped digit worse afterwards.
+Applied when collecting, when the gallery is shown (older glyphs too) and when approving.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
