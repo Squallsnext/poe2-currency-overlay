@@ -4106,8 +4106,17 @@ async function main() {
     $('settings').classList.toggle('hidden');
     if (opening) {
       renderOverridesGrid(); // refresh the grid's live market placeholders
-      let sec = 'general';
-      try { const v = localStorage.getItem(SET_SEC_KEY); if (v && document.getElementById('sec-' + v)) sec = v; } catch { }
+      // The tab you are on decides the section (asked: "bin ich im Preischeck und will was
+      // einstellen, sollte auch das Fenster dort aufgehen"): Price Check -> its settings,
+      // Currency -> Currency, Net Worth -> Net Worth. Tabs without a section of their own
+      // reopen the one used last.
+      const TAB_SEC = { 'tab-items': 'pricecheck', 'tab-currency': 'currency', 'tab-networth': 'networth' };
+      const activeTab = document.querySelector('#tabs .tab.active');
+      let sec = activeTab && TAB_SEC[activeTab.id];
+      if (!sec) {
+        sec = 'general';
+        try { const v = localStorage.getItem(SET_SEC_KEY); if (v && document.getElementById('sec-' + v)) sec = v; } catch { }
+      }
       setSettingsSection(sec);
       const sc = document.querySelector('#settings .set-scroll');
       if (sc) {

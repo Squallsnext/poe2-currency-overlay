@@ -1593,6 +1593,12 @@ indexes hold string offsets, so an edited .ndjson without them breaks every look
 the edit (checked: regenerating the unedited data reproduces the shipped .bin files byte
 for byte). Parsed offline with the real bundle: all four explicits recognised.
 
+### 4.42 The gear opens the settings of the tab you are on
+
+Asked for: "bin ich gerade im Preischeck und will was einstellen, sollte auch das Fenster
+dort aufgehen". Price Check opens its section, Currency and Net Worth theirs; other tabs
+the section used last (4.37).
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
