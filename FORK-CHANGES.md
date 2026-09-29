@@ -1563,6 +1563,23 @@ tip and 10 px of a frame-cut 2 base; the rule above changes 12 of the 117 learne
 exemplars, single pixels only, and none fits its shipped digit worse afterwards.
 Applied when collecting, when the gallery is shown (older glyphs too) and when approving.
 
+### 4.40 The guided check comes again
+
+Reported: "seit ich umgeschaltet habe (Rand retten), kam die Führung nicht mehr, wo die
+Erkennung nicht gut war - ich musste Debug einschalten und alle durchgehen". The player's
+essence scan of that night had 12 counts under 85 % and 11 missing a digit - and no offer.
+The edge rescue was not the cause: a running review blocked every later offer, and a
+review left unfinished (card folded - the bar only shows on an open card -, the OCR debug
+turned on to go through the slots by hand, "Fertig" never pressed) stayed "running" until
+the app restarted. Now:
+- a new scan of the tab under review refreshes the review in place (stays on the same
+  slot if it is still unsure, opens the card again, ends when nothing is unsure);
+- a scan of another tab offers its own check as usual; starting it replaces the old one;
+- the offer scrolls into view - it sits at the top of the tab, and a player scrolled down
+  to the gallery or a card never saw it.
+Checked in the page with a stand-in API: offer, start, fold, scan another tab -> offered
+(before: nothing), rescan -> review refreshed, clean rescan -> review ends.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

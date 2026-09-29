@@ -980,12 +980,32 @@
     state.notice = { kind: res.changed ? 'ok' : 'info', msg, actions };
     render();
   }
+  // A running review used to block every later offer ("state.review" -> return) - and
+  // one left unfinished (the card folded, the OCR debug turned on to go through the
+  // slots by hand, "Fertig" never pressed) stayed "running" until the app restarted. Reported: "seit ich umgeschaltet habe (Rand
+  // retten) kam die Führung nicht mehr, ich musste Debug einschalten und alle durchgehen"
+  // - the player's essence scan of that night had 12 unsure counts and 11 missing a
+  // digit, and no offer. Now a new scan of the tab under review refreshes the review in
+  // place (same slot if it is still unsure), and a scan of another tab offers as usual;
+  // starting that one replaces the old review.
   function reviewOffer(res) {
-    if (!res || !res.ok || res.mismatch || state.review) return;
+    if (!res || !res.ok || res.mismatch) return;
     const rows = rowsOfType(res.tab);
     const row = rows[rows.length - 1];
     if (!row) return;
     const weak = weakLines(row);
+    if (state.review && state.review.rowId === row.id) {
+      if (!weak.length) { endReview(); return; }
+      const cur = state.review.ids[state.review.i];
+      const ids = weak.map((ln) => ln.apiId);
+      state.review.ids = ids;
+      state.review.i = Math.max(0, ids.indexOf(cur));
+      state.dbgLine = ids[state.review.i];
+      state.expanded[row.id] = true; // folded meanwhile: the bar only shows on an open card
+      state.debugRows.add(row.id);
+      render();
+      return;
+    }
     if (!weak.length) return;
     if (state.notice && (state.notice.actions || state.notice.kind === 'err')) return; // a question is already open
     const list = weak.slice(0, 3).map((ln) => `${window.gameName(ln.name)} ${Math.round(ln.conf * 100)} %`).join(', ') + (weak.length > 3 ? ' …' : '');
@@ -997,6 +1017,10 @@
         { label: t('networth.review.later'), ghost: true, fn: () => {} },
       ] };
     render();
+    // the notice sits at the top of the tab; a player scrolled down to the gallery or a
+    // card never saw it - bring it into view (only when Net Worth is the tab on screen)
+    const root = $('networth-root');
+    if (root && !root.classList.contains('hidden')) { const n = root.querySelector('.nw-notice'); if (n) n.scrollIntoView({ block: 'nearest' }); }
   }
   function startReview(row, ids) {
     if (!ids.length) return;
