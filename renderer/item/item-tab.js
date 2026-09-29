@@ -496,6 +496,10 @@
     // different words.
     const DOWN_WORD = /\b(reduced|less|decreased|slower)\b/i;
     const UP_WORD = /\b(increased|more|faster)\b/i;
+    // the same words in the parser's client languages (de, fr, es, pt, ru): stems, since
+    // they inflect ("verringerten", "réduite", "уменьшение")
+    const DOWN_LOC = /\b(reduced|less|decreased|slower)\b|verringert|weniger|langsamer|réduit|moins|reducid|menos|reduzid|уменьш|меньш|медленн/i;
+    const UP_LOC = /\b(increased|more|faster)\b|erhöht|mehr\b|schneller|augment|\bplus\b|aumentad|más\b|mais\b|увелич|больш|быстр/i;
 
     const effRoll = (sc) => {
       const srcs = (sc && sc.sources) || [];
@@ -534,8 +538,15 @@
         // The pair runs BOTH ways: "reduced Tribute" against an "increased" ref, and
         // "increased Mana Cost of Skills" against a "reduced" ref. 13 stats are the
         // second kind, and a one-directional test left them inverted.
-        const spelling = (DOWN_WORD.test(matcher) && UP_WORD.test(ref))
-          || (UP_WORD.test(matcher) && DOWN_WORD.test(ref));
+        // The MATCHER is the client's language, the ref is always English: testing the
+        // matcher with English words only found "reduced" and never "verringerten" - every
+        // German reduced/less line (Ritual tablets: "kostet 27% verringerten Tribut") was
+        // flipped to +27 and searched as a MINIMUM of +23 % increased Tribute, which no
+        // tablet has. The exact search then always came back empty, and the widened steps
+        // priced the tablet from ones missing an affix (reported: 14 chaos suggested, the
+        // cheapest with all four affixes in game 45).
+        const spelling = (DOWN_LOC.test(matcher) && UP_WORD.test(ref))
+          || (UP_LOC.test(matcher) && DOWN_WORD.test(ref));
         if (!spelling) return { value: -value, min: -max, max: -min };
       }
       return { value, min, max };
@@ -1358,7 +1369,8 @@
           if (!Number.isFinite(num)) continue;
           // polarity: listing text spells negatives in words ("28% reduced X")
           // while my roll sits on the canonical increased-axis as a negative
-          if (num > 0 && grp.sum < 0 && /\b(reduced|less)\b/i.test(line.text)) num = -num;
+          // (in the client's language: a German listing says "verringerten", see effRoll)
+          if (num > 0 && grp.sum < 0 && /\b(reduced|less|decreased|slower)\b|verringert|weniger|langsamer|réduit|moins|reducid|menos|reduzid|уменьш|меньш|медленн/i.test(line.text)) num = -num;
           if (!theirGroups.has(grp)) theirGroups.set(grp, []);
           theirGroups.get(grp).push({ line, num });
         }

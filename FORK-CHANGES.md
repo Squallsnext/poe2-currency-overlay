@@ -1599,6 +1599,23 @@ Asked for: "bin ich gerade im Preischeck und will was einstellen, sollte auch da
 dort aufgehen". Price Check opens its section, Currency and Net Worth theirs; other tabs
 the section used last (4.37).
 
+### 4.43 German "verringert" lines were searched with the wrong sign
+
+Reported on a Ritual tablet ("kostet 27% verringerten Tribut"): the app suggested 14 chaos,
+while in game the cheapest tablet with all four affixes was 45 - "um das angezeigt zu
+bekommen, muss ich alle Werte rauslöschen". The exact search asked for **at least +23 %
+increased** Tribute: no tablet has that (they all roll 20-30 % reduced), so it always came
+back empty (in the author's build, a widened search then priced the tablet from others). Cause: the parser keeps a reduced line
+as a negative value on the increased stat (GGG's convention, what trade indexes), and
+`effRoll` flips it back only for matchers that are the *opposite stat* - telling the two
+apart by looking for "reduced/less" in the matcher. The matcher is in the client's
+language, so "verringerten" was never recognised and every German reduced/less line was
+flipped to a positive value. The words are now checked in all parser languages (de, fr, es,
+pt, ru stems). The listing-side polarity in `toListing` (their "27% verringerten" against
+my -27, for the per-line delta) had the same English-only test and is fixed alike.
+Checked with the tablet parsed offline: the filter is now `min: -27` (reduced by 27 or
+less, like the English client).
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
