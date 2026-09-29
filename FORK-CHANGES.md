@@ -1580,6 +1580,19 @@ the app restarted. Now:
 Checked in the page with a stand-in API: offer, start, fold, scan another tab -> offered
 (before: nothing), rescan -> review refreshed, clean rescan -> review ends.
 
+### 4.41 Delirium tablets: "Spiegel-Splitter" was not recognised
+
+Reported on a Delirium tablet: "Delirium-Nebel in Karte beschwört 14(12-26)% erhöhte
+Spiegel-Splitter" landed under "1 versteckter Mod" (N/A) and was left out of the search - with
+it added by hand the price went from 6.8 to 15.6 div. The vendored EE2 stat data carries
+GGG's untranslated trade text for this stat in every language ("... erhöhte MirrorShards"),
+while the German client writes "Spiegel-Splitter". A matcher for the client's wording is
+added (de; en "Mirror Shards" likewise, harmless if the English client already says
+MirrorShards), and the stats indexes are rebuilt with `scripts/gen-ee2-index.mjs` - the
+indexes hold string offsets, so an edited .ndjson without them breaks every lookup after
+the edit (checked: regenerating the unedited data reproduces the shipped .bin files byte
+for byte). Parsed offline with the real bundle: all four explicits recognised.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |
