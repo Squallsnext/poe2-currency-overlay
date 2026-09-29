@@ -1535,6 +1535,16 @@ unten". Two causes:
   `settingsScroll:<section>`). Links that jump to a section (Net Worth -> settings, league
   banner) still go where they point.
 
+### 4.38 The digit gallery updates live
+
+Asked for: "die Ziffern-Tafel soll sich nach jedem Scan aktualisieren, solange sie offen
+ist". It could not: after every scan the Net Worth panel is rebuilt, the gallery's box
+with it, so the scan that fed the gallery also closed it. Open/closed and the last answer
+now live outside the panel: a rebuilt box paints the last answer at once (no request per
+redraw), and each scan fetches a fresh one (main collects the scan's digits before it
+answers, so they are already in). Tiles that gained glyphs with the last scan are framed
+and show "+n". The button now toggles (second click folds the gallery up).
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

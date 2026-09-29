@@ -2138,6 +2138,8 @@ footer {
 .nw-gal-tile { position: relative; border: 1px solid var(--bd-09); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 96px; }
 .nw-gal-tile.nw-gal-ok { border-color: var(--green, #6fcf6f); }
 .nw-gal-tile.nw-gal-clash { border-color: var(--red, #e05555); }
+.nw-gal-tile.nw-gal-new { box-shadow: 0 0 0 1px var(--am-2, #e0b050) inset; }
+.nw-gal-plus { position: absolute; top: 2px; left: 4px; font-size: 10px; font-weight: 600; color: var(--am-2, #e0b050); }
 .nw-gal-d { font-weight: 700; color: var(--tx-hi); }
 .nw-gal-img { image-rendering: pixelated; max-width: 100%; }
 .nw-gal-none { color: var(--tx-faint); font-size: 20px; }

@@ -83,6 +83,13 @@
   // an open digit gallery re-reads its set when the mode it shows changes (edge on/off,
   // high-res): it showed "mit Rand" after the edge was switched off (reported)
   let galleryRefresh = null;
+  // Live gallery (asked: "die Ziffern-Tafel soll sich nach jedem Scan aktualisieren,
+  // solange sie offen ist"). render() rebuilds the whole panel after every scan, and the
+  // gallery's box with it - so it closed itself on the scan that should have fed it.
+  // Open/closed and the last answer live out here: a rebuilt box paints the last answer
+  // at once (no flicker, no IPC per render), and a scan fetches a fresh one. Tiles that
+  // gained glyphs since the previous answer are marked "+n".
+  let galleryOpen = false, galleryLast = null, galleryPrev = null;
   // Its own window where the app has one (main.js "loupe-update": the in-panel box could
   // only move inside the overlay - "die Lupe lässt sich nur im Fenster vom Overlay
   // bewegen"); the floating box below stays for a build without it.
@@ -665,9 +672,17 @@
           for (let y = y0; y <= y1; y++) for (let x = 0; x < m.w; x++) if (m.data[y * m.w + x]) g.fillRect(Math.floor(x * Z), Math.floor((y - y0) * Z), Math.ceil(Z), Math.ceil(Z));
           c.className = 'nw-gal-img'; return c;
         };
-        const show = async () => {
-          out.textContent = '…';
-          const r = await window.api.stashGallery().catch(() => null);
+        const show = async (fetch = true) => {
+          galleryOpen = true;
+          if (fetch || !galleryLast) {
+            if (!galleryLast) out.textContent = '…';
+            const fresh = await window.api.stashGallery().catch(() => null);
+            // compare only within one set - another mode/resolution has other glyphs
+            galleryPrev = fresh && fresh.ok && galleryLast && galleryLast.ok && galleryLast.key === fresh.key ? galleryLast : null;
+            galleryLast = fresh;
+          }
+          if (!galleryOpen) return; // closed while the answer was on its way
+          const r = galleryLast;
           out.innerHTML = '';
           if (!r || !r.ok) { out.textContent = t('networth.audit.failed'); return; }
           const grid = el('div', 'nw-gal-grid');
@@ -678,8 +693,11 @@
           const clashOf = (d) => r.clash.filter((c) => c.a === d || c.b === d);
           for (let d = 0; d <= 9; d++) {
             const info = r.digits[d] || { n: 0 };
-            const tile = el('div', 'nw-gal-tile' + (r.approved.includes(String(d)) ? ' nw-gal-ok' : '') + (clashOf(d).length ? ' nw-gal-clash' : ''));
+            const before = galleryPrev && galleryPrev.digits && galleryPrev.digits[d] ? galleryPrev.digits[d].n || 0 : null;
+            const gained = before != null && info.n > before ? info.n - before : 0;
+            const tile = el('div', 'nw-gal-tile' + (r.approved.includes(String(d)) ? ' nw-gal-ok' : '') + (clashOf(d).length ? ' nw-gal-clash' : '') + (gained ? ' nw-gal-new' : ''));
             tile.appendChild(el('div', 'nw-gal-d', String(d)));
+            if (gained) tile.appendChild(el('div', 'nw-gal-plus', '+' + gained));
             if (info.medoid) tile.appendChild(draw(info.medoid)); else tile.appendChild(el('div', 'nw-gal-none', '–'));
             tile.appendChild(el('div', 'nw-gal-meta', info.n ? esc(t('networth.gallery.meta', { n: info.n, pct: Math.round(info.agree * 100) })) : esc(t('networth.gallery.missing'))));
             // glyphs filed under the wrong digit (main.js galleryView): shown, never approved
@@ -707,6 +725,7 @@
             const res = await window.api.stashGalleryApprove(ds).catch(() => null);
             for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
             // approved: the gallery folds up, the result stays (reported: it stayed open)
+            galleryOpen = false; galleryLast = null; galleryPrev = null;
             out.innerHTML = '';
             out.appendChild(el('div', 'nw-gal-head', esc(res && res.ok ? t('networth.gallery.approved', { list: res.approved.join(' ') }) : t('networth.audit.failed'))));
             render();
@@ -714,8 +733,13 @@
           if (!approvable) ok.disabled = true;
           out.appendChild(ok);
         };
-        b.onclick = show;
-        galleryRefresh = () => { if (out.isConnected && out.childNodes.length) show(); };
+        // the button toggles: open reads the gallery, a second click folds it up
+        b.onclick = () => {
+          if (galleryOpen) { galleryOpen = false; galleryLast = null; galleryPrev = null; out.innerHTML = ''; return; }
+          show();
+        };
+        galleryRefresh = () => { if (galleryOpen && out.isConnected) show(); };
+        if (galleryOpen) show(false); // rebuilt by render(): paint the last answer again
         box.appendChild(b); box.appendChild(out);
         return box;
       })(),
@@ -2439,6 +2463,8 @@
       for (const k of Object.keys(dbgImgCache)) delete dbgImgCache[k];
       wizardOnScan(res);
       applyResult(res);
+      // main collected this scan's digits before answering: an open gallery shows them
+      if (galleryOpen && galleryRefresh) galleryRefresh();
       calCheckResult(res);
       // first scan of a tab: its boxes were put onto the cells (main.js autoPlaceNewTab)
       if (res && res.autoPlaced && !state.notice) { state.notice = { kind: 'ok', msg: t('networth.notice.auto_placed', { tab: TAB_LABEL[res.tab] || res.tab, n: res.autoPlaced }) }; render(); }
