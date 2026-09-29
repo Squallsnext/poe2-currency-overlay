@@ -2993,6 +2993,52 @@
   window.showNetWorthTab = () => setTab('networth');
   window.showSwapTab = () => setTab('swap');
 
+  // ---------- scroll memory per tab ----------
+  // Each tab root is its own scroll container, and hiding it (display:none) throws the
+  // position away - so coming back to Net Worth always started at the top again, and
+  // so did every app start. The position is kept per tab in localStorage (per window,
+  // no config churn) and put back after the tab has rendered. Async renders (Net Worth
+  // loads its rows, GrandEx its data) grow the content later, so the restore retries a
+  // few times until the page is tall enough - and stops as soon as the user scrolls.
+  // Price Check is left out on purpose: its page belongs to the item on it, and a new
+  // item should always start at the top, not where the last one was scrolled to.
+  const TAB_ROOTS = { currency: 'buckets', desec: 'desecrate-root', networth: 'networth-root', regex: 'regex-root', grandex: 'grandex-root', recipes: 'recipes-root', swap: 'swap-root' };
+  const SCROLL_KEY = 'tabScroll:';
+  const scrollWired = new Set();
+  let restoreTimers = [];
+  function wireScrollMemory(which) {
+    const root = $(TAB_ROOTS[which]);
+    if (!root || scrollWired.has(which)) return;
+    scrollWired.add(which);
+    let tm = null;
+    root.addEventListener('scroll', () => {
+      if (root.classList.contains('hidden') || root._restoring) return;
+      clearTimeout(tm);
+      tm = setTimeout(() => { try { localStorage.setItem(SCROLL_KEY + which, String(Math.round(root.scrollTop))); } catch { } }, 250);
+    }, { passive: true });
+    // a wheel/drag by the user ends any pending restore - never fight the user
+    const stop = () => { restoreTimers.forEach(clearTimeout); restoreTimers = []; root._restoring = false; };
+    root.addEventListener('wheel', stop, { passive: true });
+    root.addEventListener('pointerdown', stop, { passive: true });
+    root.addEventListener('keydown', stop);
+  }
+  function restoreScroll(which) {
+    restoreTimers.forEach(clearTimeout); restoreTimers = [];
+    const root = $(TAB_ROOTS[which]); if (!root) return;
+    let want = 0;
+    try { want = parseInt(localStorage.getItem(SCROLL_KEY + which), 10) || 0; } catch { }
+    if (want <= 0) return;
+    const apply = () => {
+      if (root.classList.contains('hidden')) return;
+      root._restoring = true;
+      root.scrollTop = want;
+      // the scroll event from our own assignment must not overwrite the saved value
+      requestAnimationFrame(() => { root._restoring = false; });
+    };
+    apply();
+    for (const ms of [60, 250, 700, 1500]) restoreTimers.push(setTimeout(() => { if (Math.abs(root.scrollTop - want) > 2) apply(); }, ms));
+  }
+
   function setTab(which) {
     if (which === true) which = 'items'; // legacy boolean callers
     if (which === false) which = 'currency';
@@ -3036,6 +3082,8 @@
     if (which === 'grandex' && window.GrandEx) window.GrandEx.render();
     if (which === 'recipes' && window.Recipes) window.Recipes.render();
     if (which === 'swap' && window.Swap) window.Swap.render();
+    wireScrollMemory(which);
+    restoreScroll(which);
   }
 
   // ---------- wiring ----------

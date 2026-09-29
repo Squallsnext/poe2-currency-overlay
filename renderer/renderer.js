@@ -4083,7 +4083,14 @@ async function main() {
   $('btn-hide').addEventListener('click', () => window.api.hide());
   // the nav rail is a SWITCHER, not a scroll-jump: it shows one section card at a
   // time (the content is short enough that scrolling to a section did nothing).
+  // The last section (and how far down it was scrolled) is remembered, so the gear
+  // reopens where you left off instead of always on the App section - with Net Worth
+  // settings a long page, "scroll back down to the OCR block" was every visit.
+  const SET_SEC_KEY = 'settingsSection', SET_SCROLL_KEY = 'settingsScroll:';
+  let setSecNow = 'general';
   const setSettingsSection = (sec) => {
+    setSecNow = sec;
+    try { localStorage.setItem(SET_SEC_KEY, sec); } catch { }
     document.querySelectorAll('.set-nav').forEach((n) => n.classList.toggle('active', n.dataset.sec === sec));
     document.querySelectorAll('#settings .set-card').forEach((c) => c.classList.toggle('sec-on', c.id === 'sec-' + sec));
     if (sec === 'networth' && window.NetWorth && window.NetWorth.renderSettings) window.NetWorth.renderSettings(document.getElementById('nw-set-root'));
@@ -4099,16 +4106,37 @@ async function main() {
     $('settings').classList.toggle('hidden');
     if (opening) {
       renderOverridesGrid(); // refresh the grid's live market placeholders
+      let sec = 'general';
+      try { const v = localStorage.getItem(SET_SEC_KEY); if (v && document.getElementById('sec-' + v)) sec = v; } catch { }
+      setSettingsSection(sec);
       const sc = document.querySelector('#settings .set-scroll');
-      if (sc) sc.scrollTop = 0;
-      setSettingsSection('general'); // always open on the App section
+      if (sc) {
+        let top = 0;
+        try { top = parseInt(localStorage.getItem(SET_SCROLL_KEY + sec), 10) || 0; } catch { }
+        sc.scrollTop = top;
+        // Net Worth settings render async - try once more when they have grown
+        if (top) setTimeout(() => { if (Math.abs(sc.scrollTop - top) > 2) sc.scrollTop = top; }, 200);
+      }
     }
   });
+  {
+    const sc = document.querySelector('#settings .set-scroll');
+    let tm = null;
+    if (sc) sc.addEventListener('scroll', () => {
+      if ($('settings').classList.contains('hidden')) return;
+      clearTimeout(tm);
+      tm = setTimeout(() => { try { localStorage.setItem(SET_SCROLL_KEY + setSecNow, String(Math.round(sc.scrollTop))); } catch { } }, 250);
+    }, { passive: true });
+  }
   // "close & return" hides settings; the nav rail switches the visible section
   const setClose = $('set-close');
   if (setClose) setClose.addEventListener('click', () => $('settings').classList.add('hidden'));
   document.querySelectorAll('.set-nav').forEach((nav) => {
-    nav.addEventListener('click', () => setSettingsSection(nav.dataset.sec));
+    nav.addEventListener('click', () => {
+      setSettingsSection(nav.dataset.sec);
+      const sc = document.querySelector('#settings .set-scroll');
+      if (sc) { let top = 0; try { top = parseInt(localStorage.getItem(SET_SCROLL_KEY + nav.dataset.sec), 10) || 0; } catch { } sc.scrollTop = top; }
+    });
   });
   $('btn-quit').addEventListener('click', () => window.api.quit());
   $('btn-add-bucket').addEventListener('click', () => openPicker({ type: 'add-bucket' }));

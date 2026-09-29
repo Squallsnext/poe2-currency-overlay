@@ -6118,8 +6118,10 @@ ipcMain.handle('trade2-search-fetch', async (_e, { league, query, limit }) => {
 ipcMain.on('active-tab', (_e, which) => {
   const wasActive = currencyTabActive;
   currencyTabActive = which === 'currency';
-  // remember the tab so the app reopens on it next launch
-  if (config && ['currency', 'items', 'desec'].includes(which) && config.lastTab !== which) {
+  // remember the tab so the app reopens on it next launch. The list used to stop at
+  // the first three tabs, so Net Worth / Regex / GrandEx / Recipes / Swap were never
+  // saved and the app always came back on whichever of the three was last.
+  if (config && ['currency', 'items', 'desec', 'networth', 'regex', 'grandex', 'recipes', 'swap'].includes(which) && config.lastTab !== which) {
     config.lastTab = which;
     saveConfig();
   }
