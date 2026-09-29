@@ -236,6 +236,17 @@ Steht unter einer Ziffer rot **„falsch einsortiert (sieht aus wie 6)“**, hat
 gelesener Scan dort ein Bild einer anderen Ziffer abgelegt – das wird **nie übernommen**.
 Hast du vorher schon übernommen: **„Gelernte Ziffern prüfen“** findet so eine Ziffer auch
 in den gelernten und entfernt sie.
+Die Tafel bleibt beim Scannen **offen und aktualisiert sich** nach jedem Scan; Ziffern, die
+gerade dazugekommen sind, sind gelb umrandet mit **„+n“**. Ein zweiter Klick auf den Knopf
+klappt sie zu. Einzelne Ausreißer-Pixel am Rand einer Ziffer (z. B. neben dem Balken der 4)
+werden vor dem Sammeln automatisch entfernt.
+
+**Wo du warst:** Die App öffnet wieder im zuletzt benutzten Tab und an derselben
+Scroll-Position; das Zahnrad öffnet den zuletzt benutzten Einstellungs-Bereich.
+
+**Geführte Prüfung:** Nach einem Scan mit unsicheren Zahlen erscheint oben das Angebot
+„Jetzt prüfen“ (die Seite springt dorthin). Scannst du dasselbe Fach während der Prüfung
+neu, wird die Prüfung einfach aktualisiert; ein anderes Fach bekommt sein eigenes Angebot.
 
 **Freistell-Treue (6. Bild):** vergleicht, was der Leser nach deinen Reglern bekommt
 (Bild 4), mit der Zahl, die direkt aus dem Original freigestellt wird – ganz ohne Vorlagen.
