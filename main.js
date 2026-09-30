@@ -2886,8 +2886,22 @@ ipcMain.handle('stash-slot-debug-image', (_e, apiId, opts, tabIn) => {
     const y0 = Math.max(0, Math.round(pos.cy - P.up * cs)), y1 = Math.min(ch.H2, Math.round(pos.cy + P.dn * cs));
     const cw = Math.max(1, x1 - x0), chh = Math.max(1, y1 - y0);
     const UPSCALE = Math.max(1, Math.round(6 / cs));
-    const toUrl = (b, w, h, k) => nativeImage.createFromBitmap(b, { width: w, height: h })
-      .resize({ width: w * k, height: h * k, quality: 'good' }).toDataURL();
+    // pixel-exact enlargement (each pixel a k x k block): the smoothing resize blurred a
+    // single dark pixel in a 5K "9"'s arc into its neighbours, so the player could not
+    // tell whether the pixel really was black or only looked so in the preview
+    const toUrl = (b, w, h, k) => {
+      if (k <= 1) return nativeImage.createFromBitmap(b, { width: w, height: h }).toDataURL();
+      const W = w * k, big = Buffer.alloc(W * h * k * 4);
+      for (let y = 0; y < h; y++) {
+        const row = Buffer.alloc(W * 4);
+        for (let x = 0; x < w; x++) {
+          const s = (y * w + x) * 4;
+          for (let i = 0; i < k; i++) b.copy(row, (x * k + i) * 4, s, s + 4);
+        }
+        for (let i = 0; i < k; i++) row.copy(big, (y * k + i) * W * 4);
+      }
+      return nativeImage.createFromBitmap(big, { width: W, height: h * k }).toDataURL();
+    };
     const rawBuf = Buffer.alloc(cw * chh * 4), filtBuf = Buffer.alloc(cw * chh * 4);
     for (let y = 0; y < chh; y++) {
       for (let x = 0; x < cw; x++) {
