@@ -4165,8 +4165,17 @@ async function main() {
   // the user clicks into it they want to interact - and typing needs OS keyboard
   // focus - so claim it on the first click into an unfocused window. (No click on
   // the overlay during a Ctrl+F, so game focus is untouched there.)
-  document.addEventListener('mousedown', () => {
-    if (!document.hasFocus() && window.api.focusOverlay) window.api.focusOverlay();
+  // A text field clicked while the window already "has" focus: after a native Ja/Nein
+  // question (confirm) Electron on Windows leaves text fields deaf to the keyboard although
+  // document.hasFocus() says true (reported: "neues Profil - ich klicke ins Feld, kann
+  // aber nichts schreiben; Fenstergröße ändern half") - so a click into a text field always
+  // has main hand the keyboard focus over again (hard: blur + focus, like the resize did).
+  const isTextField = (el) => !!el && (el.isContentEditable || el.tagName === 'TEXTAREA'
+    || (el.tagName === 'INPUT' && !['checkbox', 'radio', 'range', 'button', 'submit', 'color', 'file'].includes(el.type)));
+  document.addEventListener('mousedown', (e) => {
+    if (!window.api.focusOverlay) return;
+    if (!document.hasFocus()) window.api.focusOverlay();
+    else if (isTextField(e.target)) window.api.focusOverlay(true);
   }, true);
 
   // click anywhere in the app outside the settings panel closes it (but not

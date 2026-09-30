@@ -1624,6 +1624,19 @@ profile being left and comes back with it; the new profile started empty. The na
 "Neues Profil" now has "Vermögens-Fächer: leer starten / mitnehmen" (take along = the new
 profile starts with a copy; the original stays parked), and the confirmation says which.
 
+
+### 4.45 Text fields take the keyboard again after a Ja/Nein question
+
+Reported: "neues Profil machen, ich klicke ins Feld, kann aber nichts schreiben - das war
+schon mal so, Fenstergröße geändert, dann ging es; jetzt lässt es das nicht mehr zu". A known
+Electron-on-Windows fault: after a native `confirm()` the window looks focused
+(`document.hasFocus()` is true) but text fields take no keys until the window loses and
+regains focus (the resize did that). The overlay only asked main for focus when the document
+had none, so it never happened. Now a click into a text field (input/textarea/editable)
+always has main hand the focus over again: `focus-overlay` with `hard` = blur + focus +
+webContents.focus(), only when the window is already focused (the game's focus is never
+taken by it).
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

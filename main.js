@@ -6257,8 +6257,15 @@ ipcMain.on('hide-overlay', (_e, toGame) => {
 // without clicking back into the game). But once the user CLICKS into it, they
 // expect to type - which needs OS keyboard focus. The renderer asks for it on the
 // first click into an unfocused window.
-ipcMain.on('focus-overlay', () => {
-  try { if (win && !win.isDestroyed()) win.focus(); } catch {}
+ipcMain.on('focus-overlay', (_e, hard) => {
+  try {
+    if (!win || win.isDestroyed()) return;
+    // hard (a text field clicked): hand the keyboard focus over again - after a native
+    // confirm() the window looked focused but text fields took no keys (see renderer.js)
+    if (hard && win.isFocused()) { win.blur(); }
+    win.focus();
+    if (hard) win.webContents.focus();
+  } catch {}
 });
 
 ipcMain.on('quit-app', () => app.quit());

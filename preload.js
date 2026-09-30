@@ -57,7 +57,7 @@ contextBridge.exposeInMainWorld('api', {
   listLeagues: () => ipcRenderer.invoke('list-leagues'),
   leagueNames: () => ipcRenderer.invoke('league-names'),
   hide: (toGame) => ipcRenderer.send('hide-overlay', !!toGame),
-  focusOverlay: () => ipcRenderer.send('focus-overlay'),
+  focusOverlay: (hard) => ipcRenderer.send('focus-overlay', !!hard),
   quit: () => ipcRenderer.send('quit-app'),
   onShown: (cb) => ipcRenderer.on('overlay-shown', cb),
   // item price-check (trade2)
