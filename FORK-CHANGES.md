@@ -1616,6 +1616,14 @@ my -27, for the per-line delta) had the same English-only test and is fixed alik
 Checked with the tablet parsed offline: the filter is now `min: -27` (reduced by 27 or
 less, like the English client).
 
+### 4.44 New profile: Net Worth tabs "leer starten" or "mitnehmen"
+
+Asked: "wenn ich ein neues Profil mache, löscht er auch die alten gescannten Vermögen-Fächer?
+Wenn nicht, als Abfrage." Nothing was ever deleted: the current list is parked with the
+profile being left and comes back with it; the new profile started empty. The name row of
+"Neues Profil" now has "Vermögens-Fächer: leer starten / mitnehmen" (take along = the new
+profile starts with a copy; the original stays parked), and the confirmation says which.
+
 ## 5. New config keys
 
 | Key | Default | Meaning |

@@ -782,12 +782,15 @@
         let active = null;
         // the scanned list is per profile: park the current one under the old name, bring
         // the new one's back (or none) - then main reloads the window
-        const swapRows = (to) => {
+        // keep: a NEW profile starts with a copy of the current list instead of an empty one
+        // (asked: "wenn neues Profil, Vermögen-Tabs auch neu oder löschen - ja oder nein");
+        // either way the current list stays parked with the profile being left
+        const swapRows = (to, keep) => {
           try {
             state.profileSwitching = true; // persistRows must not write the old list back
             const cur = localStorage.getItem(ROWS_KEY);
             localStorage.setItem(ROWS_KEY + ':' + (active || '_vor-dem-wechsel'), cur || '');
-            const next = to ? localStorage.getItem(ROWS_KEY + ':' + to) : null;
+            const next = keep ? cur : to ? localStorage.getItem(ROWS_KEY + ':' + to) : null;
             if (next) localStorage.setItem(ROWS_KEY, next); else localStorage.removeItem(ROWS_KEY);
           } catch { /* storage blocked: the list just does not switch */ }
         };
@@ -810,20 +813,31 @@
         const nameIn = el('input', 'nw-profile-name');
         nameIn.type = 'text'; nameIn.placeholder = t('networth.profile.name_prompt');
         let nameMode = 'new';
+        // only for "Neues Profil": what happens to the scanned Net Worth tabs
+        const rowsChoice = el('span', 'nw-profile-rows');
+        const rowsSel = el('select', 'nw-profile-sel');
+        for (const [v, k] of [['fresh', 'networth.profile.rows_fresh'], ['keep', 'networth.profile.rows_keep']]) { const o = el('option', '', esc(t(k))); o.value = v; rowsSel.appendChild(o); }
+        rowsChoice.appendChild(el('span', 'nw-audit-out', esc(t('networth.profile.rows_label'))));
+        rowsChoice.appendChild(rowsSel);
+        rowsChoice.title = t('networth.profile.rows_title');
         const go = mk(t('networth.profile.create'), '', null);
         const cancel = mk(t('networth.profile.cancel'), '', () => { nameRow.style.display = 'none'; }, true);
         const askName = (mode) => {
           nameMode = mode;
           go.textContent = t(mode === 'new' ? 'networth.profile.create' : 'networth.profile.save_named');
           go.title = t(mode === 'new' ? 'networth.profile.create_title' : 'networth.profile.save_named_title');
+          rowsChoice.style.display = mode === 'new' ? '' : 'none';
+          rowsSel.value = 'fresh';
           nameRow.style.display = ''; nameIn.value = ''; nameIn.focus();
         };
         go.onclick = async () => {
           const name = nameIn.value.trim();
           if (!name) { nameIn.focus(); return; }
           if (nameMode === 'new') {
-            if (!confirm(t('networth.profile.create_confirm', { name, cur: active || t('networth.profile.no_active_short') }))) return;
-            swapRows(name);
+            const keepRows = rowsSel.value === 'keep';
+            if (!confirm(t('networth.profile.create_confirm', { name, cur: active || t('networth.profile.no_active_short') }) + '\n\n'
+              + t(keepRows ? 'networth.profile.rows_confirm_keep' : 'networth.profile.rows_confirm_fresh', { cur: active || t('networth.profile.no_active_short') }))) return;
+            swapRows(name, keepRows);
             const r = await window.api.stashProfileNew(name).catch(() => null);
             if (!r || !r.ok) { state.profileSwitching = false; out.textContent = r && r.error === 'exists' ? t('networth.profile.exists') : t('networth.profile.failed'); return; }
             out.textContent = t('networth.profile.created', { name: r.name });
@@ -835,7 +849,7 @@
           }
         };
         nameIn.onkeydown = (e) => { if (e.key === 'Enter') go.onclick(); if (e.key === 'Escape') cancel.onclick(); };
-        nameRow.appendChild(nameIn); nameRow.appendChild(go); nameRow.appendChild(cancel);
+        nameRow.appendChild(nameIn); nameRow.appendChild(rowsChoice); nameRow.appendChild(go); nameRow.appendChild(cancel);
         const load = mk(t('networth.profile.load'), t('networth.profile.load_title'), async () => {
           if (!sel.value || sel.value === active) return;
           if (!confirm(t('networth.profile.load_confirm', { name: sel.value, cur: active || t('networth.profile.no_active_short') }))) return;
